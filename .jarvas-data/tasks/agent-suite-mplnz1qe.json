@@ -1,0 +1,20 @@
+{
+  "sessionId": "agent-suite-mplnz1qe",
+  "tasks": [
+    {
+      "id": "c0694631-83a7-49a3-a4c8-6a27fab0d134",
+      "title": ": buy groceries, high priority",
+      "category": "personal",
+      "priority": "high",
+      "status": "todo",
+      "subtasks": [],
+      "tags": [],
+      "sessionId": "agent-suite-mplnz1qe",
+      "createdAt": "2026-05-25T20:33:44.612Z",
+      "updatedAt": "2026-05-25T20:33:44.612Z"
+    }
+  ],
+  "projects": [],
+  "goals": [],
+  "updatedAt": "2026-05-25T20:33:44.612Z"
+}

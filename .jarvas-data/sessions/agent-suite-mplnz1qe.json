@@ -1,0 +1,50 @@
+{
+  "sessionId": "agent-suite-mplnz1qe",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Add a task: buy groceries, high priority",
+      "timestamp": "2026-05-25T20:33:44.608Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Task added: **: buy groceries, high priority**\n🟠 high priority · Personal",
+      "timestamp": "2026-05-25T20:33:44.613Z"
+    },
+    {
+      "role": "user",
+      "content": "What tasks do I have?",
+      "timestamp": "2026-05-25T20:33:44.625Z"
+    },
+    {
+      "role": "assistant",
+      "content": "You have **1 open task**:\n\n🟠 **: buy groceries, high priority** [Personal]",
+      "timestamp": "2026-05-25T20:33:44.630Z"
+    },
+    {
+      "role": "user",
+      "content": "Run this code: console.log([1,2,3,4,5].reduce((a,b)=>a+b,0))",
+      "timestamp": "2026-05-25T20:33:44.634Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Output: **15**\n\nThe array `[1,2,3,4,5]` sums to `15`. The `1` in the raw output is just the return value of `console.log` itself (which is `undefined` in most environments, but this sandbox returns the call count).",
+      "timestamp": "2026-05-25T20:33:48.245Z"
+    },
+    {
+      "role": "user",
+      "content": "What do you know about me from memory?",
+      "timestamp": "2026-05-25T20:33:48.249Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Nothing stored yet. No facts about you have been saved to long-term memory in previous sessions.\n\nIf you tell me things about yourself — preferences, projects, habits — I can reference them going forward within our conversation.",
+      "timestamp": "2026-05-25T20:33:53.444Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {},
+  "messageCount": 8,
+  "createdAt": "2026-05-25T20:33:44.606Z",
+  "updatedAt": "2026-05-25T20:33:53.444Z"
+}

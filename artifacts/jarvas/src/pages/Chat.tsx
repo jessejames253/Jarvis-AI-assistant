@@ -30,6 +30,7 @@ import { useLocation } from "wouter";
 import MemoryPanel, { type SessionMemory } from "@/components/MemoryPanel";
 import DebugPanel, { type DebugInfo } from "@/components/DebugPanel";
 import MarkdownContent from "@/components/MarkdownContent";
+import ToolStatusBubble, { type ToolCallInfo } from "@/components/ToolStatusBubble";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,7 @@ interface Message {
   isSearch?: boolean;
   isFakeSearch?: boolean;
   debug?: DebugInfo;
+  toolCalls?: ToolCallInfo[];
 }
 
 // ─── Session management ───────────────────────────────────────────────────────
@@ -105,6 +107,11 @@ interface StreamDonePayload {
   sources?: Source[];
 }
 
+type ToolSSEEvent =
+  | { type: "tool_start"; toolCallId: string; tool: string; label: string }
+  | { type: "tool_done";  toolCallId: string; tool: string; durationMs: number; result: unknown }
+  | { type: "tool_error"; toolCallId: string; tool: string; durationMs: number; error: string };
+
 async function callChatStream(
   message: string,
   sessionId: string,
@@ -112,6 +119,7 @@ async function callChatStream(
   onToken: (text: string) => void,
   onDone: (data: StreamDonePayload) => void,
   onError: () => void,
+  onToolEvent?: (event: ToolSSEEvent) => void,
 ): Promise<void> {
   let res: Response;
   try {
@@ -145,13 +153,19 @@ async function callChatStream(
         const jsonStr = line.slice(6).trim();
         if (!jsonStr) continue;
         try {
-          const event = JSON.parse(jsonStr) as { type: string; text?: string } & Partial<StreamDonePayload>;
-          if (event.type === "token" && typeof event.text === "string") {
+          const event = JSON.parse(jsonStr) as Record<string, unknown>;
+          const evType = event.type as string;
+          if (evType === "token" && typeof event.text === "string") {
             onToken(event.text);
-          } else if (event.type === "done") {
-            onDone(event as StreamDonePayload);
-          } else if (event.type === "error") {
+          } else if (evType === "done") {
+            onDone(event as unknown as StreamDonePayload);
+          } else if (evType === "error") {
             onError();
+          } else if (
+            (evType === "tool_start" || evType === "tool_done" || evType === "tool_error") &&
+            onToolEvent
+          ) {
+            onToolEvent(event as unknown as ToolSSEEvent);
           }
         } catch { /* ignore malformed SSE lines */ }
       }
@@ -297,6 +311,8 @@ function MessageBubble({
     );
   }
 
+  const toolCalls = message.toolCalls ?? [];
+
   return (
     <div
       className="flex items-start gap-3 message-enter"
@@ -323,13 +339,18 @@ function MessageBubble({
           </div>
         )}
 
-        {/* Main bubble */}
-        <div className="bg-card border border-card-border rounded-2xl rounded-tl-sm px-4 py-3 min-w-0">
-          <MarkdownContent content={message.content} />
-          {isStreaming && (
-            <span className="streaming-cursor" aria-hidden="true" />
-          )}
-        </div>
+        {/* Tool status chips — shown above the main bubble */}
+        {toolCalls.length > 0 && <ToolStatusBubble calls={toolCalls} />}
+
+        {/* Main bubble — only rendered when there's content OR streaming */}
+        {(message.content || isStreaming) && (
+          <div className="bg-card border border-card-border rounded-2xl rounded-tl-sm px-4 py-3 min-w-0">
+            <MarkdownContent content={message.content} />
+            {isStreaming && (
+              <span className="streaming-cursor" aria-hidden="true" />
+            )}
+          </div>
+        )}
 
         {/* Source cards */}
         {message.sources && message.sources.length > 0 && (
@@ -345,7 +366,7 @@ function MessageBubble({
 
         <div className="flex items-center gap-2 px-1">
           <span className="text-xs text-muted-foreground">{timeStr}</span>
-          {!isStreaming && (
+          {!isStreaming && message.content && (
             <button
               onClick={isSpeaking ? onStopSpeak : onSpeak}
               aria-label={isSpeaking ? "Stop speaking" : "Read aloud"}
@@ -529,13 +550,36 @@ export default function Chat() {
     );
 
     const msgId = `assistant-${Date.now()}`;
-    let firstToken = true;
+    let messageCreated = false;
     // Keep a stable ref to msgId for the buffer flush callbacks
     const currentMsgId = msgId;
 
+    // Accumulates tool calls during streaming (updated via setMessages)
+    const pendingToolCalls = new Map<string, ToolCallInfo>();
+
+    /** Create the assistant message in state if not yet created */
+    function ensureMessageCreated(initialContent = "") {
+      if (messageCreated) return;
+      messageCreated = true;
+      setIsTyping(false);
+      setAgentStatus("idle");
+      setIsStreaming(true);
+      setStreamingMsgId(currentMsgId);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: currentMsgId,
+          role: "assistant" as const,
+          content: initialContent,
+          timestamp: new Date(),
+          toolCalls: Array.from(pendingToolCalls.values()),
+        },
+      ]);
+      messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+    }
+
     const handleError = () => {
-      // Clean up any in-progress streaming message
-      if (!firstToken) {
+      if (messageCreated) {
         setIsStreaming(false);
         setStreamingMsgId(null);
         flushTokenBuffer(currentMsgId, true);
@@ -544,7 +588,7 @@ export default function Chat() {
       }
       setAgentStatus("error");
       setTimeout(() => setAgentStatus("idle"), 2500);
-      if (firstToken) {
+      if (!messageCreated) {
         setMessages((prev) => [
           ...prev,
           { id: currentMsgId, role: "assistant", content: "Something went wrong on my end. Please try again.", timestamp: new Date() },
@@ -558,21 +602,10 @@ export default function Chat() {
       BASE,
       // onToken
       (tokenText) => {
-        if (firstToken) {
-          firstToken = false;
-          setIsTyping(false);
-          setAgentStatus("idle");
-          setIsStreaming(true);
-          setStreamingMsgId(currentMsgId);
-          // Create the message with the first token
-          setMessages((prev) => [
-            ...prev,
-            { id: currentMsgId, role: "assistant", content: tokenText, timestamp: new Date() },
-          ]);
-          messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+        if (!messageCreated) {
+          ensureMessageCreated(tokenText);
           return;
         }
-        // Buffer subsequent tokens and flush in batches
         tokenBufferRef.current += tokenText;
         if (!tokenFlushTimerRef.current) {
           tokenFlushTimerRef.current = setTimeout(() => {
@@ -586,7 +619,6 @@ export default function Chat() {
         flushTokenBuffer(currentMsgId, true);
         setIsStreaming(false);
         setStreamingMsgId(null);
-        // Attach debug/sources to the finalized message
         setMessages((prev) =>
           prev.map((m) =>
             m.id === currentMsgId
@@ -603,6 +635,71 @@ export default function Chat() {
       },
       // onError
       handleError,
+      // onToolEvent
+      (toolEvent) => {
+        if (toolEvent.type === "tool_start") {
+          const call: ToolCallInfo = {
+            id: toolEvent.toolCallId,
+            tool: toolEvent.tool,
+            label: toolEvent.label,
+            status: "running",
+          };
+          pendingToolCalls.set(toolEvent.toolCallId, call);
+
+          // Update agent status bar label
+          setAgentStatus(toolEvent.tool === "search_web" ? "researching" : "processing");
+
+          // Create message early so tool chips are visible immediately
+          if (!messageCreated) {
+            ensureMessageCreated();
+          } else {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === currentMsgId
+                  ? { ...m, toolCalls: Array.from(pendingToolCalls.values()) }
+                  : m
+              )
+            );
+          }
+        } else if (toolEvent.type === "tool_done") {
+          const existing = pendingToolCalls.get(toolEvent.toolCallId);
+          if (existing) {
+            pendingToolCalls.set(toolEvent.toolCallId, {
+              ...existing,
+              status: "done",
+              durationMs: toolEvent.durationMs,
+              result: toolEvent.result,
+              label: existing.label.replace(/\.\.\.$/, "").replace(/ing$/, "ed").replace(/Checking/, "Checked").replace(/Searching/, "Searched").replace(/Calculating/, "Calculated").replace(/Saving/, "Saved").replace(/Loading/, "Loaded").replace(/Running/, "Ran"),
+            });
+          }
+          setAgentStatus("idle");
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === currentMsgId
+                ? { ...m, toolCalls: Array.from(pendingToolCalls.values()) }
+                : m
+            )
+          );
+        } else if (toolEvent.type === "tool_error") {
+          const existing = pendingToolCalls.get(toolEvent.toolCallId);
+          if (existing) {
+            pendingToolCalls.set(toolEvent.toolCallId, {
+              ...existing,
+              status: "error",
+              durationMs: toolEvent.durationMs,
+              error: toolEvent.error,
+            });
+          }
+          setAgentStatus("idle");
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === currentMsgId
+                ? { ...m, toolCalls: Array.from(pendingToolCalls.values()) }
+                : m
+            )
+          );
+        }
+      },
     );
   }, [input, isTyping, isStreaming, sessionId, flushTokenBuffer]);
 

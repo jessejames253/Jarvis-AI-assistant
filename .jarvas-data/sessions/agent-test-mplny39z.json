@@ -1,0 +1,20 @@
+{
+  "sessionId": "agent-test-mplny39z",
+  "messages": [
+    {
+      "role": "user",
+      "content": "What's the weather in Tokyo and calculate 2**32",
+      "timestamp": "2026-05-25T20:32:59.958Z"
+    },
+    {
+      "role": "assistant",
+      "content": "**Tokyo** — Partly cloudy, **20°C (69°F)**, feels the same. Humidity is high at 88%, with light winds at 7 kph.\n\n**2³²** = `4,294,967,296` — the classic 32-bit unsigned integer ceiling.",
+      "timestamp": "2026-05-25T20:33:07.727Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {},
+  "messageCount": 2,
+  "createdAt": "2026-05-25T20:32:59.956Z",
+  "updatedAt": "2026-05-25T20:33:07.727Z"
+}

@@ -1,33 +1,27 @@
 /**
  * lib/types.ts — Shared types across the Jarvis agent system
- *
- * Centralising these here means every module (intent classifier, tools,
- * router, responder) imports from one place, keeping the codebase consistent
- * and avoiding circular dependencies.
  */
 
 // ─── Intent ───────────────────────────────────────────────────────────────────
 
-/** Every possible intent Jarvis can detect in a user message */
 export type IntentType =
-  | "casual"           // Greetings, small talk, wellbeing, thanks, farewell
-  | "identity"         // "who are you", "what is Jarvis"
-  | "coding"           // Code, debug, scripts, syntax, frameworks
-  | "research"         // Web search, current events, news, live data
-  | "memory_update"    // "my name is", "remember that", preference updates
-  | "math"             // Arithmetic, calculations, equations
-  | "planning"         // High-level plans, roadmaps, timelines
-  | "task_management"  // Create / list / update / complete tasks and goals
-  | "knowledge_base"   // Search / save / manage personal notes and research
-  | "definition"       // "what is X", "explain X", concept explanations
-  | "general";         // Fallback for anything unclassified
+  | "casual"
+  | "identity"
+  | "coding"
+  | "research"
+  | "memory_update"
+  | "math"
+  | "planning"
+  | "task_management"
+  | "knowledge_base"
+  | "definition"
+  | "general";
 
-/** Result from the intent classifier */
 export interface ClassificationResult {
   intent: IntentType;
-  confidence: number;        // 0.0 – 1.0 (how sure we are)
-  signals: string[];         // Human-readable list of what triggered this intent
-  secondaryIntent?: IntentType; // Runner-up (shown in debug panel)
+  confidence: number;
+  signals: string[];
+  secondaryIntent?: IntentType;
 }
 
 // ─── Conversation ─────────────────────────────────────────────────────────────
@@ -54,7 +48,6 @@ export interface SearchResponse {
 
 // ─── Tool system ──────────────────────────────────────────────────────────────
 
-/** A compact KB note snapshot passed to tools via memoryContext */
 export interface KBNoteSnapshot {
   id: string;
   title: string;
@@ -64,7 +57,6 @@ export interface KBNoteSnapshot {
   url?: string;
 }
 
-/** A long-term memory fact injected into context */
 export interface LTMFactSnapshot {
   id: string;
   category: "personal" | "coding" | "projects" | "preferences";
@@ -72,35 +64,32 @@ export interface LTMFactSnapshot {
   tags: string[];
 }
 
-/** What every tool receives as input */
 export interface ToolInput {
   message: string;
   history: HistoryEntry[];
   memoryContext?: {
     summary?: string;
     preferences?: Record<string, string>;
-    sessionId?: string;         // Passed so tools (e.g. tasks) can look up session data
-    kbNotes?: KBNoteSnapshot[]; // Top KB search hits — injected by the router
-    ltmFacts?: LTMFactSnapshot[]; // Long-term memory facts — injected by the chat route
+    sessionId?: string;
+    kbNotes?: KBNoteSnapshot[];
+    ltmFacts?: LTMFactSnapshot[];
   };
   classification: ClassificationResult;
 }
 
-/** What every tool returns */
 export interface ToolOutput {
   response: string;
-  action: string;       // Specific action taken, e.g. "code_debugger"
-  mode: string;         // Assistant mode, e.g. "coding_assistant"
-  reasoning: string[];  // Step-by-step reasoning path (shown in debug panel)
+  action: string;
+  mode: string;
+  reasoning: string[];
   sources?: SearchResult[];
   isSearch?: boolean;
   isFakeSearch?: boolean;
   sideEffects?: {
-    updatePreferences?: Record<string, string>; // Applied by the route after the tool runs
+    updatePreferences?: Record<string, string>;
   };
 }
 
-/** Tool descriptor — every tool module exports one of these */
 export interface Tool {
   name: string;
   description: string;
@@ -108,9 +97,20 @@ export interface Tool {
   execute: (input: ToolInput) => Promise<ToolOutput>;
 }
 
+// ─── Agent tool calls ─────────────────────────────────────────────────────────
+
+/** One tool invocation recorded during an agent run */
+export interface AgentToolCall {
+  tool: string;         // e.g. "get_weather"
+  label: string;        // human-readable label, e.g. "Weather retrieved"
+  durationMs: number;
+  status: "done" | "error";
+  result?: unknown;     // structured payload returned by the tool
+  error?: string;
+}
+
 // ─── Debug info ───────────────────────────────────────────────────────────────
 
-/** Attached to every chat response so the frontend debug panel can show it */
 export interface DebugInfo {
   intent: IntentType;
   secondaryIntent?: IntentType;
@@ -119,7 +119,8 @@ export interface DebugInfo {
   action: string;
   mode: string;
   memoryUsed: boolean;
-  ltmHits?: string[];  // Long-term memory entries injected into this response
+  ltmHits?: string[];
+  toolCalls?: AgentToolCall[];  // autonomous tool calls made during agent run
   reasoning: string[];
   processingMs: number;
 }
