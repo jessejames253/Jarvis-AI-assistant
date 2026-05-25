@@ -6,14 +6,16 @@
  * - DiffViewer with Approve / Reject for proposed patches
  * - Typecheck / build result chips
  * - Full streaming text from the agent
+ * - localStorage persistence across refresh / reopen
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Code2, FileSearch, FileEdit, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import { X, Code2, FileSearch, FileEdit, CheckCircle, XCircle, AlertTriangle, Trash2, RotateCcw } from "lucide-react";
 import DiffViewer from "./DiffViewer";
 import MarkdownContent from "./MarkdownContent";
 
 const BASE = import.meta.env.BASE_URL;
+const DEV_MESSAGES_KEY = "jarvas_dev_messages";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,6 +40,7 @@ type DevEventType =
   | "check_started"
   | "check_passed"
   | "check_failed"
+  | "restore_notice"
   | "error"
   | "done";
 
@@ -56,14 +59,54 @@ interface DevMessage {
   applying?: boolean;
 }
 
+// ─── Persistence helpers ──────────────────────────────────────────────────────
+
+function saveDevMessages(msgs: DevMessage[]): void {
+  try {
+    const toSave = msgs
+      .filter(m => m.type !== "check_started")
+      .map(m => ({ ...m, applying: false }));
+    const json = JSON.stringify(toSave);
+    if (json.length > 400_000) {
+      localStorage.setItem(DEV_MESSAGES_KEY, JSON.stringify(toSave.slice(-60)));
+    } else {
+      localStorage.setItem(DEV_MESSAGES_KEY, json);
+    }
+  } catch { /* quota exceeded */ }
+}
+
+function loadDevMessages(): { messages: DevMessage[]; restored: boolean; taskSummary: string } {
+  try {
+    const raw = localStorage.getItem(DEV_MESSAGES_KEY);
+    if (!raw) return { messages: [], restored: false, taskSummary: "" };
+    const msgs = JSON.parse(raw) as DevMessage[];
+    if (!Array.isArray(msgs) || msgs.length === 0) return { messages: [], restored: false, taskSummary: "" };
+
+    const userTurns = msgs.filter(m => m.type === "agent_text" && m.text?.startsWith("**You:**"));
+    const lastTask = userTurns.length > 0
+      ? (userTurns[userTurns.length - 1].text ?? "").replace("**You:** ", "").slice(0, 80)
+      : "";
+    const summary = userTurns.length > 0
+      ? `${userTurns.length} task${userTurns.length > 1 ? "s" : ""} · last: "${lastTask}${lastTask.length >= 80 ? "…" : ""}"`
+      : `${msgs.length} messages`;
+
+    return { messages: msgs, restored: true, taskSummary: summary };
+  } catch {
+    return { messages: [], restored: false, taskSummary: "" };
+  }
+}
+
+function clearDevMessages(): void {
+  localStorage.removeItem(DEV_MESSAGES_KEY);
+}
+
 // ─── Event cards ─────────────────────────────────────────────────────────────
 
 function FileOpCard({ msg }: { msg: DevMessage }) {
-  const icon = msg.op === "read" ? <FileSearch className="w-3.5 h-3.5" /> : <FileSearch className="w-3.5 h-3.5" />;
   const label = msg.op === "read" ? "Read" : msg.op === "search" ? `Search: ${msg.pattern}` : "List";
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs" style={{ background: "hsl(210 15% 8%)", border: "1px solid hsl(210 15% 15%)" }}>
-      <span style={{ color: "hsl(194 100% 55%)" }}>{icon}</span>
+      <FileSearch className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(194 100% 55%)" }} />
       <span style={{ color: "hsl(196 30% 55%)" }}>{label}</span>
       <span className="font-mono truncate" style={{ color: "hsl(196 50% 65%)" }}>{msg.path}</span>
     </div>
@@ -92,10 +135,19 @@ function CheckCard({ msg }: { msg: DevMessage }) {
   );
 }
 
-function AgentTextCard({ text }: { text: string; streaming?: boolean }) {
+function AgentTextCard({ text }: { text: string }) {
   return (
     <div className="px-0 py-1 text-sm" style={{ color: "hsl(196 40% 70%)" }}>
       <MarkdownContent content={text} />
+    </div>
+  );
+}
+
+function RestoreNotice({ text }: { text: string }) {
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: "hsl(194 100% 50% / 0.06)", border: "1px solid hsl(194 100% 50% / 0.18)" }}>
+      <RotateCcw className="w-3 h-3 flex-shrink-0" style={{ color: "hsl(194 100% 55%)" }} />
+      <span style={{ color: "hsl(194 100% 65%)" }}>{text}</span>
     </div>
   );
 }
@@ -108,7 +160,17 @@ interface DevAgentPanelProps {
 
 export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<DevMessage[]>([]);
+  const initialLoad = useRef(loadDevMessages());
+  const [messages, setMessages] = useState<DevMessage[]>(() => {
+    const { messages: saved, restored, taskSummary } = initialLoad.current;
+    if (!restored || saved.length === 0) return [];
+    const notice: DevMessage = {
+      id: `restore-${Date.now()}`,
+      type: "restore_notice",
+      text: `Session restored — ${taskSummary}`,
+    };
+    return [notice, ...saved];
+  });
   const [isRunning, setIsRunning] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -118,8 +180,21 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
   const scrollToBottom = () => bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   useEffect(() => { scrollToBottom(); }, [messages, streamingText]);
 
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const toSave = messages.filter(m => m.type !== "restore_notice");
+    if (toSave.length > 0) saveDevMessages(toSave);
+  }, [messages]);
+
   const addMsg = useCallback((msg: Omit<DevMessage, "id">) => {
     setMessages(prev => [...prev, { ...msg, id: `dev-${Date.now()}-${Math.random()}` }]);
+  }, []);
+
+  const handleClear = useCallback(() => {
+    clearDevMessages();
+    setMessages([]);
+    setStreamingText("");
+    streamingTextRef.current = "";
   }, []);
 
   const handleApprove = useCallback(async (patch: PatchData) => {
@@ -244,7 +319,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
             } else if (t === "dev:check_failed") {
               addMsg({ type: "check_failed", check: ev.check as string, output: ev.output as string });
             } else if (t === "dev:error" || t === "error") {
-              addMsg({ type: "error", error: ev.error as string ?? ev.message as string });
+              addMsg({ type: "error", error: (ev.error as string) ?? (ev.message as string) });
             } else if (t === "done") {
               if (streamingTextRef.current.trim()) {
                 addMsg({ type: "agent_text", text: streamingTextRef.current });
@@ -265,6 +340,8 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
+
+  const hasRealMessages = messages.filter(m => m.type !== "restore_notice").length > 0;
 
   return (
     <div
@@ -291,15 +368,26 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
             )}
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs" style={{ color: "hsl(210 15% 35%)" }}>Read-only until you approve a patch</span>
+            <span className="hidden sm:block text-xs" style={{ color: "hsl(210 15% 35%)" }}>Read-only until you approve a patch</span>
+            {hasRealMessages && !isRunning && (
+              <button
+                type="button"
+                onClick={handleClear}
+                title="Clear session"
+                className="p-1 rounded-lg transition-opacity hover:opacity-100 opacity-40 hover:opacity-60"
+                style={{ color: "hsl(355 70% 55%)" }}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
             <button type="button" onClick={onClose} className="p-1 rounded-lg transition-opacity hover:opacity-100 opacity-50" style={{ color: "hsl(196 30% 55%)" }}>
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Warning banner */}
-        {messages.length === 0 && (
+        {/* Warning banner — only when no messages exist at all */}
+        {!hasRealMessages && (
           <div className="flex items-start gap-2.5 mx-4 mt-3 px-3 py-2 rounded-lg" style={{ background: "hsl(38 100% 50% / 0.08)", border: "1px solid hsl(38 100% 50% / 0.2)" }}>
             <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "hsl(38 100% 62%)" }} />
             <div>
@@ -309,8 +397,8 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
           </div>
         )}
 
-        {/* Starters */}
-        {messages.length === 0 && (
+        {/* Starters — only when no messages */}
+        {!hasRealMessages && (
           <div className="flex flex-wrap gap-2 px-4 pt-3">
             {[
               "Find where the Jarvis title is rendered",
@@ -334,6 +422,9 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-3 flex flex-col gap-3">
           {messages.map(msg => {
+            if (msg.type === "restore_notice") {
+              return <RestoreNotice key={msg.id} text={msg.text ?? ""} />;
+            }
             if (msg.type === "agent_text") {
               return <AgentTextCard key={msg.id} text={msg.text ?? ""} />;
             }

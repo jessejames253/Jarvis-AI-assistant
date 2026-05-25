@@ -86,6 +86,7 @@ interface Message {
 const SESSION_KEY = "jarvas_session_id";
 const DEBUG_KEY = "jarvas_debug_mode";
 const AUTO_PLANNER_KEY = "jarvas_auto_planner";
+const DEV_PANEL_KEY = "jarvas_dev_panel_open";
 
 function getAutoPlannerEnabled(): boolean {
   return localStorage.getItem(AUTO_PLANNER_KEY) === "true";
@@ -93,6 +94,10 @@ function getAutoPlannerEnabled(): boolean {
 
 function setAutoPlannerEnabledStorage(val: boolean): void {
   localStorage.setItem(AUTO_PLANNER_KEY, String(val));
+}
+
+function getDevPanelOpen(): boolean {
+  return localStorage.getItem(DEV_PANEL_KEY) === "true";
 }
 
 // ─── Planner intent detection ─────────────────────────────────────────────────
@@ -495,8 +500,12 @@ export default function Chat() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
   const [autoPlannerEnabled, setAutoPlannerEnabled] = useState(() => getAutoPlannerEnabled());
-  const [devPanelOpen, setDevPanelOpen] = useState(false);
+  const [devPanelOpen, setDevPanelOpen] = useState(() => getDevPanelOpen());
   const autoRoutedRef = useRef(false);
+
+  useEffect(() => {
+    localStorage.setItem(DEV_PANEL_KEY, String(devPanelOpen));
+  }, [devPanelOpen]);
 
   // ── Voice ────────────────────────────────────────────────────────────────
   const speechInput = useSpeechInput();
