@@ -17,34 +17,53 @@ interface Message {
   isFakeSearch?: boolean;
 }
 
-const FAKE_RESPONSES = [
-  "Processing your request through quantum neural pathways... I've analyzed the data streams and computed a high-probability solution for you.",
-  "Accessing global knowledge matrix. My predictive algorithms suggest that the optimal approach involves cross-referencing multiple data points simultaneously.",
-  "Neural link established. Based on 847 terabytes of synthesized intelligence, I recommend the following course of action for maximum efficiency.",
-  "Quantum computation complete. The probability of success with my recommended approach is 97.3%. Shall I proceed with execution?",
-  "Scanning encrypted data channels... My deep learning modules have identified 3 key patterns in your query that require strategic attention.",
-  "Interfacing with distributed intelligence nodes. I've identified the core variables at play — let me synthesize a precise response for you.",
-  "Initializing advanced reasoning protocols. Cross-dimensional analysis suggests multiple viable pathways. I'll outline the most optimal trajectory.",
-  "System calibration complete. My heuristic models project a favorable outcome if we leverage the asymmetric data advantage I've identified.",
-  "Engaging predictive synthesis engine. The temporal data patterns indicate a clear path forward — here's what my analysis reveals.",
-  "Quantum-secure channel active. I've processed 2.4 million related data vectors to provide you with this high-confidence assessment.",
-];
+interface HistoryEntry {
+  role: "user" | "assistant";
+  content: string;
+}
 
+// Patterns that should trigger web search instead of chat
 const SEARCH_TRIGGERS = [
-  /\b(latest|current|recent|today|now|2024|2025|2026|this year|this week|this month)\b/i,
-  /\b(news|breaking|update|happening|announced|released|launched)\b/i,
-  /\b(who is|what is the|when did|where is|how much is|what are the|price of|cost of)\b/i,
-  /\b(weather|stock|score|result|winner|election|live)\b/i,
-  /\bsearch\b/i,
+  /\b(latest|current|recent|today|right now|this year|this week|this month)\b/i,
+  /\b(news|breaking|just announced|just released|just launched)\b/i,
+  /\b(weather|stock price|score|live results|election results)\b/i,
+  /\bsearch (?:for |the web for |online for )?(.+)/i,
 ];
 
 function needsWebSearch(text: string): boolean {
   return SEARCH_TRIGGERS.some((re) => re.test(text));
 }
 
-function getRandomResponse(): string {
-  return FAKE_RESPONSES[Math.floor(Math.random() * FAKE_RESPONSES.length)];
+// ─── API helpers ──────────────────────────────────────────────────────────────
+
+async function callChat(
+  message: string,
+  history: HistoryEntry[]
+): Promise<{ response: string; model: string }> {
+  const res = await fetch(`${import.meta.env.BASE_URL}api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, history }),
+  });
+  if (!res.ok) throw new Error(`Chat API error: ${res.status}`);
+  return res.json() as Promise<{ response: string; model: string }>;
 }
+
+async function callSearch(query: string): Promise<{
+  answer: string;
+  results: Source[];
+  isFake: boolean;
+}> {
+  const res = await fetch(`${import.meta.env.BASE_URL}api/search`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+  });
+  if (!res.ok) throw new Error(`Search API error: ${res.status}`);
+  return res.json() as Promise<{ answer: string; results: Source[]; isFake: boolean }>;
+}
+
+// ─── UI components ────────────────────────────────────────────────────────────
 
 function TypingIndicator({ isSearching }: { isSearching?: boolean }) {
   return (
@@ -96,10 +115,7 @@ function SourceCard({ source, index }: { source: Source; index: number }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 mb-0.5">
-          <p
-            className="text-xs font-semibold truncate leading-tight"
-            style={{ color: "hsl(194 100% 75%)" }}
-          >
+          <p className="text-xs font-semibold truncate leading-tight" style={{ color: "hsl(194 100% 75%)" }}>
             {source.title}
           </p>
           <ExternalLink
@@ -124,26 +140,17 @@ function MessageBubble({ message }: { message: Message }) {
 
   if (isUser) {
     return (
-      <div
-        className="flex items-end gap-3 justify-end message-enter"
-        data-testid={`message-user-${message.id}`}
-      >
+      <div className="flex items-end gap-3 justify-end message-enter" data-testid={`message-user-${message.id}`}>
         <div className="flex flex-col items-end gap-1 max-w-[80%]">
           <div className="bg-primary/15 border border-primary/30 rounded-2xl rounded-br-sm px-4 py-3 glow-primary">
-            <p
-              className="text-sm leading-relaxed"
-              style={{ color: "hsl(196 100% 85%)" }}
-            >
+            <p className="text-sm leading-relaxed" style={{ color: "hsl(196 100% 85%)" }}>
               {message.content}
             </p>
           </div>
           <span className="text-xs text-muted-foreground px-1">{timeStr}</span>
         </div>
         <div className="w-8 h-8 rounded-full bg-accent/20 border border-accent/50 flex items-center justify-center flex-shrink-0">
-          <span
-            className="text-xs font-semibold font-display"
-            style={{ color: "hsl(264 80% 80%)" }}
-          >
+          <span className="text-xs font-semibold font-display" style={{ color: "hsl(264 80% 80%)" }}>
             U
           </span>
         </div>
@@ -152,10 +159,7 @@ function MessageBubble({ message }: { message: Message }) {
   }
 
   return (
-    <div
-      className="flex items-end gap-3 message-enter"
-      data-testid={`message-assistant-${message.id}`}
-    >
+    <div className="flex items-end gap-3 message-enter" data-testid={`message-assistant-${message.id}`}>
       <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/40 flex items-center justify-center flex-shrink-0 pulse-glow">
         <span className="font-display text-primary text-xs font-bold">J</span>
       </div>
@@ -163,10 +167,7 @@ function MessageBubble({ message }: { message: Message }) {
         {message.isSearch && (
           <div className="flex items-center gap-1.5 px-1">
             <Search className="w-3 h-3" style={{ color: "hsl(194 100% 55%)" }} />
-            <span
-              className="text-xs tracking-wider font-medium"
-              style={{ color: "hsl(194 100% 55%)" }}
-            >
+            <span className="text-xs tracking-wider font-medium" style={{ color: "hsl(194 100% 55%)" }}>
               {message.isFakeSearch ? "DEMO SEARCH" : "WEB SEARCH"}
             </span>
           </div>
@@ -189,13 +190,14 @@ function MessageBubble({ message }: { message: Message }) {
   );
 }
 
+// ─── Main chat page ───────────────────────────────────────────────────────────
+
 export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "init",
       role: "assistant",
-      content:
-        "JARVAS online. Neural networks initialized. Web search module active. How may I assist you today?",
+      content: "Hello. I'm Jarvas — ask me anything. I'll search the web when you need current information.",
       timestamp: new Date(),
     },
   ]);
@@ -212,6 +214,15 @@ export default function Chat() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping, scrollToBottom]);
+
+  // Build history array for the API (excludes the initial greeting)
+  const buildHistory = useCallback(
+    (currentMessages: Message[]): HistoryEntry[] =>
+      currentMessages
+        .filter((m) => m.id !== "init")
+        .map((m) => ({ role: m.role, content: m.content })),
+    []
+  );
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
@@ -232,26 +243,16 @@ export default function Chat() {
       textareaRef.current.style.height = "auto";
     }
 
-    const shouldSearch = needsWebSearch(text);
-
-    if (shouldSearch) {
+    // Web search path
+    if (needsWebSearch(text)) {
       setIsSearching(true);
       try {
-        const res = await fetch(`${import.meta.env.BASE_URL}api/search`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: text }),
-        });
-
-        if (res.ok) {
-          const data = (await res.json()) as {
-            answer: string;
-            results: { title: string; url: string; description: string }[];
-            isFake: boolean;
-          };
-          setIsSearching(false);
-          setIsTyping(false);
-          const assistantMsg: Message = {
+        const data = await callSearch(text);
+        setIsSearching(false);
+        setIsTyping(false);
+        setMessages((prev) => [
+          ...prev,
+          {
             id: `assistant-${Date.now()}`,
             role: "assistant",
             content: data.answer,
@@ -259,29 +260,52 @@ export default function Chat() {
             sources: data.results,
             isSearch: true,
             isFakeSearch: data.isFake,
-          };
-          setMessages((prev) => [...prev, assistantMsg]);
-          return;
-        }
+          },
+        ]);
+        return;
       } catch {
-        // fall through to regular fake response
+        setIsSearching(false);
+        // fall through to chat
       }
-      setIsSearching(false);
     }
 
-    const delay = 1200 + Math.random() * 1000;
-    await new Promise((r) => setTimeout(r, delay));
+    // Chat path
+    try {
+      setMessages((prev) => {
+        const history = buildHistory(prev);
 
-    const assistantMsg: Message = {
-      id: `assistant-${Date.now()}`,
-      role: "assistant",
-      content: getRandomResponse(),
-      timestamp: new Date(),
-    };
+        callChat(text, history)
+          .then((data) => {
+            setIsTyping(false);
+            setMessages((latest) => [
+              ...latest,
+              {
+                id: `assistant-${Date.now()}`,
+                role: "assistant",
+                content: data.response,
+                timestamp: new Date(),
+              },
+            ]);
+          })
+          .catch(() => {
+            setIsTyping(false);
+            setMessages((latest) => [
+              ...latest,
+              {
+                id: `assistant-${Date.now()}`,
+                role: "assistant",
+                content: "Something went wrong on my end. Please try again.",
+                timestamp: new Date(),
+              },
+            ]);
+          });
 
-    setIsTyping(false);
-    setMessages((prev) => [...prev, assistantMsg]);
-  }, [input, isTyping]);
+        return prev;
+      });
+    } catch {
+      setIsTyping(false);
+    }
+  }, [input, isTyping, buildHistory]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -336,10 +360,7 @@ export default function Chat() {
       </header>
 
       {/* Messages */}
-      <main
-        className="relative z-10 flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-8 py-6"
-        data-testid="chat-messages"
-      >
+      <main className="relative z-10 flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-8 py-6" data-testid="chat-messages">
         <div className="max-w-3xl mx-auto flex flex-col gap-5">
           {messages.map((msg) => (
             <MessageBubble key={msg.id} message={msg} />
@@ -358,7 +379,7 @@ export default function Chat() {
               data-testid="input-message"
               className="flex-1 bg-transparent resize-none outline-none text-sm leading-relaxed placeholder:text-muted-foreground min-h-[24px] max-h-[120px] scrollbar-thin"
               style={{ color: "hsl(196 80% 85%)" }}
-              placeholder="Ask anything — JARVAS will search the web if needed..."
+              placeholder="Ask anything — Jarvas will search the web if needed..."
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
@@ -375,7 +396,7 @@ export default function Chat() {
             </button>
           </div>
           <p className="text-center text-xs mt-2 tracking-wider" style={{ color: "hsl(196 30% 40%)" }}>
-            JARVAS searches the web for current information · Neural link encrypted
+            Jarvas searches the web for current information · Responses are AI-generated
           </p>
         </div>
       </footer>
