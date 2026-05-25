@@ -1135,18 +1135,19 @@ export default function Chat() {
             <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: "hsl(194 100% 55%)" }} />
           </button>
 
-          {/* Dev Agent */}
+          {/* Dev Agent — visible on all screen sizes */}
           <button
             onClick={() => setDevPanelOpen(true)}
             title="Dev Agent — inspect and edit project files"
-            className="hidden sm:flex w-9 h-9 rounded-xl border items-center justify-center transition-all duration-200 active:scale-95"
+            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
             style={{
               background: devPanelOpen ? "hsl(194 100% 50% / 0.12)" : "transparent",
-              borderColor: devPanelOpen ? "hsl(194 100% 50% / 0.4)" : "hsl(210 15% 25%)",
+              borderColor: devPanelOpen ? "hsl(194 100% 50% / 0.5)" : "hsl(210 15% 30%)",
             }}
             aria-label="Open Dev Agent"
           >
-            <Code2 className="w-4 h-4" style={{ color: devPanelOpen ? "hsl(194 100% 65%)" : "hsl(196 40% 45%)" }} />
+            <Code2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: devPanelOpen ? "hsl(194 100% 65%)" : "hsl(196 60% 55%)" }} />
+            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: devPanelOpen ? "hsl(194 100% 65%)" : "hsl(196 60% 55%)" }}>DEV</span>
           </button>
 
           {/* Debug — hidden on mobile to reduce clutter */}
