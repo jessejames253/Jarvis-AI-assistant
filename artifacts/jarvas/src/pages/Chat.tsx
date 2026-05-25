@@ -743,6 +743,7 @@ export default function Chat() {
 
   const sendPlan = useCallback(async () => {
     const goal = input.trim();
+    console.log("[Planner] sendPlan called", { goal, isTyping, isStreaming });
     if (!goal || isTyping || isStreaming) return;
 
     speech.unlock();
@@ -1240,6 +1241,7 @@ export default function Chat() {
 
             {/* Plan button */}
             <button
+              type="button"
               onClick={sendPlan}
               disabled={!input.trim() || isTyping || isStreaming}
               title="Create a multi-step plan from this message"

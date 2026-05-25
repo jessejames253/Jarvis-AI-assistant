@@ -12,9 +12,21 @@
       "sessionId": "cfb6c397-6057-4b84-99be-0d5123d51466",
       "createdAt": "2026-05-25T08:00:01.037Z",
       "updatedAt": "2026-05-25T08:00:01.037Z"
+    },
+    {
+      "id": "f38b25b0-26b2-4bb9-b6d6-ef78be66f083",
+      "title": "Research what makes a good daily workout plan, summarize the main points, then create a reminder for me to review it tom",
+      "category": "work",
+      "priority": "medium",
+      "status": "todo",
+      "subtasks": [],
+      "tags": [],
+      "sessionId": "cfb6c397-6057-4b84-99be-0d5123d51466",
+      "createdAt": "2026-05-25T21:24:17.689Z",
+      "updatedAt": "2026-05-25T21:24:17.689Z"
     }
   ],
   "projects": [],
   "goals": [],
-  "updatedAt": "2026-05-25T08:00:01.037Z"
+  "updatedAt": "2026-05-25T21:24:17.689Z"
 }

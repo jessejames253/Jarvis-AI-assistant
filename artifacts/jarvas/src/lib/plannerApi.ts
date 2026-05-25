@@ -88,22 +88,29 @@ export async function callPlanStream(
   base: string,
   callbacks: PlanStreamCallbacks,
 ): Promise<void> {
+  const url = `${base}api/plan/stream`;
+  console.log("[Planner] SSE connecting →", url, { goal, sessionId });
+
   let res: Response;
   try {
-    res = await fetch(`${base}api/plan/stream`, {
+    res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ goal, sessionId }),
     });
-  } catch {
+  } catch (err) {
+    console.error("[Planner] SSE network error", err);
     callbacks.onError("Network error");
     return;
   }
 
   if (!res.ok || !res.body) {
+    console.error("[Planner] SSE HTTP error", res.status, res.statusText);
     callbacks.onError(`HTTP ${res.status}`);
     return;
   }
+
+  console.log("[Planner] SSE connected");
 
   const reader  = res.body.getReader();
   const decoder = new TextDecoder();
@@ -128,9 +135,11 @@ export async function callPlanStream(
 
           switch (t) {
             case "plan_created":
+              console.log("[Planner] plan created", ev);
               callbacks.onPlanCreated(ev as unknown as PlanCreatedPayload);
               break;
             case "plan_step_start":
+              console.log("[Planner] step started", (ev as unknown as PlanStepStartPayload).stepIndex, (ev as unknown as PlanStepStartPayload).title);
               callbacks.onStepStart(ev as unknown as PlanStepStartPayload);
               break;
             case "token":
@@ -139,22 +148,29 @@ export async function callPlanStream(
             case "tool_start":
             case "tool_done":
             case "tool_error":
+              console.log("[Planner] tool event", t, (ev as Record<string, unknown>).tool);
               callbacks.onToolEvent(ev as unknown as PlanToolEvent);
               break;
             case "plan_step_complete":
+              console.log("[Planner] step completed", (ev as unknown as PlanStepDonePayload).stepIndex);
               callbacks.onStepComplete(ev as unknown as PlanStepDonePayload);
               break;
             case "plan_step_failed":
+              console.warn("[Planner] step failed", ev);
               callbacks.onStepFailed(ev as unknown as PlanStepFailPayload);
               break;
             case "plan_done":
+              console.log("[Planner] plan done", ev);
               callbacks.onPlanDone(ev as unknown as PlanDonePayload);
               break;
             case "plan_cancelled":
+              console.log("[Planner] plan cancelled");
               break;
             case "done":
+              console.log("[Planner] stream done");
               break;
             case "error":
+              console.error("[Planner] plan error", ev.message);
               callbacks.onError(ev.message as string | undefined);
               break;
           }
