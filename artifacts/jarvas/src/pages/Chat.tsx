@@ -1,11 +1,20 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send } from "lucide-react";
+import { Send, Search, ExternalLink } from "lucide-react";
+
+interface Source {
+  title: string;
+  url: string;
+  description: string;
+}
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  sources?: Source[];
+  isSearch?: boolean;
+  isFakeSearch?: boolean;
 }
 
 const FAKE_RESPONSES = [
@@ -21,24 +30,91 @@ const FAKE_RESPONSES = [
   "Quantum-secure channel active. I've processed 2.4 million related data vectors to provide you with this high-confidence assessment.",
 ];
 
+const SEARCH_TRIGGERS = [
+  /\b(latest|current|recent|today|now|2024|2025|2026|this year|this week|this month)\b/i,
+  /\b(news|breaking|update|happening|announced|released|launched)\b/i,
+  /\b(who is|what is the|when did|where is|how much is|what are the|price of|cost of)\b/i,
+  /\b(weather|stock|score|result|winner|election|live)\b/i,
+  /\bsearch\b/i,
+];
+
+function needsWebSearch(text: string): boolean {
+  return SEARCH_TRIGGERS.some((re) => re.test(text));
+}
+
 function getRandomResponse(): string {
   return FAKE_RESPONSES[Math.floor(Math.random() * FAKE_RESPONSES.length)];
 }
 
-function TypingIndicator() {
+function TypingIndicator({ isSearching }: { isSearching?: boolean }) {
   return (
     <div className="flex items-end gap-3 message-enter" data-testid="typing-indicator">
       <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/40 flex items-center justify-center flex-shrink-0 glow-primary">
         <span className="font-display text-primary text-xs font-bold">J</span>
       </div>
       <div className="bg-card border border-card-border rounded-2xl rounded-bl-sm px-4 py-3">
-        <div className="flex items-center gap-1.5 h-5">
-          <span className="typing-dot w-1.5 h-1.5 bg-primary rounded-full" />
-          <span className="typing-dot w-1.5 h-1.5 bg-primary rounded-full" />
-          <span className="typing-dot w-1.5 h-1.5 bg-primary rounded-full" />
-        </div>
+        {isSearching ? (
+          <div className="flex items-center gap-2">
+            <Search className="w-3.5 h-3.5 animate-pulse" style={{ color: "hsl(194 100% 60%)" }} />
+            <span className="text-xs tracking-wider" style={{ color: "hsl(194 100% 60%)" }}>
+              SCANNING WEB...
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 h-5">
+            <span className="typing-dot w-1.5 h-1.5 bg-primary rounded-full" />
+            <span className="typing-dot w-1.5 h-1.5 bg-primary rounded-full" />
+            <span className="typing-dot w-1.5 h-1.5 bg-primary rounded-full" />
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+function SourceCard({ source, index }: { source: Source; index: number }) {
+  const hostname = (() => {
+    try {
+      return new URL(source.url).hostname.replace("www.", "");
+    } catch {
+      return source.url;
+    }
+  })();
+
+  return (
+    <a
+      href={source.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      data-testid={`source-link-${index}`}
+      className="flex items-start gap-3 p-3 rounded-xl border border-primary/20 bg-primary/5 hover:border-primary/40 hover:bg-primary/10 transition-all duration-200 group"
+    >
+      <div className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
+        <span className="font-display text-xs font-bold" style={{ color: "hsl(194 100% 60%)" }}>
+          {index + 1}
+        </span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <p
+            className="text-xs font-semibold truncate leading-tight"
+            style={{ color: "hsl(194 100% 75%)" }}
+          >
+            {source.title}
+          </p>
+          <ExternalLink
+            className="w-3 h-3 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ color: "hsl(194 100% 60%)" }}
+          />
+        </div>
+        <p className="text-xs mb-1 leading-snug line-clamp-2" style={{ color: "hsl(196 40% 55%)" }}>
+          {source.description}
+        </p>
+        <p className="text-xs font-mono" style={{ color: "hsl(194 100% 45%)" }}>
+          {hostname}
+        </p>
+      </div>
+    </a>
   );
 }
 
@@ -48,29 +124,65 @@ function MessageBubble({ message }: { message: Message }) {
 
   if (isUser) {
     return (
-      <div className="flex items-end gap-3 justify-end message-enter" data-testid={`message-user-${message.id}`}>
+      <div
+        className="flex items-end gap-3 justify-end message-enter"
+        data-testid={`message-user-${message.id}`}
+      >
         <div className="flex flex-col items-end gap-1 max-w-[80%]">
           <div className="bg-primary/15 border border-primary/30 rounded-2xl rounded-br-sm px-4 py-3 glow-primary">
-            <p className="text-sm text-primary-foreground/90 leading-relaxed" style={{ color: 'hsl(196 100% 85%)' }}>{message.content}</p>
+            <p
+              className="text-sm leading-relaxed"
+              style={{ color: "hsl(196 100% 85%)" }}
+            >
+              {message.content}
+            </p>
           </div>
           <span className="text-xs text-muted-foreground px-1">{timeStr}</span>
         </div>
         <div className="w-8 h-8 rounded-full bg-accent/20 border border-accent/50 flex items-center justify-center flex-shrink-0">
-          <span className="text-accent-foreground text-xs font-semibold font-display" style={{ color: 'hsl(264 80% 80%)' }}>U</span>
+          <span
+            className="text-xs font-semibold font-display"
+            style={{ color: "hsl(264 80% 80%)" }}
+          >
+            U
+          </span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex items-end gap-3 message-enter" data-testid={`message-assistant-${message.id}`}>
+    <div
+      className="flex items-end gap-3 message-enter"
+      data-testid={`message-assistant-${message.id}`}
+    >
       <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/40 flex items-center justify-center flex-shrink-0 pulse-glow">
         <span className="font-display text-primary text-xs font-bold">J</span>
       </div>
-      <div className="flex flex-col gap-1 max-w-[80%]">
+      <div className="flex flex-col gap-2 max-w-[85%] sm:max-w-[80%]">
+        {message.isSearch && (
+          <div className="flex items-center gap-1.5 px-1">
+            <Search className="w-3 h-3" style={{ color: "hsl(194 100% 55%)" }} />
+            <span
+              className="text-xs tracking-wider font-medium"
+              style={{ color: "hsl(194 100% 55%)" }}
+            >
+              {message.isFakeSearch ? "DEMO SEARCH" : "WEB SEARCH"}
+            </span>
+          </div>
+        )}
         <div className="bg-card border border-card-border rounded-2xl rounded-bl-sm px-4 py-3">
-          <p className="text-sm leading-relaxed" style={{ color: 'hsl(196 80% 80%)' }}>{message.content}</p>
+          <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: "hsl(196 80% 80%)" }}>
+            {message.content}
+          </p>
         </div>
+        {message.sources && message.sources.length > 0 && (
+          <div className="flex flex-col gap-2 px-1" data-testid="search-sources">
+            {message.sources.map((source, i) => (
+              <SourceCard key={i} source={source} index={i} />
+            ))}
+          </div>
+        )}
         <span className="text-xs text-muted-foreground px-1">{timeStr}</span>
       </div>
     </div>
@@ -82,12 +194,14 @@ export default function Chat() {
     {
       id: "init",
       role: "assistant",
-      content: "JARVAS online. Neural networks initialized. All systems operational. How may I assist you today?",
+      content:
+        "JARVAS online. Neural networks initialized. Web search module active. How may I assist you today?",
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -118,7 +232,44 @@ export default function Chat() {
       textareaRef.current.style.height = "auto";
     }
 
-    const delay = 1200 + Math.random() * 1200;
+    const shouldSearch = needsWebSearch(text);
+
+    if (shouldSearch) {
+      setIsSearching(true);
+      try {
+        const res = await fetch(`${import.meta.env.BASE_URL}api/search`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: text }),
+        });
+
+        if (res.ok) {
+          const data = (await res.json()) as {
+            answer: string;
+            results: { title: string; url: string; description: string }[];
+            isFake: boolean;
+          };
+          setIsSearching(false);
+          setIsTyping(false);
+          const assistantMsg: Message = {
+            id: `assistant-${Date.now()}`,
+            role: "assistant",
+            content: data.answer,
+            timestamp: new Date(),
+            sources: data.results,
+            isSearch: true,
+            isFakeSearch: data.isFake,
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+          return;
+        }
+      } catch {
+        // fall through to regular fake response
+      }
+      setIsSearching(false);
+    }
+
+    const delay = 1200 + Math.random() * 1000;
     await new Promise((r) => setTimeout(r, delay));
 
     const assistantMsg: Message = {
@@ -148,51 +299,57 @@ export default function Chat() {
 
   return (
     <div className="flex flex-col h-screen w-full bg-background scan-overlay overflow-hidden">
-      {/* Background grid */}
       <div className="fixed inset-0 bg-grid opacity-60 pointer-events-none" />
-
-      {/* Ambient glows */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-96 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
       <div className="fixed bottom-24 right-8 w-64 h-64 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header */}
       <header className="relative z-10 flex-shrink-0 flex items-center justify-between px-4 sm:px-8 py-4 border-b border-border/60 bg-background/80 backdrop-blur-sm">
         <div className="flex items-center gap-3">
-          {/* Logo mark */}
           <div className="relative w-10 h-10 rounded-xl bg-primary/10 border border-primary/40 flex items-center justify-center glow-primary">
             <span className="font-display text-primary font-black text-lg">J</span>
             <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-primary rounded-full animate-pulse" />
           </div>
           <div>
-            <h1 className="font-display font-bold text-xl sm:text-2xl tracking-widest glow-primary-text" style={{ color: 'hsl(194 100% 60%)' }}>
+            <h1
+              className="font-display font-bold text-xl sm:text-2xl tracking-widest glow-primary-text"
+              style={{ color: "hsl(194 100% 60%)" }}
+            >
               JARVAS
             </h1>
-            <p className="text-xs tracking-widest" style={{ color: 'hsl(196 40% 50%)' }}>AI ASSISTANT · v7.4.1</p>
+            <p className="text-xs tracking-widest" style={{ color: "hsl(196 40% 50%)" }}>
+              AI ASSISTANT · WEB SEARCH ENABLED
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary/30 bg-primary/5">
             <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-xs font-medium tracking-wider" style={{ color: 'hsl(142 71% 60%)' }}>ONLINE</span>
+            <span className="text-xs font-medium tracking-wider" style={{ color: "hsl(142 71% 60%)" }}>
+              ONLINE
+            </span>
           </div>
-          <div className="flex sm:hidden items-center gap-1">
+          <div className="flex sm:hidden">
             <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
           </div>
         </div>
       </header>
 
-      {/* Messages area */}
-      <main className="relative z-10 flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-8 py-6" data-testid="chat-messages">
+      {/* Messages */}
+      <main
+        className="relative z-10 flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-8 py-6"
+        data-testid="chat-messages"
+      >
         <div className="max-w-3xl mx-auto flex flex-col gap-5">
           {messages.map((msg) => (
             <MessageBubble key={msg.id} message={msg} />
           ))}
-          {isTyping && <TypingIndicator />}
+          {isTyping && <TypingIndicator isSearching={isSearching} />}
           <div ref={messagesEndRef} />
         </div>
       </main>
 
-      {/* Input area */}
+      {/* Input */}
       <footer className="relative z-10 flex-shrink-0 border-t border-border/60 bg-background/80 backdrop-blur-sm px-4 sm:px-8 py-4">
         <div className="max-w-3xl mx-auto">
           <div className="flex items-end gap-3 bg-card border border-border rounded-2xl px-4 py-3 focus-within:border-primary/60 focus-within:glow-primary transition-all duration-200">
@@ -200,8 +357,8 @@ export default function Chat() {
               ref={textareaRef}
               data-testid="input-message"
               className="flex-1 bg-transparent resize-none outline-none text-sm leading-relaxed placeholder:text-muted-foreground min-h-[24px] max-h-[120px] scrollbar-thin"
-              style={{ color: 'hsl(196 80% 85%)' }}
-              placeholder="Send a message to JARVAS..."
+              style={{ color: "hsl(196 80% 85%)" }}
+              placeholder="Ask anything — JARVAS will search the web if needed..."
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
@@ -214,11 +371,11 @@ export default function Chat() {
               className="flex-shrink-0 w-9 h-9 rounded-xl bg-primary flex items-center justify-center transition-all duration-200 hover:bg-primary/80 disabled:opacity-30 disabled:cursor-not-allowed glow-primary"
               aria-label="Send message"
             >
-              <Send className="w-4 h-4" style={{ color: 'hsl(220 20% 6%)' }} />
+              <Send className="w-4 h-4" style={{ color: "hsl(220 20% 6%)" }} />
             </button>
           </div>
-          <p className="text-center text-xs mt-2 tracking-wider" style={{ color: 'hsl(196 30% 40%)' }}>
-            JARVAS may produce inaccurate information · Neural link encrypted
+          <p className="text-center text-xs mt-2 tracking-wider" style={{ color: "hsl(196 30% 40%)" }}>
+            JARVAS searches the web for current information · Neural link encrypted
           </p>
         </div>
       </footer>
