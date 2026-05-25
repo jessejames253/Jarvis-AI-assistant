@@ -433,6 +433,8 @@
   border: 1px solid hsl(194 100% 40% / 0.25);
   background: hsl(222 28% 6%);
   overflow: hidden;
+  /* Clip child content to rounded corners — prevents long lines bleeding out */
+  contain: paint;
 }
 .jarvis-code-block:first-child { margin-top: 0; }
 .jarvis-code-block:last-child  { margin-bottom: 0; }
@@ -478,6 +480,10 @@
 .jarvis-code-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  will-change: scroll-position;
+  /* Breathing room so the last char never clips at the right edge */
+  padding-bottom: 2px;
 }
 .jarvis-code-scroll::-webkit-scrollbar { height: 4px; }
 .jarvis-code-scroll::-webkit-scrollbar-track { background: transparent; }

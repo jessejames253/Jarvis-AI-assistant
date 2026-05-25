@@ -126,7 +126,7 @@ const components: Components = {
             style={jarvisTheme}
             customStyle={{
               margin: 0,
-              padding: "1rem",
+              padding: "0.9rem 1.5rem 0.9rem 1rem",
               background: "transparent",
               fontSize: "0.8rem",
               lineHeight: "1.6",
