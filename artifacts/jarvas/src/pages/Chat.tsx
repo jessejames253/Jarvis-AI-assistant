@@ -11,7 +11,14 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Search, ExternalLink, Brain, Terminal, LayoutDashboard } from "lucide-react";
+import {
+  Send,
+  Search,
+  ExternalLink,
+  Brain,
+  Terminal,
+  LayoutDashboard,
+} from "lucide-react";
 import { useLocation } from "wouter";
 import MemoryPanel, { type SessionMemory } from "@/components/MemoryPanel";
 import DebugPanel, { type DebugInfo } from "@/components/DebugPanel";
@@ -73,7 +80,11 @@ interface ChatApiResponse {
   debug: DebugInfo;
 }
 
-async function callChat(message: string, sessionId: string, base: string): Promise<ChatApiResponse> {
+async function callChat(
+  message: string,
+  sessionId: string,
+  base: string,
+): Promise<ChatApiResponse> {
   const res = await fetch(`${base}api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -83,7 +94,10 @@ async function callChat(message: string, sessionId: string, base: string): Promi
   return res.json() as Promise<ChatApiResponse>;
 }
 
-async function loadSession(sessionId: string, base: string): Promise<SessionMemory> {
+async function loadSession(
+  sessionId: string,
+  base: string,
+): Promise<SessionMemory> {
   const res = await fetch(`${base}api/memory/${sessionId}`);
   if (!res.ok) throw new Error(`Memory API error: ${res.status}`);
   return res.json() as Promise<SessionMemory>;
@@ -93,7 +107,10 @@ async function loadSession(sessionId: string, base: string): Promise<SessionMemo
 
 function TypingIndicator() {
   return (
-    <div className="flex items-end gap-3 message-enter" data-testid="typing-indicator">
+    <div
+      className="flex items-end gap-3 message-enter"
+      data-testid="typing-indicator"
+    >
       <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/40 flex items-center justify-center flex-shrink-0 glow-primary">
         <span className="font-display text-primary text-xs font-bold">J</span>
       </div>
@@ -110,8 +127,11 @@ function TypingIndicator() {
 
 function SourceCard({ source, index }: { source: Source; index: number }) {
   const hostname = (() => {
-    try { return new URL(source.url).hostname.replace("www.", ""); }
-    catch { return source.url; }
+    try {
+      return new URL(source.url).hostname.replace("www.", "");
+    } catch {
+      return source.url;
+    }
   })();
   return (
     <a
@@ -122,42 +142,87 @@ function SourceCard({ source, index }: { source: Source; index: number }) {
       className="flex items-start gap-3 p-3 rounded-xl border border-primary/20 bg-primary/5 hover:border-primary/40 hover:bg-primary/10 transition-all duration-200 group"
     >
       <div className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
-        <span className="font-display text-xs font-bold" style={{ color: "hsl(194 100% 60%)" }}>{index + 1}</span>
+        <span
+          className="font-display text-xs font-bold"
+          style={{ color: "hsl(194 100% 60%)" }}
+        >
+          {index + 1}
+        </span>
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 mb-0.5">
-          <p className="text-xs font-semibold truncate leading-tight" style={{ color: "hsl(194 100% 75%)" }}>{source.title}</p>
-          <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: "hsl(194 100% 60%)" }} />
+          <p
+            className="text-xs font-semibold truncate leading-tight"
+            style={{ color: "hsl(194 100% 75%)" }}
+          >
+            {source.title}
+          </p>
+          <ExternalLink
+            className="w-3 h-3 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ color: "hsl(194 100% 60%)" }}
+          />
         </div>
-        <p className="text-xs mb-1 leading-snug line-clamp-2" style={{ color: "hsl(196 40% 55%)" }}>{source.description}</p>
-        <p className="text-xs font-mono" style={{ color: "hsl(194 100% 45%)" }}>{hostname}</p>
+        <p
+          className="text-xs mb-1 leading-snug line-clamp-2"
+          style={{ color: "hsl(196 40% 55%)" }}
+        >
+          {source.description}
+        </p>
+        <p className="text-xs font-mono" style={{ color: "hsl(194 100% 45%)" }}>
+          {hostname}
+        </p>
       </div>
     </a>
   );
 }
 
-function MessageBubble({ message, showDebug }: { message: Message; showDebug: boolean }) {
+function MessageBubble({
+  message,
+  showDebug,
+}: {
+  message: Message;
+  showDebug: boolean;
+}) {
   const isUser = message.role === "user";
-  const timeStr = message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const timeStr = message.timestamp.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   if (isUser) {
     return (
-      <div className="flex items-end gap-3 justify-end message-enter" data-testid={`message-user-${message.id}`}>
+      <div
+        className="flex items-end gap-3 justify-end message-enter"
+        data-testid={`message-user-${message.id}`}
+      >
         <div className="flex flex-col items-end gap-1 max-w-[80%]">
           <div className="bg-primary/15 border border-primary/30 rounded-2xl rounded-br-sm px-4 py-3 glow-primary">
-            <p className="text-sm leading-relaxed" style={{ color: "hsl(196 100% 85%)" }}>{message.content}</p>
+            <p
+              className="text-sm leading-relaxed"
+              style={{ color: "hsl(196 100% 85%)" }}
+            >
+              {message.content}
+            </p>
           </div>
           <span className="text-xs text-muted-foreground px-1">{timeStr}</span>
         </div>
         <div className="w-8 h-8 rounded-full bg-accent/20 border border-accent/50 flex items-center justify-center flex-shrink-0">
-          <span className="text-xs font-semibold font-display" style={{ color: "hsl(264 80% 80%)" }}>U</span>
+          <span
+            className="text-xs font-semibold font-display"
+            style={{ color: "hsl(264 80% 80%)" }}
+          >
+            U
+          </span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex items-start gap-3 message-enter" data-testid={`message-assistant-${message.id}`}>
+    <div
+      className="flex items-start gap-3 message-enter"
+      data-testid={`message-assistant-${message.id}`}
+    >
       <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/40 flex items-center justify-center flex-shrink-0 pulse-glow mt-0.5">
         <span className="font-display text-primary text-xs font-bold">J</span>
       </div>
@@ -166,8 +231,14 @@ function MessageBubble({ message, showDebug }: { message: Message; showDebug: bo
         {/* Search / web badge */}
         {message.isSearch && (
           <div className="flex items-center gap-1.5 px-1">
-            <Search className="w-3 h-3" style={{ color: "hsl(194 100% 55%)" }} />
-            <span className="text-xs tracking-wider font-medium" style={{ color: "hsl(194 100% 55%)" }}>
+            <Search
+              className="w-3 h-3"
+              style={{ color: "hsl(194 100% 55%)" }}
+            />
+            <span
+              className="text-xs tracking-wider font-medium"
+              style={{ color: "hsl(194 100% 55%)" }}
+            >
               {message.isFakeSearch ? "DEMO SEARCH" : "WEB SEARCH"}
             </span>
           </div>
@@ -175,24 +246,30 @@ function MessageBubble({ message, showDebug }: { message: Message; showDebug: bo
 
         {/* Main bubble */}
         <div className="bg-card border border-card-border rounded-2xl rounded-tl-sm px-4 py-3">
-          <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: "hsl(196 80% 80%)" }}>
+          <p
+            className="text-sm leading-relaxed whitespace-pre-line"
+            style={{ color: "hsl(196 80% 80%)" }}
+          >
             {message.content}
           </p>
         </div>
 
         {/* Source cards */}
         {message.sources && message.sources.length > 0 && (
-          <div className="flex flex-col gap-2 px-1" data-testid="search-sources">
-            {message.sources.map((s, i) => <SourceCard key={i} source={s} index={i} />)}
+          <div
+            className="flex flex-col gap-2 px-1"
+            data-testid="search-sources"
+          >
+            {message.sources.map((s, i) => (
+              <SourceCard key={i} source={s} index={i} />
+            ))}
           </div>
         )}
 
         <span className="text-xs text-muted-foreground px-1">{timeStr}</span>
 
         {/* Debug panel — shown only when debug mode is on */}
-        {showDebug && message.debug && (
-          <DebugPanel debug={message.debug} />
-        )}
+        {showDebug && message.debug && <DebugPanel debug={message.debug} />}
       </div>
     </div>
   );
@@ -229,7 +306,9 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
-  useEffect(() => { scrollToBottom(); }, [messages, isTyping, scrollToBottom]);
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isTyping, scrollToBottom]);
 
   // Load session on mount / session change
   useEffect(() => {
@@ -252,10 +331,16 @@ export default function Chat() {
           setMessages([WELCOME(session.preferences?.name)]);
         }
       })
-      .catch(() => { if (!cancelled) setMessages([WELCOME()]); })
-      .finally(() => { if (!cancelled) setIsLoadingHistory(false); });
+      .catch(() => {
+        if (!cancelled) setMessages([WELCOME()]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingHistory(false);
+      });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [sessionId]);
 
   const toggleDebug = useCallback(() => {
@@ -281,7 +366,9 @@ export default function Chat() {
     setInput("");
     setIsTyping(true);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
-    setMemory((prev) => prev ? { ...prev, messageCount: prev.messageCount + 1 } : prev);
+    setMemory((prev) =>
+      prev ? { ...prev, messageCount: prev.messageCount + 1 } : prev,
+    );
 
     try {
       const data = await callChat(text, sessionId, BASE);
@@ -299,11 +386,15 @@ export default function Chat() {
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
-      setMemory((prev) => prev ? { ...prev, messageCount: prev.messageCount + 1 } : prev);
+      setMemory((prev) =>
+        prev ? { ...prev, messageCount: prev.messageCount + 1 } : prev,
+      );
 
       // If the memory tool updated a preference, refresh memory panel
       if (data.debug?.action === "preference_update") {
-        loadSession(sessionId, BASE).then(setMemory).catch(() => {});
+        loadSession(sessionId, BASE)
+          .then(setMemory)
+          .catch(() => {});
       }
     } catch {
       setIsTyping(false);
@@ -320,7 +411,10 @@ export default function Chat() {
   }, [input, isTyping, sessionId]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -331,9 +425,17 @@ export default function Chat() {
   };
 
   const handleMemoryCleared = useCallback(() => {
-    setMemory((prev) => prev
-      ? { ...prev, messages: [], summary: null, preferences: {}, messageCount: 0 }
-      : prev);
+    setMemory((prev) =>
+      prev
+        ? {
+            ...prev,
+            messages: [],
+            summary: null,
+            preferences: {},
+            messageCount: 0,
+          }
+        : prev,
+    );
     setMessages([WELCOME()]);
   }, []);
 
@@ -362,14 +464,22 @@ export default function Chat() {
       <header className="relative z-10 flex-shrink-0 flex items-center justify-between px-4 sm:px-8 py-4 border-b border-border/60 bg-background/80 backdrop-blur-sm">
         <div className="flex items-center gap-3">
           <div className="relative w-10 h-10 rounded-xl bg-primary/10 border border-primary/40 flex items-center justify-center glow-primary">
-            <span className="font-display text-primary font-black text-lg">J</span>
+            <span className="font-display text-primary font-black text-lg">
+              J
+            </span>
             <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-primary rounded-full animate-pulse" />
           </div>
           <div>
-            <h1 className="font-display font-bold text-xl sm:text-2xl tracking-widest glow-primary-text" style={{ color: "hsl(194 100% 60%)" }}>
+            <h1
+              className="font-display font-bold text-xl sm:text-2xl tracking-widest glow-primary-text"
+              style={{ color: "hsl(194 100% 60%)" }}
+            >
               JARVAS
             </h1>
-            <p className="text-xs tracking-widest" style={{ color: "hsl(196 40% 50%)" }}>
+            <p
+              className="text-xs tracking-widest"
+              style={{ color: "hsl(196 40% 50%)" }}
+            >
               AGENT v2 · INTENT ROUTING · WEB SEARCH
             </p>
           </div>
@@ -378,7 +488,12 @@ export default function Chat() {
         <div className="flex items-center gap-2">
           <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary/30 bg-primary/5">
             <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-xs font-medium tracking-wider" style={{ color: "hsl(142 71% 60%)" }}>ONLINE</span>
+            <span
+              className="text-xs font-medium tracking-wider"
+              style={{ color: "hsl(142 71% 60%)" }}
+            >
+              ONLINE
+            </span>
           </div>
 
           {/* Dashboard link */}
@@ -388,7 +503,10 @@ export default function Chat() {
             className="w-9 h-9 rounded-xl border border-border/60 bg-card flex items-center justify-center hover:border-primary/40 transition-colors"
             aria-label="Open dashboard"
           >
-            <LayoutDashboard className="w-4 h-4" style={{ color: "hsl(194 100% 55%)" }} />
+            <LayoutDashboard
+              className="w-4 h-4"
+              style={{ color: "hsl(194 100% 55%)" }}
+            />
           </button>
 
           {/* Debug mode toggle */}
@@ -399,13 +517,17 @@ export default function Chat() {
             className="w-9 h-9 rounded-xl border flex items-center justify-center transition-all duration-200"
             style={{
               background: debugMode ? "hsl(38 100% 55% / 0.15)" : "transparent",
-              borderColor: debugMode ? "hsl(38 100% 55% / 0.4)" : "hsl(210 15% 25%)",
+              borderColor: debugMode
+                ? "hsl(38 100% 55% / 0.4)"
+                : "hsl(210 15% 25%)",
             }}
             aria-label="Toggle debug mode"
           >
             <Terminal
               className="w-4 h-4"
-              style={{ color: debugMode ? "hsl(38 100% 65%)" : "hsl(196 40% 45%)" }}
+              style={{
+                color: debugMode ? "hsl(38 100% 65%)" : "hsl(196 40% 45%)",
+              }}
             />
           </button>
 
@@ -424,35 +546,72 @@ export default function Chat() {
         </div>
       </header>
 
+      {/* Mobile-safe Dashboard shortcut.
+          This sits outside the header so it cannot get squeezed off-screen on iPhone.
+          Tap it to open the productivity/task Dashboard. */}
+      <button
+        onClick={() => navigate("/dashboard")}
+        title="Open Dashboard"
+        className="fixed top-20 right-4 z-50 px-3 py-2 rounded-xl border-2 border-cyan-400 bg-black/90 text-cyan-300 text-xs font-bold tracking-wider shadow-lg"
+        aria-label="Open dashboard"
+      >
+        <span className="inline-flex items-center gap-2">
+          <LayoutDashboard className="w-4 h-4" />
+          Dashboard
+        </span>
+      </button>
+
       {/* Loading banner */}
       {isLoadingHistory && (
         <div className="relative z-10 flex-shrink-0 flex items-center justify-center gap-2 py-2 bg-primary/5 border-b border-primary/20">
           <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
-          <span className="text-xs tracking-wider" style={{ color: "hsl(194 100% 55%)" }}>RESTORING MEMORY...</span>
+          <span
+            className="text-xs tracking-wider"
+            style={{ color: "hsl(194 100% 55%)" }}
+          >
+            RESTORING MEMORY...
+          </span>
         </div>
       )}
 
       {/* Debug mode banner */}
       {debugMode && (
-        <div className="relative z-10 flex-shrink-0 flex items-center justify-center gap-2 py-1.5 border-b"
-          style={{ background: "hsl(38 100% 55% / 0.08)", borderColor: "hsl(38 100% 55% / 0.25)" }}>
+        <div
+          className="relative z-10 flex-shrink-0 flex items-center justify-center gap-2 py-1.5 border-b"
+          style={{
+            background: "hsl(38 100% 55% / 0.08)",
+            borderColor: "hsl(38 100% 55% / 0.25)",
+          }}
+        >
           <Terminal className="w-3 h-3" style={{ color: "hsl(38 100% 65%)" }} />
-          <span className="text-xs tracking-wider font-mono" style={{ color: "hsl(38 100% 65%)" }}>
+          <span
+            className="text-xs tracking-wider font-mono"
+            style={{ color: "hsl(38 100% 65%)" }}
+          >
             DEBUG MODE ACTIVE — click any response to expand reasoning
           </span>
         </div>
       )}
 
       {/* ── Message list ── */}
-      <main className="relative z-10 flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-8 py-6" data-testid="chat-messages">
+      <main
+        className="relative z-10 flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-8 py-6"
+        data-testid="chat-messages"
+      >
         <div className="max-w-3xl mx-auto flex flex-col gap-5">
           {/* Summary badge */}
           {memory?.summary && !isLoadingHistory && (
             <div className="flex items-center gap-2 py-2 px-3 rounded-xl bg-primary/5 border border-primary/20">
-              <Brain className="w-3 h-3 flex-shrink-0" style={{ color: "hsl(194 100% 55%)" }} />
+              <Brain
+                className="w-3 h-3 flex-shrink-0"
+                style={{ color: "hsl(194 100% 55%)" }}
+              />
               <p className="text-xs" style={{ color: "hsl(194 100% 55%)" }}>
                 Older messages are summarized in memory.{" "}
-                <button className="underline hover:no-underline" onClick={() => setPanelOpen(true)}>
+                <button
+                  className="underline hover:no-underline"
+                  onClick={() => setPanelOpen(true)}
+                >
                   View summary
                 </button>
               </p>
@@ -493,8 +652,12 @@ export default function Chat() {
               <Send className="w-4 h-4" style={{ color: "hsl(220 20% 6%)" }} />
             </button>
           </div>
-          <p className="text-center text-xs mt-2 tracking-wider" style={{ color: "hsl(196 30% 40%)" }}>
-            Intent-routed · Web search · Persistent memory · Press ⌘ to toggle debug
+          <p
+            className="text-center text-xs mt-2 tracking-wider"
+            style={{ color: "hsl(196 30% 40%)" }}
+          >
+            Intent-routed · Web search · Persistent memory · Press ⌘ to toggle
+            debug
           </p>
         </div>
       </footer>
@@ -513,3 +676,4 @@ export default function Chat() {
     </div>
   );
 }
+

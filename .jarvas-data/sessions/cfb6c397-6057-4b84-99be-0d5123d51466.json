@@ -50,13 +50,53 @@
       "role": "assistant",
       "content": "[DEMO MODE — add SEARCH_API_KEY for live results]\n\nScanning available data for: \"Latest news today\". Retrieved 3 relevant results.",
       "timestamp": "2026-05-25T07:43:45.344Z"
+    },
+    {
+      "role": "user",
+      "content": "add a high priority work task to finish Jarvas dashboard tomorrow",
+      "timestamp": "2026-05-25T08:00:01.036Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Task added: **add a high priority work task to finish Jarvas dashboard tomorrow**\n🟠 high priority · Work",
+      "timestamp": "2026-05-25T08:00:01.038Z"
+    },
+    {
+      "role": "user",
+      "content": "show me my tasks",
+      "timestamp": "2026-05-25T08:00:25.041Z"
+    },
+    {
+      "role": "assistant",
+      "content": "You have **1 open task**:\n\n🟠 **add a high priority work task to finish Jarvas dashboard tomorrow** [Work]",
+      "timestamp": "2026-05-25T08:00:25.042Z"
+    },
+    {
+      "role": "user",
+      "content": "what should I work on?",
+      "timestamp": "2026-05-25T08:00:35.562Z"
+    },
+    {
+      "role": "assistant",
+      "content": "You have **1 open task**:\n\n🟠 **add a high priority work task to finish Jarvas dashboard tomorrow** [Work]",
+      "timestamp": "2026-05-25T08:00:35.564Z"
+    },
+    {
+      "role": "user",
+      "content": "mark finish Jarvas dashboard done",
+      "timestamp": "2026-05-25T08:00:48.935Z"
+    },
+    {
+      "role": "assistant",
+      "content": "I couldn't find a task matching \"finish Jarvas dashboard done\". Your open tasks:\n• add a high priority work task to finish Jarvas dashboard tomorrow",
+      "timestamp": "2026-05-25T08:00:48.937Z"
     }
   ],
   "summary": null,
   "preferences": {
     "name": "JesseJames"
   },
-  "messageCount": 10,
+  "messageCount": 18,
   "createdAt": "2026-05-25T07:41:51.243Z",
-  "updatedAt": "2026-05-25T07:43:45.344Z"
+  "updatedAt": "2026-05-25T08:00:48.937Z"
 }
