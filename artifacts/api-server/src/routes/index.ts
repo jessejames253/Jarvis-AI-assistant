@@ -19,6 +19,7 @@ import searchRouter from "./search";
 import chatRouter from "./chat";
 import memoryRouter from "./memory";
 import tasksRouter from "./tasks";
+import kbRouter from "./kb";
 
 const router: IRouter = Router();
 
@@ -27,5 +28,6 @@ router.use(searchRouter);
 router.use(chatRouter);
 router.use(memoryRouter);
 router.use(tasksRouter);
+router.use(kbRouter);
 
 export default router;

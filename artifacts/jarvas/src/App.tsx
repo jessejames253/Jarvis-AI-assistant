@@ -26,6 +26,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Chat from "@/pages/Chat";
 import Dashboard from "@/pages/Dashboard";
+import KnowledgeBase from "@/pages/KnowledgeBase";
 import NotFound from "@/pages/not-found";
 
 // QueryClient is the central cache for all API data fetching in the app.
@@ -35,12 +36,14 @@ const queryClient = new QueryClient();
 // Router maps URL paths to page components.
 // "/"           → Chat page (the main interface)
 // "/dashboard"  → Task management dashboard
+// "/kb"         → Knowledge Base (notes, research, facts)
 // anything else → NotFound page (404)
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Chat} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/kb" component={KnowledgeBase} />
       <Route component={NotFound} />
     </Switch>
   );

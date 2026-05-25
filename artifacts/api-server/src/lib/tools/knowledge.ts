@@ -73,10 +73,38 @@ export const knowledgeTool: Tool = {
     const subject = extractSubject(input.message);
     const isFollowUp = input.history.length > 2;
 
+    // ── Personal KB check (highest priority source) ──────────────────────────
+    // The router injects relevant KB notes into memoryContext.kbNotes.
+    // If there are relevant notes, use them BEFORE the built-in knowledge base
+    // and BEFORE suggesting a web search. This is the core "KB-first" behaviour.
+    const kbNotes = input.memoryContext?.kbNotes;
+    if (kbNotes && kbNotes.length > 0) {
+      const items = kbNotes
+        .map((n) => {
+          const url = n.url ? `\n  🔗 ${n.url}` : "";
+          const tags = n.tags.length ? ` [${n.tags.join(", ")}]` : "";
+          const preview = n.content.length > 400 ? n.content.slice(0, 400).trim() + "…" : n.content;
+          return `**${n.title}**${tags}\n${preview}${url}`;
+        })
+        .join("\n\n");
+
+      return {
+        response: `From your Knowledge Base:\n\n${items}`,
+        action: "from_personal_kb",
+        mode: "knowledge_base",
+        reasoning: [
+          `Personal KB had ${kbNotes.length} relevant note(s)`,
+          `Top note: "${kbNotes[0].title}"`,
+          "Returned KB content (KB-first policy)",
+        ],
+      };
+    }
+
     const reasoning: string[] = [
       `Intent: ${input.classification.intent}`,
       `Sub-type: ${subtype}`,
       subject ? `Subject extracted: "${subject.slice(0, 50)}"` : "Subject: not clear",
+      "Personal KB: no relevant notes found",
       "Checking built-in knowledge base",
     ];
 

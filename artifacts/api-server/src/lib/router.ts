@@ -14,6 +14,7 @@
 
 import { classifyIntent } from "./intent";
 import { getTool } from "./tools/registry";
+import { searchNotes } from "./kb/manager";
 import type { HistoryEntry, DebugInfo, SearchResult, ToolInput } from "./types";
 
 // ─── I/O types ────────────────────────────────────────────────────────────────
@@ -57,9 +58,31 @@ export async function route(input: RouterInput): Promise<RouterOutput> {
   const toolInput: ToolInput = {
     message: input.message,
     history: input.history,
-    memoryContext: input.memoryContext,
+    memoryContext: { ...(input.memoryContext ?? {}) },
     classification,
   };
+
+  // Step 3b: KB injection — search the personal Knowledge Base and attach
+  // relevant notes to memoryContext.kbNotes so any tool can reference them.
+  // This is what makes Jarvas consult your own notes before external sources.
+  const sessionId = toolInput.memoryContext?.sessionId;
+  if (sessionId && classification.intent !== "casual" && classification.intent !== "identity") {
+    try {
+      const hits = await searchNotes(sessionId, input.message, 3);
+      if (hits.length > 0 && hits[0].score > 0.15) {
+        toolInput.memoryContext!.kbNotes = hits.map((h) => ({
+          id: h.note.id,
+          title: h.note.title,
+          content: h.note.content,
+          type: h.note.type,
+          tags: h.note.tags,
+          url: h.note.url,
+        }));
+      }
+    } catch {
+      // KB search failure should never block a chat response
+    }
+  }
 
   // Step 4: Execute the tool
   const toolOutput = await tool.execute(toolInput);

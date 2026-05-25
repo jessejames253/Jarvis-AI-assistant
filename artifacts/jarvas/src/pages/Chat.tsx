@@ -18,6 +18,7 @@ import {
   Brain,
   Terminal,
   LayoutDashboard,
+  BookOpen,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import MemoryPanel, { type SessionMemory } from "@/components/MemoryPanel";
@@ -496,6 +497,19 @@ export default function Chat() {
             </span>
           </div>
 
+          {/* Knowledge Base link */}
+          <button
+            onClick={() => navigate("/kb")}
+            title="Open Knowledge Base"
+            className="w-9 h-9 rounded-xl border border-border/60 bg-card flex items-center justify-center hover:border-primary/40 transition-colors"
+            aria-label="Open Knowledge Base"
+          >
+            <BookOpen
+              className="w-4 h-4"
+              style={{ color: "hsl(264 80% 70%)" }}
+            />
+          </button>
+
           {/* Dashboard link */}
           <button
             onClick={() => navigate("/dashboard")}
@@ -546,20 +560,33 @@ export default function Chat() {
         </div>
       </header>
 
-      {/* Mobile-safe Dashboard shortcut.
-          This sits outside the header so it cannot get squeezed off-screen on iPhone.
-          Tap it to open the productivity/task Dashboard. */}
-      <button
-        onClick={() => navigate("/dashboard")}
-        title="Open Dashboard"
-        className="fixed top-20 right-4 z-50 px-3 py-2 rounded-xl border-2 border-cyan-400 bg-black/90 text-cyan-300 text-xs font-bold tracking-wider shadow-lg"
-        aria-label="Open dashboard"
-      >
-        <span className="inline-flex items-center gap-2">
-          <LayoutDashboard className="w-4 h-4" />
-          Dashboard
-        </span>
-      </button>
+      {/* Mobile-safe nav shortcuts.
+          Sit outside the header so they cannot get squeezed off-screen on iPhone. */}
+      <div className="fixed top-20 right-4 z-50 flex flex-col gap-2">
+        <button
+          onClick={() => navigate("/kb")}
+          title="Open Knowledge Base"
+          className="px-3 py-2 rounded-xl border-2 bg-black/90 text-xs font-bold tracking-wider shadow-lg"
+          style={{ borderColor: "hsl(264 80% 70%)", color: "hsl(264 80% 75%)" }}
+          aria-label="Open Knowledge Base"
+        >
+          <span className="inline-flex items-center gap-2">
+            <BookOpen className="w-4 h-4" />
+            Notes
+          </span>
+        </button>
+        <button
+          onClick={() => navigate("/dashboard")}
+          title="Open Dashboard"
+          className="px-3 py-2 rounded-xl border-2 border-cyan-400 bg-black/90 text-cyan-300 text-xs font-bold tracking-wider shadow-lg"
+          aria-label="Open dashboard"
+        >
+          <span className="inline-flex items-center gap-2">
+            <LayoutDashboard className="w-4 h-4" />
+            Dashboard
+          </span>
+        </button>
+      </div>
 
       {/* Loading banner */}
       {isLoadingHistory && (

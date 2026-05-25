@@ -1,0 +1,20 @@
+{
+  "sessionId": "1db607e2-64e4-4017-b033-8f31c05aa854",
+  "messages": [
+    {
+      "role": "user",
+      "content": "What is 99*20",
+      "timestamp": "2026-05-25T17:38:02.957Z"
+    },
+    {
+      "role": "assistant",
+      "content": "**99*20 = 1980**",
+      "timestamp": "2026-05-25T17:38:02.963Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {},
+  "messageCount": 2,
+  "createdAt": "2026-05-25T08:38:21.942Z",
+  "updatedAt": "2026-05-25T17:38:02.963Z"
+}

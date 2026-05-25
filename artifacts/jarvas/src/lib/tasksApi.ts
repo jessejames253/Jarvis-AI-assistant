@@ -132,6 +132,7 @@ export function createProject(body: {
   name: string;
   description?: string;
   category?: TaskCategory;
+  color?: string;
 }): Promise<Project> {
   return request(api("projects"), {
     method: "POST",

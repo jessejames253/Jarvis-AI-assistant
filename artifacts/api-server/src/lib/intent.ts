@@ -125,6 +125,21 @@ const DESCRIPTORS: IntentDescriptor[] = [
     ],
   },
   {
+    intent: "knowledge_base",
+    strongPatterns: [
+      /\b(search|find|look up|what did i (save|note|write|store))\b.*\b(note|kb|knowledge|research)\b/i,
+      /\b(save|add|store)\b.{0,30}\b(as a?\s+)?(note|fact|research link|idea)\b/i,
+      /\b(notes? on|notes? about|my notes?|my research|my facts?)\b/i,
+      /\bopen (my )?(kb|knowledge base|notes?)\b/i,
+      /\b(what'?s? in my (kb|knowledge base|notes))\b/i,
+    ],
+    weakPatterns: [
+      /\b(note|notes|kb|knowledge base)\b/i,
+      /\b(saved|stored|remembered|bookmarked)\b/i,
+      /\b(research link|saved link|bookmark)\b/i,
+    ],
+  },
+  {
     intent: "task_management",
     strongPatterns: [
       /\b(add|create|new|make)\s+(a\s+)?(task|todo|to-do|reminder)\b/i,
