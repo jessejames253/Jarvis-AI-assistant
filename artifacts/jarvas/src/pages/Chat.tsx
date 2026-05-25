@@ -25,7 +25,8 @@ import {
   VolumeX,
 } from "lucide-react";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
-import { useSpeechOutput } from "@/hooks/useSpeechOutput";
+import { useSpeechSession } from "@/hooks/useSpeechSession";
+import SpeechDebugOverlay from "@/components/SpeechDebugOverlay";
 import { useLocation } from "wouter";
 import MemoryPanel, { type SessionMemory } from "@/components/MemoryPanel";
 import DebugPanel, { type DebugInfo } from "@/components/DebugPanel";
@@ -418,7 +419,7 @@ export default function Chat() {
 
   // ── Voice ────────────────────────────────────────────────────────────────
   const speechInput = useSpeechInput();
-  const speechOutput = useSpeechOutput();
+  const speech = useSpeechSession();
   // Base text in input box before voice recording started (so interim results
   // replace correctly and don't duplicate already-typed text)
   const micBaseTextRef = useRef<string>("");
@@ -428,6 +429,7 @@ export default function Chat() {
   // Token batching — flush to state at most every 25 ms to avoid over-rendering
   const tokenBufferRef = useRef<string>("");
   const tokenFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const responseContentRef = useRef<string>("");
 
   const scrollToBottom = useCallback((instant = false) => {
     messagesEndRef.current?.scrollIntoView({ behavior: instant ? "auto" : "smooth" });
@@ -497,6 +499,7 @@ export default function Chat() {
 
   // ── Mic toggle ─────────────────────────────────────────────────────────────
   const toggleMic = useCallback(() => {
+    speech.unlock();
     if (speechInput.isListening) {
       speechInput.stop();
       return;
@@ -532,6 +535,8 @@ export default function Chat() {
   const sendMessage = useCallback(async () => {
     const text = input.trim();
     if (!text || isTyping || isStreaming) return;
+    speech.unlock();
+    responseContentRef.current = "";
 
     const userMsg: Message = {
       id: `user-${Date.now()}`,
@@ -602,6 +607,7 @@ export default function Chat() {
       BASE,
       // onToken
       (tokenText) => {
+        responseContentRef.current += tokenText;
         if (!messageCreated) {
           ensureMessageCreated(tokenText);
           return;
@@ -632,6 +638,10 @@ export default function Chat() {
         if (data.debug?.action === "preference_update") {
           loadSession(sessionId, BASE).then(setMemory).catch(() => {});
         }
+        if (speech.autoSpeak) {
+          speech.queue(currentMsgId, responseContentRef.current);
+        }
+        responseContentRef.current = "";
       },
       // onError
       handleError,
@@ -831,6 +841,25 @@ export default function Chat() {
             <Terminal className="w-4 h-4" style={{ color: debugMode ? "hsl(38 100% 65%)" : "hsl(196 40% 45%)" }} />
           </button>
 
+          {/* Auto-speak toggle */}
+          {speech.isSupported && (
+            <button
+              onClick={() => { speech.unlock(); speech.setAutoSpeak(!speech.autoSpeak); }}
+              title={speech.autoSpeak ? "Auto-speak on — click to disable" : "Auto-speak off — click to enable"}
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border flex items-center justify-center transition-all duration-200 active:scale-95"
+              style={{
+                background: speech.autoSpeak ? "hsl(142 60% 40% / 0.15)" : "transparent",
+                borderColor: speech.autoSpeak ? "hsl(142 60% 40% / 0.45)" : "hsl(210 15% 25%)",
+              }}
+              aria-label={speech.autoSpeak ? "Disable auto-speak" : "Enable auto-speak"}
+            >
+              {speech.autoSpeak
+                ? <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: "hsl(142 71% 60%)" }} />
+                : <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: "hsl(196 40% 40%)" }} />
+              }
+            </button>
+          )}
+
           {/* Memory */}
           <button
             onClick={() => setPanelOpen(true)}
@@ -928,9 +957,9 @@ export default function Chat() {
               message={msg}
               showDebug={debugMode}
               isStreaming={isStreaming && msg.id === streamingMsgId}
-              isSpeaking={speechOutput.speakingMsgId === msg.id}
-              onSpeak={() => speechOutput.speak(msg.id, msg.content)}
-              onStopSpeak={speechOutput.stop}
+              isSpeaking={speech.isSpeakingMsg(msg.id)}
+              onSpeak={() => speech.toggle(msg.id, msg.content)}
+              onStopSpeak={speech.stop}
             />
           ))}
 
@@ -1012,6 +1041,11 @@ export default function Chat() {
           </p>
         </div>
       </footer>
+
+      {/* Speech debug overlay — visible when debug mode is on */}
+      {debugMode && speech.isSupported && (
+        <SpeechDebugOverlay speech={speech} />
+      )}
 
       {/* Memory panel */}
       <MemoryPanel
