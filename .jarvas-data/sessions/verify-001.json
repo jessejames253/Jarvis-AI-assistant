@@ -1,0 +1,40 @@
+{
+  "sessionId": "verify-001",
+  "messages": [
+    {
+      "role": "user",
+      "content": "what is 45 * 12 + 7",
+      "timestamp": "2026-05-25T07:38:02.773Z"
+    },
+    {
+      "role": "assistant",
+      "content": "**45 * 12 + 7 = 547**",
+      "timestamp": "2026-05-25T07:38:02.779Z"
+    },
+    {
+      "role": "user",
+      "content": "what is the latest news in AI today",
+      "timestamp": "2026-05-25T07:38:02.960Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Artificial intelligence refers to software systems that perform tasks typically requiring human-like reasoning — recognising patterns, making decisions, generating language, or solving problems. Modern AI is largely built on machine learning: statistical models trained on large datasets rather than hand-coded rules.",
+      "timestamp": "2026-05-25T07:38:02.963Z"
+    },
+    {
+      "role": "user",
+      "content": "what is machine learning",
+      "timestamp": "2026-05-25T07:38:03.156Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Machine learning is a branch of AI where models learn patterns from data rather than following explicit instructions. Given enough examples, a model can generalise to new inputs — the basis of everything from image recognition to language models.",
+      "timestamp": "2026-05-25T07:38:03.159Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {},
+  "messageCount": 6,
+  "createdAt": "2026-05-25T07:38:02.771Z",
+  "updatedAt": "2026-05-25T07:38:03.159Z"
+}

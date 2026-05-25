@@ -1,26 +1,19 @@
 /**
- * pages/Chat.tsx — Main Jarvas chat interface with persistent memory
+ * pages/Chat.tsx — Main Jarvas chat interface
  *
- * Session lifecycle:
- *   1. On mount, read (or generate) a UUID from localStorage → sessionId
- *   2. Fetch GET /api/memory/:sessionId to restore stored messages
- *   3. Show restored messages in the chat immediately
- *   4. Every message sent is persisted server-side via POST /api/chat?sessionId=...
- *   5. The memory panel lets users view session stats, set their name, and clear memory
+ * All messages now go through a single POST /api/chat endpoint.
+ * The backend handles intent classification, tool routing, web search,
+ * and memory — the frontend just sends the message and renders the response.
  *
- * State:
- *   messages     — conversation displayed in the UI
- *   input        — current textarea value
- *   isTyping     — whether Jarvas is "thinking" (shows indicator)
- *   isSearching  — whether a web search is running
- *   memory       — the SessionMemory object from the backend
- *   sessionId    — UUID stored in localStorage, identifies this browser's session
- *   panelOpen    — whether the memory side panel is visible
+ * Debug mode (toggle with the Terminal button in the header):
+ *   Each assistant message shows a debug panel with intent, action,
+ *   confidence, reasoning path, and timing.
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Search, ExternalLink, Brain } from "lucide-react";
+import { Send, Search, ExternalLink, Brain, Terminal } from "lucide-react";
 import MemoryPanel, { type SessionMemory } from "@/components/MemoryPanel";
+import DebugPanel, { type DebugInfo } from "@/components/DebugPanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,13 +31,14 @@ interface Message {
   sources?: Source[];
   isSearch?: boolean;
   isFakeSearch?: boolean;
+  debug?: DebugInfo;
 }
 
 // ─── Session management ───────────────────────────────────────────────────────
 
 const SESSION_KEY = "jarvas_session_id";
+const DEBUG_KEY = "jarvas_debug_mode";
 
-/** Gets the current session ID from localStorage, or creates and stores a new one */
 function getOrCreateSessionId(): string {
   const existing = localStorage.getItem(SESSION_KEY);
   if (existing) return existing;
@@ -53,58 +47,41 @@ function getOrCreateSessionId(): string {
   return id;
 }
 
-/** Replaces the session with a new UUID (starts a fresh conversation) */
 function createNewSessionId(): string {
   const id = crypto.randomUUID();
   localStorage.setItem(SESSION_KEY, id);
   return id;
 }
 
-// ─── Web search trigger detection ─────────────────────────────────────────────
-
-const SEARCH_TRIGGERS = [
-  /\b(latest|current|recent|today|right now|this year|this week|this month)\b/i,
-  /\b(news|breaking|just announced|just released|just launched)\b/i,
-  /\b(weather|stock price|score|live results|election results)\b/i,
-  /\bsearch (?:for |the web for |online for )?(.+)/i,
-];
-
-function needsWebSearch(text: string): boolean {
-  return SEARCH_TRIGGERS.some((re) => re.test(text));
+function getDebugMode(): boolean {
+  return localStorage.getItem(DEBUG_KEY) === "true";
 }
 
-// ─── API helpers ──────────────────────────────────────────────────────────────
+function setDebugMode(val: boolean): void {
+  localStorage.setItem(DEBUG_KEY, String(val));
+}
 
-/** Sends a message to the chat endpoint and returns Jarvas's reply */
-async function callChat(
-  message: string,
-  sessionId: string,
-  base: string
-): Promise<{ response: string; model: string }> {
+// ─── API ─────────────────────────────────────────────────────────────────────
+
+interface ChatApiResponse {
+  response: string;
+  model: string;
+  sources?: Source[];
+  isSearch?: boolean;
+  isFakeSearch?: boolean;
+  debug: DebugInfo;
+}
+
+async function callChat(message: string, sessionId: string, base: string): Promise<ChatApiResponse> {
   const res = await fetch(`${base}api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, sessionId }),
   });
   if (!res.ok) throw new Error(`Chat API error: ${res.status}`);
-  return res.json() as Promise<{ response: string; model: string }>;
+  return res.json() as Promise<ChatApiResponse>;
 }
 
-/** Sends a search query and returns web results */
-async function callSearch(
-  query: string,
-  base: string
-): Promise<{ answer: string; results: Source[]; isFake: boolean }> {
-  const res = await fetch(`${base}api/search`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query }),
-  });
-  if (!res.ok) throw new Error(`Search API error: ${res.status}`);
-  return res.json() as Promise<{ answer: string; results: Source[]; isFake: boolean }>;
-}
-
-/** Loads a session from the backend (creates it if new) */
 async function loadSession(sessionId: string, base: string): Promise<SessionMemory> {
   const res = await fetch(`${base}api/memory/${sessionId}`);
   if (!res.ok) throw new Error(`Memory API error: ${res.status}`);
@@ -113,27 +90,18 @@ async function loadSession(sessionId: string, base: string): Promise<SessionMemo
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function TypingIndicator({ isSearching }: { isSearching?: boolean }) {
+function TypingIndicator() {
   return (
     <div className="flex items-end gap-3 message-enter" data-testid="typing-indicator">
       <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/40 flex items-center justify-center flex-shrink-0 glow-primary">
         <span className="font-display text-primary text-xs font-bold">J</span>
       </div>
       <div className="bg-card border border-card-border rounded-2xl rounded-bl-sm px-4 py-3">
-        {isSearching ? (
-          <div className="flex items-center gap-2">
-            <Search className="w-3.5 h-3.5 animate-pulse" style={{ color: "hsl(194 100% 60%)" }} />
-            <span className="text-xs tracking-wider" style={{ color: "hsl(194 100% 60%)" }}>
-              SCANNING WEB...
-            </span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5 h-5">
-            <span className="typing-dot w-1.5 h-1.5 bg-primary rounded-full" />
-            <span className="typing-dot w-1.5 h-1.5 bg-primary rounded-full" />
-            <span className="typing-dot w-1.5 h-1.5 bg-primary rounded-full" />
-          </div>
-        )}
+        <div className="flex items-center gap-1.5 h-5">
+          <span className="typing-dot w-1.5 h-1.5 bg-primary rounded-full" />
+          <span className="typing-dot w-1.5 h-1.5 bg-primary rounded-full" />
+          <span className="typing-dot w-1.5 h-1.5 bg-primary rounded-full" />
+        </div>
       </div>
     </div>
   );
@@ -153,27 +121,21 @@ function SourceCard({ source, index }: { source: Source; index: number }) {
       className="flex items-start gap-3 p-3 rounded-xl border border-primary/20 bg-primary/5 hover:border-primary/40 hover:bg-primary/10 transition-all duration-200 group"
     >
       <div className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
-        <span className="font-display text-xs font-bold" style={{ color: "hsl(194 100% 60%)" }}>
-          {index + 1}
-        </span>
+        <span className="font-display text-xs font-bold" style={{ color: "hsl(194 100% 60%)" }}>{index + 1}</span>
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 mb-0.5">
-          <p className="text-xs font-semibold truncate leading-tight" style={{ color: "hsl(194 100% 75%)" }}>
-            {source.title}
-          </p>
+          <p className="text-xs font-semibold truncate leading-tight" style={{ color: "hsl(194 100% 75%)" }}>{source.title}</p>
           <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: "hsl(194 100% 60%)" }} />
         </div>
-        <p className="text-xs mb-1 leading-snug line-clamp-2" style={{ color: "hsl(196 40% 55%)" }}>
-          {source.description}
-        </p>
+        <p className="text-xs mb-1 leading-snug line-clamp-2" style={{ color: "hsl(196 40% 55%)" }}>{source.description}</p>
         <p className="text-xs font-mono" style={{ color: "hsl(194 100% 45%)" }}>{hostname}</p>
       </div>
     </a>
   );
 }
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message, showDebug }: { message: Message; showDebug: boolean }) {
   const isUser = message.role === "user";
   const timeStr = message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
@@ -194,11 +156,13 @@ function MessageBubble({ message }: { message: Message }) {
   }
 
   return (
-    <div className="flex items-end gap-3 message-enter" data-testid={`message-assistant-${message.id}`}>
-      <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/40 flex items-center justify-center flex-shrink-0 pulse-glow">
+    <div className="flex items-start gap-3 message-enter" data-testid={`message-assistant-${message.id}`}>
+      <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/40 flex items-center justify-center flex-shrink-0 pulse-glow mt-0.5">
         <span className="font-display text-primary text-xs font-bold">J</span>
       </div>
-      <div className="flex flex-col gap-2 max-w-[85%] sm:max-w-[80%]">
+
+      <div className="flex flex-col gap-2 max-w-[85%] sm:max-w-[80%] min-w-0">
+        {/* Search / web badge */}
         {message.isSearch && (
           <div className="flex items-center gap-1.5 px-1">
             <Search className="w-3 h-3" style={{ color: "hsl(194 100% 55%)" }} />
@@ -207,17 +171,27 @@ function MessageBubble({ message }: { message: Message }) {
             </span>
           </div>
         )}
-        <div className="bg-card border border-card-border rounded-2xl rounded-bl-sm px-4 py-3">
+
+        {/* Main bubble */}
+        <div className="bg-card border border-card-border rounded-2xl rounded-tl-sm px-4 py-3">
           <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: "hsl(196 80% 80%)" }}>
             {message.content}
           </p>
         </div>
+
+        {/* Source cards */}
         {message.sources && message.sources.length > 0 && (
           <div className="flex flex-col gap-2 px-1" data-testid="search-sources">
-            {message.sources.map((source, i) => <SourceCard key={i} source={source} index={i} />)}
+            {message.sources.map((s, i) => <SourceCard key={i} source={s} index={i} />)}
           </div>
         )}
+
         <span className="text-xs text-muted-foreground px-1">{timeStr}</span>
+
+        {/* Debug panel — shown only when debug mode is on */}
+        {showDebug && message.debug && (
+          <DebugPanel debug={message.debug} />
+        )}
       </div>
     </div>
   );
@@ -227,24 +201,22 @@ function MessageBubble({ message }: { message: Message }) {
 
 const BASE = import.meta.env.BASE_URL;
 
-const WELCOME_MESSAGE = (name?: string): Message => ({
+const WELCOME = (name?: string): Message => ({
   id: "init",
   role: "assistant",
   content: name
     ? `Hello, ${name}. I remember you. What can I help with today?`
-    : "Hello. I'm Jarvas — ask me anything. I'll search the web when you need current information.",
+    : "Hello. I'm Jarvas — ask me anything. I'll search the web, write code, help plan, or just talk.",
   timestamp: new Date(),
 });
 
 export default function Chat() {
-  // Session ID — unique per browser, persisted in localStorage
-  const [sessionId, setSessionId] = useState<string>(() => getOrCreateSessionId());
-
-  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE()]);
+  const [sessionId, setSessionId] = useState(() => getOrCreateSessionId());
+  const [messages, setMessages] = useState<Message[]>([WELCOME()]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [debugMode, setDebugModeState] = useState(() => getDebugMode());
   const [memory, setMemory] = useState<SessionMemory | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
 
@@ -255,11 +227,9 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, isTyping, scrollToBottom]);
+  useEffect(() => { scrollToBottom(); }, [messages, isTyping, scrollToBottom]);
 
-  // ── Load session on mount (or when session changes) ──────────────────────
+  // Load session on mount / session change
   useEffect(() => {
     let cancelled = false;
     setIsLoadingHistory(true);
@@ -268,8 +238,6 @@ export default function Chat() {
       .then((session) => {
         if (cancelled) return;
         setMemory(session);
-
-        // Restore stored messages into the chat UI
         if (session.messages.length > 0) {
           const restored: Message[] = session.messages.map((m, i) => ({
             id: `restored-${i}`,
@@ -277,23 +245,25 @@ export default function Chat() {
             content: m.content,
             timestamp: new Date(m.timestamp),
           }));
-          // Prepend welcome, then restored history
-          setMessages([WELCOME_MESSAGE(session.preferences?.name), ...restored]);
+          setMessages([WELCOME(session.preferences?.name), ...restored]);
         } else {
-          setMessages([WELCOME_MESSAGE(session.preferences?.name)]);
+          setMessages([WELCOME(session.preferences?.name)]);
         }
       })
-      .catch(() => {
-        if (!cancelled) setMessages([WELCOME_MESSAGE()]);
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoadingHistory(false);
-      });
+      .catch(() => { if (!cancelled) setMessages([WELCOME()]); })
+      .finally(() => { if (!cancelled) setIsLoadingHistory(false); });
 
     return () => { cancelled = true; };
   }, [sessionId]);
 
-  // ── Send message ─────────────────────────────────────────────────────────
+  const toggleDebug = useCallback(() => {
+    setDebugModeState((v) => {
+      const next = !v;
+      setDebugMode(next);
+      return next;
+    });
+  }, []);
+
   const sendMessage = useCallback(async () => {
     const text = input.trim();
     if (!text || isTyping) return;
@@ -308,49 +278,31 @@ export default function Chat() {
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setIsTyping(true);
-
     if (textareaRef.current) textareaRef.current.style.height = "auto";
-
-    // Update local message count so the memory panel stays in sync
     setMemory((prev) => prev ? { ...prev, messageCount: prev.messageCount + 1 } : prev);
 
-    // ── Web search path ──────────────────────────────────────────────────────
-    if (needsWebSearch(text)) {
-      setIsSearching(true);
-      try {
-        const data = await callSearch(text, BASE);
-        setIsSearching(false);
-        setIsTyping(false);
-        const assistantMsg: Message = {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: data.answer,
-          timestamp: new Date(),
-          sources: data.results,
-          isSearch: true,
-          isFakeSearch: data.isFake,
-        };
-        setMessages((prev) => [...prev, assistantMsg]);
-        setMemory((prev) => prev ? { ...prev, messageCount: prev.messageCount + 1 } : prev);
-        return;
-      } catch {
-        setIsSearching(false);
-        // fall through to chat path
-      }
-    }
-
-    // ── Chat path (memory-backed) ────────────────────────────────────────────
     try {
       const data = await callChat(text, sessionId, BASE);
       setIsTyping(false);
+
       const assistantMsg: Message = {
         id: `assistant-${Date.now()}`,
         role: "assistant",
         content: data.response,
         timestamp: new Date(),
+        sources: data.sources,
+        isSearch: data.isSearch,
+        isFakeSearch: data.isFakeSearch,
+        debug: data.debug,
       };
+
       setMessages((prev) => [...prev, assistantMsg]);
       setMemory((prev) => prev ? { ...prev, messageCount: prev.messageCount + 1 } : prev);
+
+      // If the memory tool updated a preference, refresh memory panel
+      if (data.debug?.action === "preference_update") {
+        loadSession(sessionId, BASE).then(setMemory).catch(() => {});
+      }
     } catch {
       setIsTyping(false);
       setMessages((prev) => [
@@ -376,32 +328,28 @@ export default function Chat() {
     el.style.height = Math.min(el.scrollHeight, 120) + "px";
   };
 
-  // ── Memory panel callbacks ───────────────────────────────────────────────
   const handleMemoryCleared = useCallback(() => {
     setMemory((prev) => prev
       ? { ...prev, messages: [], summary: null, preferences: {}, messageCount: 0 }
-      : prev
-    );
-    setMessages([WELCOME_MESSAGE()]);
+      : prev);
+    setMessages([WELCOME()]);
   }, []);
 
   const handleNewSession = useCallback(() => {
     const newId = createNewSessionId();
     setSessionId(newId);
     setMemory(null);
-    setMessages([WELCOME_MESSAGE()]);
+    setMessages([WELCOME()]);
   }, []);
 
   const handlePreferencesSaved = useCallback((updated: SessionMemory) => {
     setMemory(updated);
-    // Update the welcome message greeting if the user just set their name
     setMessages((prev) => {
       const rest = prev.filter((m) => m.id !== "init");
-      return [WELCOME_MESSAGE(updated.preferences?.name), ...rest];
+      return [WELCOME(updated.preferences?.name), ...rest];
     });
   }, []);
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-screen w-full bg-background scan-overlay overflow-hidden">
       <div className="fixed inset-0 bg-grid opacity-60 pointer-events-none" />
@@ -416,12 +364,11 @@ export default function Chat() {
             <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-primary rounded-full animate-pulse" />
           </div>
           <div>
-            <h1 className="font-display font-bold text-xl sm:text-2xl tracking-widest glow-primary-text"
-              style={{ color: "hsl(194 100% 60%)" }}>
+            <h1 className="font-display font-bold text-xl sm:text-2xl tracking-widest glow-primary-text" style={{ color: "hsl(194 100% 60%)" }}>
               JARVAS
             </h1>
             <p className="text-xs tracking-widest" style={{ color: "hsl(196 40% 50%)" }}>
-              AI ASSISTANT · WEB SEARCH ENABLED
+              AGENT v2 · INTENT ROUTING · WEB SEARCH
             </p>
           </div>
         </div>
@@ -429,21 +376,35 @@ export default function Chat() {
         <div className="flex items-center gap-2">
           <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary/30 bg-primary/5">
             <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-xs font-medium tracking-wider" style={{ color: "hsl(142 71% 60%)" }}>
-              ONLINE
-            </span>
+            <span className="text-xs font-medium tracking-wider" style={{ color: "hsl(142 71% 60%)" }}>ONLINE</span>
           </div>
 
-          {/* Memory button — opens the memory panel */}
+          {/* Debug mode toggle */}
+          <button
+            onClick={toggleDebug}
+            data-testid="button-toggle-debug"
+            title={debugMode ? "Hide debug panel" : "Show debug panel"}
+            className="w-9 h-9 rounded-xl border flex items-center justify-center transition-all duration-200"
+            style={{
+              background: debugMode ? "hsl(38 100% 55% / 0.15)" : "transparent",
+              borderColor: debugMode ? "hsl(38 100% 55% / 0.4)" : "hsl(210 15% 25%)",
+            }}
+            aria-label="Toggle debug mode"
+          >
+            <Terminal
+              className="w-4 h-4"
+              style={{ color: debugMode ? "hsl(38 100% 65%)" : "hsl(196 40% 45%)" }}
+            />
+          </button>
+
+          {/* Memory panel toggle */}
           <button
             onClick={() => setPanelOpen(true)}
             data-testid="button-open-memory"
             className="relative w-9 h-9 rounded-xl border border-border/60 bg-card flex items-center justify-center hover:border-primary/40 transition-colors"
             aria-label="Open memory panel"
-            title="Memory & Preferences"
           >
             <Brain className="w-4 h-4" style={{ color: "hsl(194 100% 55%)" }} />
-            {/* Dot indicator: lit when session has messages saved */}
             {(memory?.messageCount ?? 0) > 0 && (
               <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-primary rounded-full" />
             )}
@@ -451,12 +412,21 @@ export default function Chat() {
         </div>
       </header>
 
-      {/* ── Loading banner (shown while restoring history) ── */}
+      {/* Loading banner */}
       {isLoadingHistory && (
         <div className="relative z-10 flex-shrink-0 flex items-center justify-center gap-2 py-2 bg-primary/5 border-b border-primary/20">
           <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
-          <span className="text-xs tracking-wider" style={{ color: "hsl(194 100% 55%)" }}>
-            RESTORING MEMORY...
+          <span className="text-xs tracking-wider" style={{ color: "hsl(194 100% 55%)" }}>RESTORING MEMORY...</span>
+        </div>
+      )}
+
+      {/* Debug mode banner */}
+      {debugMode && (
+        <div className="relative z-10 flex-shrink-0 flex items-center justify-center gap-2 py-1.5 border-b"
+          style={{ background: "hsl(38 100% 55% / 0.08)", borderColor: "hsl(38 100% 55% / 0.25)" }}>
+          <Terminal className="w-3 h-3" style={{ color: "hsl(38 100% 65%)" }} />
+          <span className="text-xs tracking-wider font-mono" style={{ color: "hsl(38 100% 65%)" }}>
+            DEBUG MODE ACTIVE — click any response to expand reasoning
           </span>
         </div>
       )}
@@ -464,24 +434,24 @@ export default function Chat() {
       {/* ── Message list ── */}
       <main className="relative z-10 flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-8 py-6" data-testid="chat-messages">
         <div className="max-w-3xl mx-auto flex flex-col gap-5">
-          {/* Summary badge — shown when older messages have been compressed */}
+          {/* Summary badge */}
           {memory?.summary && !isLoadingHistory && (
             <div className="flex items-center gap-2 py-2 px-3 rounded-xl bg-primary/5 border border-primary/20">
               <Brain className="w-3 h-3 flex-shrink-0" style={{ color: "hsl(194 100% 55%)" }} />
               <p className="text-xs" style={{ color: "hsl(194 100% 55%)" }}>
-                Older messages have been summarized and stored in memory.{" "}
-                <button
-                  className="underline hover:no-underline"
-                  onClick={() => setPanelOpen(true)}
-                >
+                Older messages are summarized in memory.{" "}
+                <button className="underline hover:no-underline" onClick={() => setPanelOpen(true)}>
                   View summary
                 </button>
               </p>
             </div>
           )}
 
-          {messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)}
-          {isTyping && <TypingIndicator isSearching={isSearching} />}
+          {messages.map((msg) => (
+            <MessageBubble key={msg.id} message={msg} showDebug={debugMode} />
+          ))}
+
+          {isTyping && <TypingIndicator />}
           <div ref={messagesEndRef} />
         </div>
       </main>
@@ -495,7 +465,7 @@ export default function Chat() {
               data-testid="input-message"
               className="flex-1 bg-transparent resize-none outline-none text-sm leading-relaxed placeholder:text-muted-foreground min-h-[24px] max-h-[120px] scrollbar-thin"
               style={{ color: "hsl(196 80% 85%)" }}
-              placeholder="Ask anything — Jarvas will search the web if needed..."
+              placeholder="Ask anything — Jarvas detects intent automatically..."
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
@@ -512,12 +482,12 @@ export default function Chat() {
             </button>
           </div>
           <p className="text-center text-xs mt-2 tracking-wider" style={{ color: "hsl(196 30% 40%)" }}>
-            Jarvas remembers your conversations · Web search enabled
+            Intent-routed · Web search · Persistent memory · Press ⌘ to toggle debug
           </p>
         </div>
       </footer>
 
-      {/* ── Memory panel (slide in from right) ── */}
+      {/* Memory panel */}
       <MemoryPanel
         isOpen={panelOpen}
         onClose={() => setPanelOpen(false)}

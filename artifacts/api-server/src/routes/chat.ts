@@ -3,42 +3,43 @@
  *
  * POST /api/chat
  *
- * Accepts a user message and returns Jarvas's response.
- * When a sessionId is provided, this route:
- *   1. Loads conversation history from persistent memory (server-side)
- *   2. Saves the user message before generating the response
- *   3. Saves the assistant response after generating it
+ * Full pipeline:
+ *   1. Validate input
+ *   2. Load session history from memory (if sessionId provided)
+ *   3. Save the user's message to memory
+ *   4. Run the agent: classify intent → route to tool → generate response
+ *   5. Save the assistant's response to memory
+ *   6. Apply any side effects (e.g. preference updates from the memory tool)
+ *   7. Return response + sources + debug info
  *
  * Request body:
  *   {
- *     message:   string  — the user's latest message (required)
- *     sessionId: string  — UUID identifying the chat session (optional)
+ *     message:   string   — the user's message (required)
+ *     sessionId: string   — UUID identifying the session (optional)
  *   }
  *
  * Response:
  *   {
- *     response: string  — Jarvas's reply
- *     model:    string  — which engine produced the response
+ *     response:   string       — Jarvas's reply
+ *     model:      string       — engine that produced the response
+ *     sources?:   Source[]     — web search results (when intent = research)
+ *     isSearch?:  boolean      — true when sources are included
+ *     isFakeSearch?: boolean   — true when running in demo search mode
+ *     debug:      DebugInfo    — intent, action, reasoning path, timing
  *   }
- *
- * If no sessionId is given, the route falls back to stateless mode:
- * history must be provided by the client and nothing is persisted.
- *
- * To plug in a real AI model, only lib/responder.ts needs to change.
  */
 
 import { Router } from "express";
-import { complete, type HistoryEntry } from "../lib/responder";
-import { appendMessage, getOrCreateSession } from "../lib/memory";
+import { complete } from "../lib/responder";
+import { appendMessage, getOrCreateSession, updatePreferences } from "../lib/memory";
 import { logger } from "../lib/logger";
 
 const router = Router();
 
 router.post("/chat", async (req, res) => {
-  const { message, sessionId, history: clientHistory = [] } = req.body as {
+  const { message, sessionId } = req.body as {
     message?: string;
     sessionId?: string;
-    history?: HistoryEntry[];
   };
 
   if (!message || typeof message !== "string" || !message.trim()) {
@@ -47,40 +48,49 @@ router.post("/chat", async (req, res) => {
   }
 
   const trimmedMessage = message.trim();
+  const hasSession = !!(sessionId && /^[a-zA-Z0-9\-]{8,64}$/.test(sessionId));
 
   try {
-    let history: HistoryEntry[] = Array.isArray(clientHistory) ? clientHistory : [];
+    // ── Load memory context ──────────────────────────────────────────────────
+    let history: Array<{ role: "user" | "assistant"; content: string }> = [];
     let memoryContext: { summary?: string; preferences?: Record<string, string> } = {};
 
-    // ── Memory-backed mode (sessionId provided) ───────────────────────────────
-    if (sessionId && /^[a-zA-Z0-9\-]{8,64}$/.test(sessionId)) {
-      // 1. Load the session to get history and any auto-summary
-      const session = await getOrCreateSession(sessionId);
-
-      // Build history from stored messages for the AI
+    if (hasSession) {
+      const session = await getOrCreateSession(sessionId!);
       history = session.messages.map((m) => ({ role: m.role, content: m.content }));
-
-      // Pass the summary and preferences as context for real AI models
       if (session.summary) memoryContext.summary = session.summary;
       if (Object.keys(session.preferences).length > 0) {
         memoryContext.preferences = session.preferences as Record<string, string>;
       }
-
-      // 2. Persist the user's message before generating a response
-      await appendMessage(sessionId, "user", trimmedMessage);
+      // Save the user message before generating (so it's in memory even on error)
+      await appendMessage(sessionId!, "user", trimmedMessage);
     }
 
-    // ── Generate response ──────────────────────────────────────────────────────
+    // ── Run the agent ────────────────────────────────────────────────────────
     const output = await complete({ message: trimmedMessage, history, memoryContext });
 
-    // ── Persist the assistant response ────────────────────────────────────────
-    if (sessionId && /^[a-zA-Z0-9\-]{8,64}$/.test(sessionId)) {
-      await appendMessage(sessionId, "assistant", output.response);
+    // ── Persist the response ─────────────────────────────────────────────────
+    if (hasSession) {
+      await appendMessage(sessionId!, "assistant", output.response);
+
+      // Apply side effects — e.g. the memory update tool sets a name preference
+      if (output.sideEffects?.updatePreferences) {
+        await updatePreferences(sessionId!, output.sideEffects.updatePreferences);
+        logger.info({ sessionId, prefs: output.sideEffects.updatePreferences }, "Preferences updated via tool");
+      }
     }
 
-    res.json(output);
+    // ── Respond ──────────────────────────────────────────────────────────────
+    res.json({
+      response: output.response,
+      model: output.model,
+      sources: output.sources,
+      isSearch: output.isSearch,
+      isFakeSearch: output.isFakeSearch,
+      debug: output.debug,
+    });
   } catch (err) {
-    logger.error({ err }, "Chat completion error");
+    logger.error({ err, message: trimmedMessage }, "Chat pipeline error");
     res.status(500).json({ error: "Failed to generate response" });
   }
 });

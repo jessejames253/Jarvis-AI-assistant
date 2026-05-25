@@ -1,0 +1,92 @@
+{
+  "sessionId": "final-verify",
+  "messages": [
+    {
+      "role": "user",
+      "content": "what is the latest news in AI today",
+      "timestamp": "2026-05-25T07:38:56.858Z"
+    },
+    {
+      "role": "assistant",
+      "content": "[DEMO MODE — add SEARCH_API_KEY for live results]\n\nScanning available data for: \"what is the latest news in AI today\". Retrieved 3 relevant results.",
+      "timestamp": "2026-05-25T07:38:56.864Z"
+    },
+    {
+      "role": "user",
+      "content": "hello there",
+      "timestamp": "2026-05-25T07:38:57.020Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello. What can I help you with today?",
+      "timestamp": "2026-05-25T07:38:57.024Z"
+    },
+    {
+      "role": "user",
+      "content": "debug my typescript function",
+      "timestamp": "2026-05-25T07:38:57.431Z"
+    },
+    {
+      "role": "assistant",
+      "content": "To debug this further, could you share:\n\n1. The exact error message or stack trace\n2. The relevant code section\n3. What you expected to happen vs. what actually happened\n\nPaste those and I'll walk through the issue with you.",
+      "timestamp": "2026-05-25T07:38:57.434Z"
+    },
+    {
+      "role": "user",
+      "content": "what is 99 * 3",
+      "timestamp": "2026-05-25T07:38:57.826Z"
+    },
+    {
+      "role": "assistant",
+      "content": "**99 * 3 = 297**",
+      "timestamp": "2026-05-25T07:38:57.828Z"
+    },
+    {
+      "role": "user",
+      "content": "my name is Jordan",
+      "timestamp": "2026-05-25T07:38:58.237Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Got it — I'll call you Jordan from now on. I've saved that to your session preferences.",
+      "timestamp": "2026-05-25T07:38:58.239Z"
+    },
+    {
+      "role": "user",
+      "content": "plan a project roadmap",
+      "timestamp": "2026-05-25T07:38:58.616Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Here's a high-level roadmap framework for \"A project roadmap\":\n\n**1. Discovery (Week 1)**\nDefine scope, gather requirements, identify stakeholders\n\n**2. Design (Week 2–3)**\nArchitecture decisions, wireframes, technical stack\n\n**3. Build (Week 4+)**\nIterative development in short cycles, regular reviews\n\n**4. Test & Launch**\nQA, user testing, deployment, monitoring\n\n**5. Iterate**\nFeedback loops, improvements, scale\n\nTell me more about your project and I can make this much more specific.",
+      "timestamp": "2026-05-25T07:38:58.618Z"
+    },
+    {
+      "role": "user",
+      "content": "what is machine learning",
+      "timestamp": "2026-05-25T07:38:59.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Machine learning is a branch of AI where models learn patterns from data rather than following explicit instructions. Given enough examples, a model can generalise to new inputs — the basis of everything from image recognition to language models.",
+      "timestamp": "2026-05-25T07:38:59.003Z"
+    },
+    {
+      "role": "user",
+      "content": "latest news today",
+      "timestamp": "2026-05-25T07:38:59.404Z"
+    },
+    {
+      "role": "assistant",
+      "content": "[DEMO MODE — add SEARCH_API_KEY for live results]\n\nScanning available data for: \"latest news today\". Retrieved 3 relevant results.",
+      "timestamp": "2026-05-25T07:38:59.406Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {
+    "name": "Jordan"
+  },
+  "messageCount": 16,
+  "createdAt": "2026-05-25T07:38:56.856Z",
+  "updatedAt": "2026-05-25T07:38:59.406Z"
+}
