@@ -759,7 +759,14 @@ export default function Chat() {
       content: `⚡ Plan: ${goal}`,
       timestamp: new Date(),
     };
-    setMessages((prev) => [...prev, userMsg]);
+    // Immediate visible confirmation message so user sees the planner path is active
+    const confirmMsg: Message = {
+      id: `planner-confirm-${Date.now()}`,
+      role: "assistant",
+      content: "⚡ Planner started — breaking your goal into steps…",
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, userMsg, confirmMsg]);
     setIsTyping(true);
     setAgentStatus("thinking");
     scrollToBottom(false);
@@ -1242,25 +1249,26 @@ export default function Chat() {
               </div>
             )}
 
-            {/* ── Plan button ─────────────────────────────────────── */}
+            {/* ── Plan button (BRIGHT PURPLE = planner path) ───────── */}
             <button
               data-testid="button-plan"
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                console.log("[Planner] checklist clicked — input:", input.trim(), "isTyping:", isTyping, "isStreaming:", isStreaming);
+                e.preventDefault();
+                console.log("[Planner] BUTTON CLICKED — input:", JSON.stringify(input.trim()), "isTyping:", isTyping, "isStreaming:", isStreaming);
                 sendPlan();
               }}
               disabled={!input.trim() || isTyping || isStreaming}
-              title="Autonomous multi-step plan"
-              aria-label="Create plan"
+              title="Run autonomous plan"
+              aria-label="Run autonomous plan"
               className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
               style={{
-                border: "1px solid hsl(194 100% 40% / 0.5)",
-                background: "hsl(194 100% 50% / 0.08)",
+                border: "2px solid hsl(270 100% 65%)",
+                background: "hsl(270 80% 55% / 0.18)",
               }}
             >
-              <ListChecks className="w-4 h-4" style={{ color: "hsl(194 100% 60%)" }} />
+              <ListChecks className="w-4 h-4" style={{ color: "hsl(270 100% 75%)" }} />
             </button>
 
             {/* ── Send button ──────────────────────────────────────── */}
