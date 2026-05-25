@@ -23,12 +23,16 @@ import {
   MicOff,
   Volume2,
   VolumeX,
+  ListChecks,
 } from "lucide-react";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
 import { useSpeechSession } from "@/hooks/useSpeechSession";
 import RuntimeInspector from "@/components/RuntimeInspector";
 import NotificationToast from "@/components/NotificationToast";
+import PlanCard from "@/components/PlanCard";
+import PlannerPanel from "@/components/PlannerPanel";
 import { JarvisRuntime } from "@/lib/runtime";
+import { callPlanStream, savePlan, clearSavedPlan, type FrontendPlan, type PlanToolEvent } from "@/lib/plannerApi";
 import { useLocation } from "wouter";
 import MemoryPanel, { type SessionMemory } from "@/components/MemoryPanel";
 import DebugPanel, { type DebugInfo } from "@/components/DebugPanel";
@@ -71,6 +75,7 @@ interface Message {
   isFakeSearch?: boolean;
   debug?: DebugInfo;
   toolCalls?: ToolCallInfo[];
+  plan?: FrontendPlan;
 }
 
 // ─── Session management ───────────────────────────────────────────────────────
@@ -345,6 +350,9 @@ function MessageBubble({
         {/* Tool status chips — shown above the main bubble */}
         {toolCalls.length > 0 && <ToolStatusBubble calls={toolCalls} />}
 
+        {/* Plan card — shown for plan messages */}
+        {message.plan && <PlanCard plan={message.plan} />}
+
         {/* Main bubble — only rendered when there's content OR streaming */}
         {(message.content || isStreaming) && (
           <div className="bg-card border border-card-border rounded-2xl rounded-tl-sm px-4 py-3 min-w-0">
@@ -419,6 +427,7 @@ export default function Chat() {
   const [debugMode, setDebugModeState] = useState(() => getDebugMode());
   const [memory, setMemory] = useState<SessionMemory | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [activePlan, setActivePlan] = useState<FrontendPlan | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
 
@@ -729,6 +738,193 @@ export default function Chat() {
       },
     );
   }, [input, isTyping, isStreaming, sessionId, flushTokenBuffer]);
+
+  // ── Plan execution ──────────────────────────────────────────────────────────
+
+  const sendPlan = useCallback(async () => {
+    const goal = input.trim();
+    if (!goal || isTyping || isStreaming) return;
+
+    speech.unlock();
+    responseContentRef.current = "";
+    setInput("");
+
+    const userMsg: Message = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: `⚡ Plan: ${goal}`,
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setIsTyping(true);
+    setAgentStatus("thinking");
+    scrollToBottom(false);
+
+    const planMsgId = `plan-${Date.now()}`;
+    const pendingToolCalls = new Map<string, ToolCallInfo>();
+    let currentPlan: FrontendPlan | null = null;
+    let planMessageCreated = false;
+
+    const ensurePlanMessage = (plan: FrontendPlan) => {
+      if (planMessageCreated) return;
+      planMessageCreated = true;
+      setIsTyping(false);
+      setIsStreaming(true);
+      setStreamingMsgId(planMsgId);
+      setMessages((prev) => [
+        ...prev,
+        { id: planMsgId, role: "assistant", content: "", timestamp: new Date(), plan },
+      ]);
+    };
+
+    const updatePlan = (updated: FrontendPlan) => {
+      currentPlan = updated;
+      setActivePlan({ ...updated });
+      setMessages((prev) =>
+        prev.map((m) => m.id === planMsgId ? { ...m, plan: { ...updated } } : m),
+      );
+      savePlan(sessionId, updated);
+    };
+
+    const streamStartTime = Date.now();
+    _rt.bus.emit({ type: "stream:start", sessionId, ts: Date.now() });
+
+    await callPlanStream(goal, sessionId, BASE, {
+      onPlanCreated: (payload) => {
+        const plan: FrontendPlan = {
+          id: payload.id,
+          title: payload.title,
+          goal: payload.goal,
+          steps: payload.steps,
+          status: "running",
+          createdAt: payload.createdAt,
+        };
+        currentPlan = plan;
+        ensurePlanMessage(plan);
+        updatePlan(plan);
+        _rt.bus.emit({ type: "plan:created", planId: plan.id, title: plan.title, stepCount: plan.steps.length, ts: Date.now() });
+      },
+
+      onStepStart: (payload) => {
+        if (!currentPlan) return;
+        const updated: FrontendPlan = {
+          ...currentPlan,
+          steps: currentPlan.steps.map((s) =>
+            s.id === payload.stepId ? { ...s, status: "running" as const } : s,
+          ),
+        };
+        tokenBufferRef.current += `\n\n### Step ${payload.stepIndex + 1}: ${payload.title}\n\n`;
+        flushTokenBuffer(planMsgId);
+        updatePlan(updated);
+        _rt.bus.emit({ type: "plan:step:start", planId: payload.planId, stepId: payload.stepId, stepIndex: payload.stepIndex, ts: Date.now() });
+      },
+
+      onToken: (text) => {
+        responseContentRef.current += text;
+        tokenBufferRef.current += text;
+        if (!tokenFlushTimerRef.current) {
+          tokenFlushTimerRef.current = setTimeout(() => {
+            tokenFlushTimerRef.current = null;
+            flushTokenBuffer(planMsgId);
+          }, 25);
+        }
+      },
+
+      onToolEvent: (toolEvent: PlanToolEvent) => {
+        if (toolEvent.type === "tool_start") {
+          _rt.bus.emit({ type: "tool:start", tool: toolEvent.tool, label: toolEvent.label, ts: Date.now() });
+          const call: ToolCallInfo = { id: toolEvent.toolCallId, tool: toolEvent.tool, label: toolEvent.label, status: "running" };
+          pendingToolCalls.set(toolEvent.toolCallId, call);
+          setAgentStatus(toolEvent.tool === "search_web" ? "researching" : "processing");
+          setMessages((prev) =>
+            prev.map((m) => m.id === planMsgId ? { ...m, toolCalls: Array.from(pendingToolCalls.values()) } : m),
+          );
+        } else if (toolEvent.type === "tool_done") {
+          _rt.bus.emit({ type: "tool:done", tool: toolEvent.tool, durationMs: toolEvent.durationMs, ts: Date.now() });
+          const existing = pendingToolCalls.get(toolEvent.toolCallId);
+          if (existing) pendingToolCalls.set(toolEvent.toolCallId, { ...existing, status: "done", durationMs: toolEvent.durationMs });
+          setAgentStatus("idle");
+          setMessages((prev) =>
+            prev.map((m) => m.id === planMsgId ? { ...m, toolCalls: Array.from(pendingToolCalls.values()) } : m),
+          );
+        } else if (toolEvent.type === "tool_error") {
+          _rt.bus.emit({ type: "tool:error", tool: toolEvent.tool, error: toolEvent.error, ts: Date.now() });
+          const existing = pendingToolCalls.get(toolEvent.toolCallId);
+          if (existing) pendingToolCalls.set(toolEvent.toolCallId, { ...existing, status: "error", durationMs: toolEvent.durationMs, error: toolEvent.error });
+          setAgentStatus("idle");
+          setMessages((prev) =>
+            prev.map((m) => m.id === planMsgId ? { ...m, toolCalls: Array.from(pendingToolCalls.values()) } : m),
+          );
+        }
+      },
+
+      onStepComplete: (payload) => {
+        if (!currentPlan) return;
+        const updated: FrontendPlan = {
+          ...currentPlan,
+          steps: currentPlan.steps.map((s) =>
+            s.id === payload.stepId ? { ...s, status: "complete" as const, durationMs: payload.durationMs } : s,
+          ),
+        };
+        updatePlan(updated);
+        _rt.bus.emit({ type: "plan:step:complete", planId: payload.planId, stepId: payload.stepId, stepIndex: payload.stepIndex, ts: Date.now() });
+      },
+
+      onStepFailed: (payload) => {
+        if (!currentPlan) return;
+        const updated: FrontendPlan = {
+          ...currentPlan,
+          steps: currentPlan.steps.map((s) =>
+            s.id === payload.stepId
+              ? { ...s, status: payload.willRetry ? ("running" as const) : ("failed" as const), error: payload.error }
+              : s,
+          ),
+        };
+        updatePlan(updated);
+        _rt.bus.emit({ type: "plan:step:failed", planId: payload.planId, stepId: payload.stepId, stepIndex: payload.stepIndex, ts: Date.now() });
+      },
+
+      onPlanDone: (payload) => {
+        if (!currentPlan) return;
+        flushTokenBuffer(planMsgId, true);
+        const completed: FrontendPlan = {
+          ...currentPlan,
+          status: "complete" as const,
+          durationMs: payload.durationMs,
+          summary: payload.summary,
+          stepsCompleted: payload.stepsCompleted,
+          stepsFailed: payload.stepsFailed,
+        };
+        updatePlan(completed);
+        setActivePlan(null);
+        setIsStreaming(false);
+        setStreamingMsgId(null);
+        setAgentStatus("idle");
+        _rt.bus.emit({ type: "plan:done", planId: payload.planId, durationMs: payload.durationMs, ts: Date.now() });
+        _rt.bus.emit({ type: "stream:done", sessionId, durationMs: Date.now() - streamStartTime, tokens: responseContentRef.current.length, ts: Date.now() });
+        clearSavedPlan(sessionId);
+        responseContentRef.current = "";
+        if (speech.autoSpeak && payload.summary) {
+          speech.queue(planMsgId, payload.summary);
+        }
+      },
+
+      onError: (msg) => {
+        _rt.bus.emit({ type: "stream:error", error: msg ?? "Plan failed", ts: Date.now() });
+        setIsTyping(false);
+        setIsStreaming(false);
+        setStreamingMsgId(null);
+        setAgentStatus("error");
+        setTimeout(() => setAgentStatus("idle"), 2500);
+        if (!planMessageCreated) {
+          setMessages((prev) => [
+            ...prev,
+            { id: planMsgId, role: "assistant", content: "Plan execution failed. Please try again.", timestamp: new Date() },
+          ]);
+        }
+      },
+    });
+  }, [input, isTyping, isStreaming, sessionId, flushTokenBuffer, speech]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -1042,6 +1238,18 @@ export default function Chat() {
               </div>
             )}
 
+            {/* Plan button */}
+            <button
+              onClick={sendPlan}
+              disabled={!input.trim() || isTyping || isStreaming}
+              title="Create a multi-step plan from this message"
+              aria-label="Create plan"
+              className="flex-shrink-0 w-9 h-9 rounded-xl border flex items-center justify-center transition-all duration-200 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+              style={{ borderColor: "hsl(210 15% 22%)", background: "transparent" }}
+            >
+              <ListChecks className="w-4 h-4" style={{ color: "hsl(194 100% 50%)" }} />
+            </button>
+
             <button
               data-testid="button-send"
               onClick={sendMessage}
@@ -1064,6 +1272,20 @@ export default function Chat() {
 
       {/* In-app notification toasts (always active) */}
       <NotificationToast />
+
+      {/* Live plan panel — shows while a plan is running */}
+      {activePlan && activePlan.status === "running" && (
+        <PlannerPanel
+          plan={activePlan}
+          onCancel={() => {
+            setActivePlan(null);
+            setIsStreaming(false);
+            setStreamingMsgId(null);
+            setAgentStatus("idle");
+            clearSavedPlan(sessionId);
+          }}
+        />
+      )}
 
       {/* Memory panel */}
       <MemoryPanel

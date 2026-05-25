@@ -68,6 +68,13 @@ export type RuntimeEvent =
   | { type: "network:offline"; ts: number }
   | { type: "device:visible";  ts: number }
   | { type: "device:hidden";   ts: number }
+  // Planner
+  | { type: "plan:created";       planId: string; title: string; stepCount: number; ts: number }
+  | { type: "plan:step:start";    planId: string; stepId: string; stepIndex: number; ts: number }
+  | { type: "plan:step:complete"; planId: string; stepId: string; stepIndex: number; ts: number }
+  | { type: "plan:step:failed";   planId: string; stepId: string; stepIndex: number; ts: number }
+  | { type: "plan:done";          planId: string; durationMs: number; ts: number }
+  | { type: "plan:cancelled";     planId: string; ts: number }
   // Runtime meta
   | { type: "runtime:notify";  notification: Notification; ts: number }
   | { type: "runtime:dismiss"; notificationId: string; ts: number }

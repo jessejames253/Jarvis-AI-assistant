@@ -20,6 +20,7 @@ import chatRouter from "./chat";
 import memoryRouter from "./memory";
 import tasksRouter from "./tasks";
 import kbRouter from "./kb";
+import planRouter from "./plan";
 
 const router: IRouter = Router();
 
@@ -29,5 +30,6 @@ router.use(chatRouter);
 router.use(memoryRouter);
 router.use(tasksRouter);
 router.use(kbRouter);
+router.use(planRouter);
 
 export default router;
