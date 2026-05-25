@@ -60,9 +60,46 @@
       "sessionId": "cfb6c397-6057-4b84-99be-0d5123d51466",
       "createdAt": "2026-05-25T21:46:06.648Z",
       "updatedAt": "2026-05-25T21:46:06.648Z"
+    },
+    {
+      "id": "ce421fbf-2fa0-4455-9de8-2b4dbda5809d",
+      "title": "Research daily workout plans, summarize the main points, then create a reminder for me to review it tomorrow.",
+      "category": "work",
+      "priority": "medium",
+      "status": "todo",
+      "subtasks": [],
+      "tags": [],
+      "sessionId": "cfb6c397-6057-4b84-99be-0d5123d51466",
+      "createdAt": "2026-05-25T21:49:20.637Z",
+      "updatedAt": "2026-05-25T21:49:20.637Z"
+    },
+    {
+      "id": "cf1bd5d9-9eee-44b7-ad96-b9f843180133",
+      "title": "📋 Daily Workout Plan Summary — Key Findings\n\n🏋️ WORKOUT TYPES:\n• Strength Training — Compound lifts (squats, deadlifts, bench press) → Muscle & metabolism\n• Cardio — Running, cycling, HIIT, jump rope → Fat loss & endurance\n• Mobility/Flexibility — Yoga, stretching, foam rolling → Recovery & injury prevention\n\n📅 BEGINNER SCHEDULE (3–4 Days/Week):\n• Mon: Full Body Strength (Squats, Push-ups, Dumbbell Rows)\n• Wed: Cardio + Core\n• Fri: Full Body Strength (variation)\n• Sun: Active Recovery / Mobility\n\n💡 CORE PRINCIPLES:\n• Progressive overload — increase weight/reps gradually\n• Rest days matter — muscles grow during recovery\n• Consistency > Intensity — show up regularly\n• Nutrition supports training — protein intake is key\n• Sleep 7–9 hrs — essential for performance & recovery\n\n🎯 GOAL-BASED FOCUS:\n• Fat Loss → Cardio + Strength combo + calorie deficit\n• Muscle Gain → Progressive strength training + caloric surplus\n• Endurance → Cardio-heavy with long slow-distance runs\n• General Fitness → Balanced mix of all three types",
+      "category": "personal",
+      "priority": "medium",
+      "status": "todo",
+      "subtasks": [],
+      "tags": [],
+      "sessionId": "cfb6c397-6057-4b84-99be-0d5123d51466",
+      "createdAt": "2026-05-25T21:50:21.525Z",
+      "updatedAt": "2026-05-25T21:50:21.525Z"
+    },
+    {
+      "id": "a9ad4ba0-ded3-4df1-9deb-96f22e425312",
+      "title": "Review your daily workout plan summary",
+      "category": "personal",
+      "priority": "medium",
+      "status": "todo",
+      "dueDate": "tomorrow",
+      "subtasks": [],
+      "tags": [],
+      "sessionId": "cfb6c397-6057-4b84-99be-0d5123d51466",
+      "createdAt": "2026-05-25T21:50:27.885Z",
+      "updatedAt": "2026-05-25T21:50:27.885Z"
     }
   ],
   "projects": [],
   "goals": [],
-  "updatedAt": "2026-05-25T21:46:06.648Z"
+  "updatedAt": "2026-05-25T21:50:27.885Z"
 }

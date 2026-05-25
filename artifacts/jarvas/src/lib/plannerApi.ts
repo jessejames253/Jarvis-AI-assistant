@@ -15,6 +15,7 @@ export interface FrontendPlanStep {
   retryCount: number;
   durationMs?: number;
   error?: string;
+  result?: string;
 }
 
 export interface FrontendPlan {

@@ -76,12 +76,65 @@ interface Message {
   debug?: DebugInfo;
   toolCalls?: ToolCallInfo[];
   plan?: FrontendPlan;
+  autoRouted?: boolean;
 }
 
 // ─── Session management ───────────────────────────────────────────────────────
 
 const SESSION_KEY = "jarvas_session_id";
 const DEBUG_KEY = "jarvas_debug_mode";
+const AUTO_PLANNER_KEY = "jarvas_auto_planner";
+
+function getAutoPlannerEnabled(): boolean {
+  return localStorage.getItem(AUTO_PLANNER_KEY) === "true";
+}
+
+function setAutoPlannerEnabledStorage(val: boolean): void {
+  localStorage.setItem(AUTO_PLANNER_KEY, String(val));
+}
+
+// ─── Planner intent detection ─────────────────────────────────────────────────
+
+interface PlannerIntentResult {
+  shouldRoute: boolean;
+  confidence: number;
+  reason: string;
+}
+
+function detectPlannerIntent(msg: string): PlannerIntentResult {
+  const m = msg.toLowerCase().trim();
+  const words = m.split(/\s+/);
+
+  if (words.length < 4) return { shouldRoute: false, confidence: 0.1, reason: "too_short" };
+
+  const casualOpener = /^(hi|hey|hello|what is|what's|who is|who's|how do|how does|is there|are there|can you just|tell me|explain|what are|define|what does)\b/i;
+  if (casualOpener.test(m) && words.length < 10) {
+    return { shouldRoute: false, confidence: 0.15, reason: "casual_question" };
+  }
+
+  const multiStep = /\b(then|and then|after that|followed by|also remind|and remind|and summarize|and create|and save|and send)\b/i.test(msg);
+
+  const startsWithPlanner = /^(research|summarize|summarise|compare|analyze|analyse|investigate|evaluate|assess|find the best|make a plan|create a plan|plan out|break down|compile|gather)\b/i.test(m);
+
+  const hasPlannerVerb = /\b(research|summarize|summarise|compare|analyze|analyse|investigate|evaluate|find the best|compile a|gather (info|data)|create a (report|summary|plan|schedule|breakdown))\b/i.test(msg);
+
+  const hasReminder = /\b(remind me|set a reminder|create a reminder|schedule a reminder|add a reminder)\b/i.test(msg);
+
+  let confidence = 0;
+  let reason = "no_match";
+
+  if (startsWithPlanner && multiStep) { confidence = 0.97; reason = "planner_start+multi_step"; }
+  else if (startsWithPlanner && hasReminder) { confidence = 0.92; reason = "planner_start+reminder"; }
+  else if (startsWithPlanner) { confidence = 0.82; reason = "planner_start"; }
+  else if (hasPlannerVerb && multiStep) { confidence = 0.90; reason = "planner_verb+multi_step"; }
+  else if (hasPlannerVerb && hasReminder) { confidence = 0.85; reason = "planner_verb+reminder"; }
+  else if (hasPlannerVerb) { confidence = 0.76; reason = "planner_verb"; }
+  else if (multiStep && hasReminder) { confidence = 0.80; reason = "multi_step+reminder"; }
+  else if (hasReminder && words.length >= 8) { confidence = 0.65; reason = "reminder_long"; }
+  else if (multiStep && words.length >= 12) { confidence = 0.62; reason = "multi_step_long"; }
+
+  return { shouldRoute: confidence >= 0.75, confidence, reason };
+}
 
 function getOrCreateSessionId(): string {
   const existing = localStorage.getItem(SESSION_KEY);
@@ -431,6 +484,8 @@ export default function Chat() {
   const [activePlan, setActivePlan] = useState<FrontendPlan | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
+  const [autoPlannerEnabled, setAutoPlannerEnabled] = useState(() => getAutoPlannerEnabled());
+  const autoRoutedRef = useRef(false);
 
   // ── Voice ────────────────────────────────────────────────────────────────
   const speechInput = useSpeechInput();
@@ -555,6 +610,19 @@ export default function Chat() {
     console.log("[Chat] sendMessage entered — input:", JSON.stringify(input.trim()));
     const text = input.trim();
     if (!text || isTyping || isStreaming) return;
+
+    // Auto-route to planner if enabled and intent is high-confidence multi-step
+    if (autoPlannerEnabled) {
+      const intent = detectPlannerIntent(text);
+      console.log("[Chat] planner intent check:", intent);
+      if (intent.shouldRoute) {
+        console.log("[Chat] auto-routing to planner — confidence:", intent.confidence, "reason:", intent.reason);
+        autoRoutedRef.current = true;
+        sendPlan();
+        return;
+      }
+    }
+
     speech.unlock();
     responseContentRef.current = "";
 
@@ -753,11 +821,15 @@ export default function Chat() {
     responseContentRef.current = "";
     setInput("");
 
+    const isAutoRouted = autoRoutedRef.current;
+    autoRoutedRef.current = false;
+
     const userMsg: Message = {
       id: `user-${Date.now()}`,
       role: "user",
-      content: `⚡ Plan: ${goal}`,
+      content: isAutoRouted ? goal : `⚡ Plan: ${goal}`,
       timestamp: new Date(),
+      autoRouted: isAutoRouted,
     };
     // Immediate visible confirmation message so user sees the planner path is active
     const confirmMsg: Message = {
@@ -874,7 +946,9 @@ export default function Chat() {
         const updated: FrontendPlan = {
           ...currentPlan,
           steps: currentPlan.steps.map((s) =>
-            s.id === payload.stepId ? { ...s, status: "complete" as const, durationMs: payload.durationMs } : s,
+            s.id === payload.stepId
+              ? { ...s, status: "complete" as const, durationMs: payload.durationMs, result: payload.summary }
+              : s,
           ),
         };
         updatePlan(updated);

@@ -56,7 +56,7 @@ function buildStepPrompt(plan: Plan, step: PlanStep, stepIndex: number, prevResu
     });
   }
 
-  parts.push("\nExecute this step directly and concisely. Use tools when needed. Your response becomes the step result shown to the user.");
+  parts.push("\nExecute this step. Use tools when needed. Respond in ≤ 100 words — state what you did and what the result was. Be direct and specific. No preamble, no filler, no unnecessary headings or bullet points.");
 
   return parts.join("\n");
 }
@@ -85,7 +85,7 @@ async function executeStep(
 
     const stream = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 4096,
+      max_tokens: 700,
       system: systemPrompt,
       messages: messages as Parameters<typeof anthropic.messages.create>[0]["messages"],
       tools: TOOL_DEFINITIONS as Parameters<typeof anthropic.messages.create>[0]["tools"],
@@ -247,7 +247,7 @@ export async function executePlan(
           stepId: step.id,
           stepIndex: i,
           durationMs: step.durationMs,
-          summary: result.slice(0, 200),
+          summary: result,
         });
         succeeded = true;
         break;

@@ -2,9 +2,10 @@
  * components/PlanCard.tsx — Inline plan card rendered inside an assistant message.
  *
  * Shows the plan title, step-by-step progress, and final summary.
- * Rendered in MessageBubble when message.plan is set.
+ * Each step shows a compact title + short result, with "View details" toggle.
  */
 
+import { useState } from "react";
 import type { FrontendPlan, FrontendPlanStep, PlanStepStatus } from "@/lib/plannerApi";
 
 // ─── Step status icon ─────────────────────────────────────────────────────────
@@ -33,7 +34,6 @@ function StepIcon({ status }: { status: PlanStepStatus }) {
       />
     );
   }
-  // pending
   return (
     <span className="flex-shrink-0 w-4 h-4 rounded-full border"
       style={{ borderColor: "hsl(210 15% 28%)" }}
@@ -43,30 +43,81 @@ function StepIcon({ status }: { status: PlanStepStatus }) {
 
 // ─── Single step row ──────────────────────────────────────────────────────────
 
-function StepRow({ step, index }: { step: FrontendPlanStep; index: number }) {
+function StepRow({
+  step,
+  index,
+  expanded,
+  onToggle,
+}: {
+  step: FrontendPlanStep;
+  index: number;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
   const isRunning = step.status === "running";
   const isDone    = step.status === "complete";
   const isFailed  = step.status === "failed";
 
+  const hasResult = isDone && !!step.result && step.result.trim().length > 0;
+
+  // Compact summary: first ~120 chars of the result
+  const shortResult = hasResult
+    ? (step.result!.length > 120 ? step.result!.slice(0, 120).trimEnd() + "…" : step.result!)
+    : null;
+
   return (
-    <div className={`flex items-center gap-2.5 py-1 ${isRunning ? "opacity-100" : isDone || isFailed ? "opacity-80" : "opacity-45"}`}>
-      <StepIcon status={step.status} />
-      <span
-        className="text-sm flex-1 min-w-0 truncate"
-        style={{
-          color: isFailed ? "hsl(355 80% 62%)" : isRunning ? "hsl(194 100% 70%)" : isDone ? "hsl(196 30% 55%)" : "hsl(210 20% 40%)",
-          textDecoration: isFailed ? "line-through" : "none",
-          fontFamily: "'Courier New', Courier, monospace",
-          fontSize: "0.78rem",
-        }}
-      >
-        <span style={{ color: "hsl(210 20% 35%)", marginRight: "0.4em" }}>{String(index + 1).padStart(2, "0")}.</span>
-        {step.title}
-      </span>
-      {step.durationMs != null && (
-        <span className="flex-shrink-0 text-xs" style={{ color: "hsl(210 20% 32%)", fontFamily: "monospace", fontSize: "0.7rem" }}>
-          {step.durationMs < 1000 ? `${step.durationMs}ms` : `${(step.durationMs / 1000).toFixed(1)}s`}
+    <div className={`flex flex-col py-1 ${isRunning ? "opacity-100" : isDone || isFailed ? "opacity-80" : "opacity-45"}`}>
+      <div className="flex items-center gap-2.5">
+        <StepIcon status={step.status} />
+        <span
+          className="text-sm flex-1 min-w-0 truncate"
+          style={{
+            color: isFailed ? "hsl(355 80% 62%)" : isRunning ? "hsl(194 100% 70%)" : isDone ? "hsl(196 30% 55%)" : "hsl(210 20% 40%)",
+            textDecoration: isFailed ? "line-through" : "none",
+            fontFamily: "'Courier New', Courier, monospace",
+            fontSize: "0.78rem",
+          }}
+        >
+          <span style={{ color: "hsl(210 20% 35%)", marginRight: "0.4em" }}>{String(index + 1).padStart(2, "0")}.</span>
+          {step.title}
         </span>
+        {step.durationMs != null && (
+          <span className="flex-shrink-0 text-xs" style={{ color: "hsl(210 20% 32%)", fontFamily: "monospace", fontSize: "0.7rem" }}>
+            {step.durationMs < 1000 ? `${step.durationMs}ms` : `${(step.durationMs / 1000).toFixed(1)}s`}
+          </span>
+        )}
+      </div>
+
+      {/* Compact result + toggle */}
+      {hasResult && (
+        <div className="ml-6 mt-1">
+          {!expanded && (
+            <p className="text-xs leading-relaxed" style={{ color: "hsl(196 25% 48%)", fontFamily: "inherit" }}>
+              {shortResult}
+            </p>
+          )}
+          {expanded && (
+            <p className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: "hsl(196 30% 55%)", fontFamily: "inherit" }}>
+              {step.result}
+            </p>
+          )}
+          {step.result!.length > 120 && (
+            <button
+              type="button"
+              onClick={onToggle}
+              className="text-xs mt-0.5 transition-opacity hover:opacity-100 opacity-60"
+              style={{ color: "hsl(194 100% 60%)", fontFamily: "monospace" }}
+            >
+              {expanded ? "▲ Hide" : "▼ View details"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {isFailed && step.error && (
+        <p className="ml-6 mt-0.5 text-xs" style={{ color: "hsl(355 80% 58%)", fontFamily: "monospace" }}>
+          ✕ {step.error.slice(0, 100)}
+        </p>
       )}
     </div>
   );
@@ -105,6 +156,17 @@ function ProgressBar({ plan }: { plan: FrontendPlan }) {
 // ─── Main PlanCard ────────────────────────────────────────────────────────────
 
 export default function PlanCard({ plan }: { plan: FrontendPlan }) {
+  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
+
+  const toggleStep = (stepId: string) => {
+    setExpandedSteps(prev => {
+      const next = new Set(prev);
+      if (next.has(stepId)) next.delete(stepId);
+      else next.add(stepId);
+      return next;
+    });
+  };
+
   const isRunning  = plan.status === "running";
   const isComplete = plan.status === "complete";
   const isFailed   = plan.status === "failed";
@@ -140,7 +202,13 @@ export default function PlanCard({ plan }: { plan: FrontendPlan }) {
         <ProgressBar plan={plan} />
         <div className="flex flex-col">
           {plan.steps.map((step, i) => (
-            <StepRow key={step.id} step={step} index={i} />
+            <StepRow
+              key={step.id}
+              step={step}
+              index={i}
+              expanded={expandedSteps.has(step.id)}
+              onToggle={() => toggleStep(step.id)}
+            />
           ))}
         </div>
       </div>
