@@ -1,0 +1,20 @@
+{
+  "sessionId": "stream-test-1",
+  "messages": [
+    {
+      "role": "user",
+      "content": "What is recursion?",
+      "timestamp": "2026-05-25T19:42:21.275Z"
+    },
+    {
+      "role": "assistant",
+      "content": "**Recursion** is when a function calls itself as part of its own definition, solving a problem by breaking it into smaller instances of the same problem.\n\nEvery recursive solution has two parts:\n\n- **Base case** — the condition that stops the recursion\n- **Recursive case** — where the function calls itself with a simpler input\n\n### Classic example: factorial\n\n```python\ndef factorial(n):\n    if n == 0:        # base case\n        return 1\n    return n * factorial(n - 1)  # recursive case\n\nfactorial(5)  # → 120\n```\n\nThe call chain looks like:\n```\nfactorial(5)\n└─ 5 * factorial(4)\n       └─ 4 * factorial(3)\n              └─ 3 * factorial(2)\n                     └─ 2 * factorial(1)\n                            └─ 1 * factorial(0)\n                                   └─ 1  ← base case\n```\n\n### When to use it\n\nRecursion shines when the **data structure or problem is naturally recursive** — trees, graphs, divide-and-conquer algorithms (merge sort, binary search), parsing nested structures, etc.\n\n### The tradeoff\n\nEach call adds a frame to the **call stack**. Too many levels = **stack overflow**. Iterative solutions are often more memory-efficient, but recursive ones can be far more readable.",
+      "timestamp": "2026-05-25T19:42:27.371Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {},
+  "messageCount": 2,
+  "createdAt": "2026-05-25T19:42:21.273Z",
+  "updatedAt": "2026-05-25T19:42:27.371Z"
+}

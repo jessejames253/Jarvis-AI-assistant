@@ -290,6 +290,26 @@
 .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0,200,255,0.3); border-radius: 2px; }
 .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(0,200,255,0.5); }
 
+/* ── Streaming cursor ────────────────────────────────────────────────────── */
+
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.streaming-cursor {
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  background: hsl(194 100% 55%);
+  border-radius: 1px;
+  vertical-align: -0.15em;
+  margin-left: 2px;
+  animation: blink-cursor 0.65s step-end infinite;
+  box-shadow: 0 0 6px rgba(0,200,255,0.5);
+  flex-shrink: 0;
+}
+
 /* ── Jarvis Markdown Renderer ─────────────────────────────────────────────── */
 
 .jarvis-md-root {

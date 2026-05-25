@@ -1,0 +1,20 @@
+{
+  "sessionId": "nodets-abcde123",
+  "messages": [
+    {
+      "role": "user",
+      "content": "hello there",
+      "timestamp": "2026-05-25T19:43:19.473Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello. What's on your mind?",
+      "timestamp": "2026-05-25T19:43:19.474Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {},
+  "messageCount": 2,
+  "createdAt": "2026-05-25T19:43:19.471Z",
+  "updatedAt": "2026-05-25T19:43:19.474Z"
+}

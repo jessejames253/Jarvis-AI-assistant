@@ -1,0 +1,20 @@
+{
+  "sessionId": "stream-test-2",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Say hello",
+      "timestamp": "2026-05-25T19:42:36.962Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello. What do you need?",
+      "timestamp": "2026-05-25T19:42:37.711Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {},
+  "messageCount": 2,
+  "createdAt": "2026-05-25T19:42:36.961Z",
+  "updatedAt": "2026-05-25T19:42:37.711Z"
+}

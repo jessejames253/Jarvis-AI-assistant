@@ -1,0 +1,20 @@
+{
+  "sessionId": "claude-test-12345",
+  "messages": [
+    {
+      "role": "user",
+      "content": "What is recursion? Be brief.",
+      "timestamp": "2026-05-25T19:44:41.663Z"
+    },
+    {
+      "role": "assistant",
+      "content": "**Recursion** is when a function calls itself to solve a smaller version of the same problem, until it hits a base case that stops the chain.\n\n```python\ndef factorial(n):\n    if n == 0:        # base case\n        return 1\n    return n * factorial(n - 1)  # recursive call\n```\n\nThe key insight: break a problem into a smaller version of itself, solve the smallest version directly, and let the call stack unwind the rest.",
+      "timestamp": "2026-05-25T19:44:44.135Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {},
+  "messageCount": 2,
+  "createdAt": "2026-05-25T19:44:41.662Z",
+  "updatedAt": "2026-05-25T19:44:44.135Z"
+}

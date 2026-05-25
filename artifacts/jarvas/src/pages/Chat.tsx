@@ -91,27 +91,68 @@ function setDebugMode(val: boolean): void {
 
 // ─── API ─────────────────────────────────────────────────────────────────────
 
-interface ChatApiResponse {
-  response: string;
+interface StreamDonePayload {
+  debug: DebugInfo;
   model: string;
-  sources?: Source[];
   isSearch?: boolean;
   isFakeSearch?: boolean;
-  debug: DebugInfo;
+  sources?: Source[];
 }
 
-async function callChat(
+async function callChatStream(
   message: string,
   sessionId: string,
   base: string,
-): Promise<ChatApiResponse> {
-  const res = await fetch(`${base}api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, sessionId }),
-  });
-  if (!res.ok) throw new Error(`Chat API error: ${res.status}`);
-  return res.json() as Promise<ChatApiResponse>;
+  onToken: (text: string) => void,
+  onDone: (data: StreamDonePayload) => void,
+  onError: () => void,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${base}api/chat/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, sessionId }),
+    });
+  } catch {
+    onError();
+    return;
+  }
+
+  if (!res.ok || !res.body) { onError(); return; }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const jsonStr = line.slice(6).trim();
+        if (!jsonStr) continue;
+        try {
+          const event = JSON.parse(jsonStr) as { type: string; text?: string } & Partial<StreamDonePayload>;
+          if (event.type === "token" && typeof event.text === "string") {
+            onToken(event.text);
+          } else if (event.type === "done") {
+            onDone(event as StreamDonePayload);
+          } else if (event.type === "error") {
+            onError();
+          }
+        } catch { /* ignore malformed SSE lines */ }
+      }
+    }
+  } catch {
+    onError();
+  }
 }
 
 async function loadSession(
@@ -203,9 +244,11 @@ function SourceCard({ source, index }: { source: Source; index: number }) {
 function MessageBubble({
   message,
   showDebug,
+  isStreaming,
 }: {
   message: Message;
   showDebug: boolean;
+  isStreaming: boolean;
 }) {
   const isUser = message.role === "user";
   const timeStr = message.timestamp.toLocaleTimeString([], {
@@ -271,6 +314,9 @@ function MessageBubble({
         {/* Main bubble */}
         <div className="bg-card border border-card-border rounded-2xl rounded-tl-sm px-4 py-3 min-w-0">
           <MarkdownContent content={message.content} />
+          {isStreaming && (
+            <span className="streaming-cursor" aria-hidden="true" />
+          )}
         </div>
 
         {/* Source cards */}
@@ -318,17 +364,39 @@ export default function Chat() {
   const [debugMode, setDebugModeState] = useState(() => getDebugMode());
   const [memory, setMemory] = useState<SessionMemory | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Token batching — flush to state at most every 25 ms to avoid over-rendering
+  const tokenBufferRef = useRef<string>("");
+  const tokenFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = useCallback((instant = false) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: instant ? "auto" : "smooth" });
   }, []);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping, scrollToBottom]);
+
+  // Flush the token buffer into the named message and scroll
+  const flushTokenBuffer = useCallback((msgId: string, final = false) => {
+    if (tokenFlushTimerRef.current) {
+      clearTimeout(tokenFlushTimerRef.current);
+      tokenFlushTimerRef.current = null;
+    }
+    const buffered = tokenBufferRef.current;
+    tokenBufferRef.current = "";
+    if (buffered) {
+      setMessages((prev) =>
+        prev.map((m) => m.id === msgId ? { ...m, content: m.content + buffered } : m)
+      );
+    }
+    if (final) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    else messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+  }, []);
 
   // Load session on mount / session change
   useEffect(() => {
@@ -373,7 +441,7 @@ export default function Chat() {
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
-    if (!text || isTyping) return;
+    if (!text || isTyping || isStreaming) return;
 
     const userMsg: Message = {
       id: `user-${Date.now()}`,
@@ -391,48 +459,83 @@ export default function Chat() {
       prev ? { ...prev, messageCount: prev.messageCount + 1 } : prev,
     );
 
-    try {
-      const data = await callChat(text, sessionId, BASE);
-      setIsTyping(false);
-      setAgentStatus("idle");
+    const msgId = `assistant-${Date.now()}`;
+    let firstToken = true;
+    // Keep a stable ref to msgId for the buffer flush callbacks
+    const currentMsgId = msgId;
 
-      const assistantMsg: Message = {
-        id: `assistant-${Date.now()}`,
-        role: "assistant",
-        content: data.response,
-        timestamp: new Date(),
-        sources: data.sources,
-        isSearch: data.isSearch,
-        isFakeSearch: data.isFakeSearch,
-        debug: data.debug,
-      };
-
-      setMessages((prev) => [...prev, assistantMsg]);
-      setMemory((prev) =>
-        prev ? { ...prev, messageCount: prev.messageCount + 1 } : prev,
-      );
-
-      // If the memory tool updated a preference, refresh memory panel
-      if (data.debug?.action === "preference_update") {
-        loadSession(sessionId, BASE)
-          .then(setMemory)
-          .catch(() => {});
+    const handleError = () => {
+      // Clean up any in-progress streaming message
+      if (!firstToken) {
+        setIsStreaming(false);
+        setStreamingMsgId(null);
+        flushTokenBuffer(currentMsgId, true);
+      } else {
+        setIsTyping(false);
       }
-    } catch {
-      setIsTyping(false);
       setAgentStatus("error");
       setTimeout(() => setAgentStatus("idle"), 2500);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `assistant-${Date.now()}`,
-          role: "assistant",
-          content: "Something went wrong on my end. Please try again.",
-          timestamp: new Date(),
-        },
-      ]);
-    }
-  }, [input, isTyping, sessionId]);
+      if (firstToken) {
+        setMessages((prev) => [
+          ...prev,
+          { id: currentMsgId, role: "assistant", content: "Something went wrong on my end. Please try again.", timestamp: new Date() },
+        ]);
+      }
+    };
+
+    await callChatStream(
+      text,
+      sessionId,
+      BASE,
+      // onToken
+      (tokenText) => {
+        if (firstToken) {
+          firstToken = false;
+          setIsTyping(false);
+          setAgentStatus("idle");
+          setIsStreaming(true);
+          setStreamingMsgId(currentMsgId);
+          // Create the message with the first token
+          setMessages((prev) => [
+            ...prev,
+            { id: currentMsgId, role: "assistant", content: tokenText, timestamp: new Date() },
+          ]);
+          messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+          return;
+        }
+        // Buffer subsequent tokens and flush in batches
+        tokenBufferRef.current += tokenText;
+        if (!tokenFlushTimerRef.current) {
+          tokenFlushTimerRef.current = setTimeout(() => {
+            tokenFlushTimerRef.current = null;
+            flushTokenBuffer(currentMsgId);
+          }, 25);
+        }
+      },
+      // onDone
+      (data) => {
+        flushTokenBuffer(currentMsgId, true);
+        setIsStreaming(false);
+        setStreamingMsgId(null);
+        // Attach debug/sources to the finalized message
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === currentMsgId
+              ? { ...m, sources: data.sources, isSearch: data.isSearch, isFakeSearch: data.isFakeSearch, debug: data.debug }
+              : m
+          )
+        );
+        setMemory((prev) =>
+          prev ? { ...prev, messageCount: prev.messageCount + 1 } : prev,
+        );
+        if (data.debug?.action === "preference_update") {
+          loadSession(sessionId, BASE).then(setMemory).catch(() => {});
+        }
+      },
+      // onError
+      handleError,
+    );
+  }, [input, isTyping, isStreaming, sessionId, flushTokenBuffer]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -654,7 +757,12 @@ export default function Chat() {
           )}
 
           {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} showDebug={debugMode} />
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              showDebug={debugMode}
+              isStreaming={isStreaming && msg.id === streamingMsgId}
+            />
           ))}
 
           {isTyping && <TypingIndicator status={agentStatus} />}
@@ -682,7 +790,7 @@ export default function Chat() {
             <button
               data-testid="button-send"
               onClick={sendMessage}
-              disabled={!input.trim() || isTyping}
+              disabled={!input.trim() || isTyping || isStreaming}
               className="flex-shrink-0 w-9 h-9 rounded-xl bg-primary flex items-center justify-center transition-all duration-200 hover:bg-primary/80 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed glow-primary"
               aria-label="Send message"
             >

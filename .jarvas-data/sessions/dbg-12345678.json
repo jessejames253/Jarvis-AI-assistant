@@ -1,0 +1,20 @@
+{
+  "sessionId": "dbg-12345678",
+  "messages": [
+    {
+      "role": "user",
+      "content": "2+2",
+      "timestamp": "2026-05-25T19:43:47.381Z"
+    },
+    {
+      "role": "assistant",
+      "content": "**2+2 = 4**",
+      "timestamp": "2026-05-25T19:43:47.383Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {},
+  "messageCount": 2,
+  "createdAt": "2026-05-25T19:43:47.381Z",
+  "updatedAt": "2026-05-25T19:43:47.383Z"
+}

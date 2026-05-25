@@ -74,6 +74,57 @@ function buildMessages(input: ToolInput): Array<{ role: "user" | "assistant"; co
   return messages;
 }
 
+/**
+ * Streaming variant — pipes tokens to onToken as they arrive from Claude.
+ * Used by the /api/chat/stream SSE endpoint.
+ */
+export async function streamAiCompletion(
+  input: ToolInput,
+  onToken: (text: string) => void,
+): Promise<{ action: string; mode: string; reasoning: string[] }> {
+  const intent = input.classification.intent;
+  const mode =
+    intent === "coding" ? "coding_assistant" :
+    intent === "planning" ? "planning_assistant" :
+    "knowledge_base";
+
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let stopReason = "end_turn";
+
+  const stream = await anthropic.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 8192,
+    system: SYSTEM_PROMPT,
+    messages: buildMessages(input),
+    stream: true,
+  });
+
+  for await (const event of stream) {
+    if (event.type === "message_start") {
+      inputTokens = event.message.usage.input_tokens;
+    } else if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+      onToken(event.delta.text);
+    } else if (event.type === "message_delta") {
+      outputTokens = event.usage.output_tokens;
+      stopReason = event.delta.stop_reason ?? "end_turn";
+    }
+  }
+
+  return {
+    action: `ai_${intent}`,
+    mode,
+    reasoning: [
+      `Claude claude-sonnet-4-6 streamed`,
+      `intent: ${intent} (confidence: ${input.classification.confidence})`,
+      `history turns: ${input.history.length}`,
+      `kb notes injected: ${input.memoryContext?.kbNotes?.length ?? 0}`,
+      `stop_reason: ${stopReason}`,
+      `tokens: ${inputTokens} in / ${outputTokens} out`,
+    ],
+  };
+}
+
 export const aiTool: Tool = {
   name: "ai",
   description: "Claude-powered AI brain — handles all knowledge, coding, planning, and general questions",
