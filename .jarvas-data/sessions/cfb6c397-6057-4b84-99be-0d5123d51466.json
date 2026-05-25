@@ -2,71 +2,6 @@
   "sessionId": "cfb6c397-6057-4b84-99be-0d5123d51466",
   "messages": [
     {
-      "role": "user",
-      "content": "Hello",
-      "timestamp": "2026-05-25T07:42:03.087Z"
-    },
-    {
-      "role": "assistant",
-      "content": "Hey. Ready when you are.",
-      "timestamp": "2026-05-25T07:42:03.088Z"
-    },
-    {
-      "role": "user",
-      "content": "What is 99*3",
-      "timestamp": "2026-05-25T07:42:21.206Z"
-    },
-    {
-      "role": "assistant",
-      "content": "**99*3 = 297**",
-      "timestamp": "2026-05-25T07:42:21.208Z"
-    },
-    {
-      "role": "user",
-      "content": "My name is JesseJames",
-      "timestamp": "2026-05-25T07:42:36.476Z"
-    },
-    {
-      "role": "assistant",
-      "content": "Got it — I'll call you JesseJames from now on. I've saved that to your session preferences.",
-      "timestamp": "2026-05-25T07:42:36.477Z"
-    },
-    {
-      "role": "user",
-      "content": "plan a 3 step roadmap for improving Jarvas",
-      "timestamp": "2026-05-25T07:43:05.444Z"
-    },
-    {
-      "role": "assistant",
-      "content": "Here's a high-level roadmap framework for \"A 3 step roadmap for improving Jarvas\":\n\n**1. Discovery (Week 1)**\nDefine scope, gather requirements, identify stakeholders\n\n**2. Design (Week 2–3)**\nArchitecture decisions, wireframes, technical stack\n\n**3. Build (Week 4+)**\nIterative development in short cycles, regular reviews\n\n**4. Test & Launch**\nQA, user testing, deployment, monitoring\n\n**5. Iterate**\nFeedback loops, improvements, scale\n\nTell me more about your project and I can make this much more specific.",
-      "timestamp": "2026-05-25T07:43:05.446Z"
-    },
-    {
-      "role": "user",
-      "content": "Latest news today",
-      "timestamp": "2026-05-25T07:43:45.343Z"
-    },
-    {
-      "role": "assistant",
-      "content": "[DEMO MODE — add SEARCH_API_KEY for live results]\n\nScanning available data for: \"Latest news today\". Retrieved 3 relevant results.",
-      "timestamp": "2026-05-25T07:43:45.344Z"
-    },
-    {
-      "role": "user",
-      "content": "add a high priority work task to finish Jarvas dashboard tomorrow",
-      "timestamp": "2026-05-25T08:00:01.036Z"
-    },
-    {
-      "role": "assistant",
-      "content": "Task added: **add a high priority work task to finish Jarvas dashboard tomorrow**\n🟠 high priority · Work",
-      "timestamp": "2026-05-25T08:00:01.038Z"
-    },
-    {
-      "role": "user",
-      "content": "show me my tasks",
-      "timestamp": "2026-05-25T08:00:25.041Z"
-    },
-    {
       "role": "assistant",
       "content": "You have **1 open task**:\n\n🟠 **add a high priority work task to finish Jarvas dashboard tomorrow** [Work]",
       "timestamp": "2026-05-25T08:00:25.042Z"
@@ -100,13 +35,23 @@
       "role": "assistant",
       "content": "I'm Jarvas — an AI assistant designed for clear thinking and direct answers. I can explain concepts, work through problems, write and debug code, and search the web for current information.",
       "timestamp": "2026-05-25T18:20:12.204Z"
+    },
+    {
+      "role": "user",
+      "content": "Who are you?",
+      "timestamp": "2026-05-25T18:22:13.862Z"
+    },
+    {
+      "role": "assistant",
+      "content": "I'm an AI assistant called Jarvas. Ask me anything — I'll give you a direct answer or go find one.",
+      "timestamp": "2026-05-25T18:22:13.865Z"
     }
   ],
-  "summary": null,
+  "summary": "Earlier in this conversation, the user asked about:\n- \"Hello\"\n- \"What is 99*3\"\n- \"My name is JesseJames\"\n- \"plan a 3 step roadmap for improving Jarvas\"\n- \"Latest news today\"\n- \"add a high priority work task to finish Jarvas dashboard tomorrow\"\n- \"show me my tasks\"",
   "preferences": {
     "name": "JesseJames"
   },
-  "messageCount": 20,
+  "messageCount": 22,
   "createdAt": "2026-05-25T07:41:51.243Z",
-  "updatedAt": "2026-05-25T18:20:12.204Z"
+  "updatedAt": "2026-05-25T18:22:13.865Z"
 }
