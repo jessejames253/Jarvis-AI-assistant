@@ -26,7 +26,9 @@ import {
 } from "lucide-react";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
 import { useSpeechSession } from "@/hooks/useSpeechSession";
-import SpeechDebugOverlay from "@/components/SpeechDebugOverlay";
+import RuntimeInspector from "@/components/RuntimeInspector";
+import NotificationToast from "@/components/NotificationToast";
+import { JarvisRuntime } from "@/lib/runtime";
 import { useLocation } from "wouter";
 import MemoryPanel, { type SessionMemory } from "@/components/MemoryPanel";
 import DebugPanel, { type DebugInfo } from "@/components/DebugPanel";
@@ -394,6 +396,9 @@ function MessageBubble({
 
 const BASE = import.meta.env.BASE_URL;
 
+// Runtime singleton — no React dependency, survives re-renders
+const _rt = JarvisRuntime.getInstance();
+
 const WELCOME = (name?: string): Message => ({
   id: "init",
   role: "assistant",
@@ -464,6 +469,7 @@ export default function Chat() {
     loadSession(sessionId, BASE)
       .then((session) => {
         if (cancelled) return;
+        _rt.bus.emit({ type: "memory:loaded", sessionId, messageCount: session.messages.length, ts: Date.now() });
         setMemory(session);
         if (session.messages.length > 0) {
           const restored: Message[] = session.messages.map((m, i) => ({
@@ -478,7 +484,10 @@ export default function Chat() {
         }
       })
       .catch(() => {
-        if (!cancelled) setMessages([WELCOME()]);
+        if (!cancelled) {
+          _rt.bus.emit({ type: "memory:error", error: "Failed to load session", ts: Date.now() });
+          setMessages([WELCOME()]);
+        }
       })
       .finally(() => {
         if (!cancelled) setIsLoadingHistory(false);
@@ -583,7 +592,11 @@ export default function Chat() {
       messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
     }
 
+    const streamStartTime = Date.now();
+    _rt.bus.emit({ type: "stream:start", sessionId, ts: Date.now() });
+
     const handleError = () => {
+      _rt.bus.emit({ type: "stream:error", error: "SSE stream failed", ts: Date.now() });
       if (messageCreated) {
         setIsStreaming(false);
         setStreamingMsgId(null);
@@ -623,6 +636,7 @@ export default function Chat() {
       // onDone
       (data) => {
         flushTokenBuffer(currentMsgId, true);
+        _rt.bus.emit({ type: "stream:done", sessionId, durationMs: Date.now() - streamStartTime, tokens: responseContentRef.current.length, ts: Date.now() });
         setIsStreaming(false);
         setStreamingMsgId(null);
         setMessages((prev) =>
@@ -648,6 +662,7 @@ export default function Chat() {
       // onToolEvent
       (toolEvent) => {
         if (toolEvent.type === "tool_start") {
+          _rt.bus.emit({ type: "tool:start", tool: toolEvent.tool, label: toolEvent.label, ts: Date.now() });
           const call: ToolCallInfo = {
             id: toolEvent.toolCallId,
             tool: toolEvent.tool,
@@ -672,6 +687,7 @@ export default function Chat() {
             );
           }
         } else if (toolEvent.type === "tool_done") {
+          _rt.bus.emit({ type: "tool:done", tool: toolEvent.tool, durationMs: toolEvent.durationMs, ts: Date.now() });
           const existing = pendingToolCalls.get(toolEvent.toolCallId);
           if (existing) {
             pendingToolCalls.set(toolEvent.toolCallId, {
@@ -691,6 +707,7 @@ export default function Chat() {
             )
           );
         } else if (toolEvent.type === "tool_error") {
+          _rt.bus.emit({ type: "tool:error", tool: toolEvent.tool, error: toolEvent.error ?? "unknown", ts: Date.now() });
           const existing = pendingToolCalls.get(toolEvent.toolCallId);
           if (existing) {
             pendingToolCalls.set(toolEvent.toolCallId, {
@@ -1042,10 +1059,11 @@ export default function Chat() {
         </div>
       </footer>
 
-      {/* Speech debug overlay — visible when debug mode is on */}
-      {debugMode && speech.isSupported && (
-        <SpeechDebugOverlay speech={speech} />
-      )}
+      {/* Runtime inspector — visible when debug mode is on */}
+      {debugMode && <RuntimeInspector />}
+
+      {/* In-app notification toasts (always active) */}
+      <NotificationToast />
 
       {/* Memory panel */}
       <MemoryPanel
