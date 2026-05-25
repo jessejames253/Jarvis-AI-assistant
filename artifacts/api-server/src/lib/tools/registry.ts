@@ -2,44 +2,41 @@
  * lib/tools/registry.ts — Tool registry
  *
  * Maps every IntentType to the tool that handles it.
- * Tools are registered in priority order — earlier entries win if multiple
- * tools claim the same intent.
  *
- * To add a new tool:
- *   1. Create lib/tools/yourTool.ts (export a Tool object)
- *   2. Import it here
- *   3. Add it to ALL_TOOLS
- *   4. Add your IntentType entries to lib/types.ts → IntentType
- *   5. Add intent patterns to lib/intent.ts → DESCRIPTORS
+ * AI-powered tools (Claude):
+ *   aiTool      — definition, general, coding, planning
+ *   researchTool — research (web search + Claude synthesis)
+ *
+ * Deterministic tools (no AI):
+ *   mathTool        — exact arithmetic
+ *   memoryUpdateTool — name/preference extraction
+ *   tasksTool        — task CRUD
+ *   kbTool           — knowledge base CRUD
+ *   casualTool       — greetings/farewells
+ *   identityTool     — "who are you"
  */
 
 import type { Tool, IntentType } from "../types";
 import { casualTool } from "./casual";
 import { identityTool } from "./identity";
-import { codingTool } from "./coding";
 import { mathTool } from "./math";
-import { planningTool } from "./planning";
 import { researchTool } from "./research";
 import { memoryUpdateTool } from "./memoryUpdate";
 import { tasksTool } from "./tasks";
 import { kbTool } from "./kb";
-import { knowledgeTool } from "./knowledge"; // also acts as the general fallback
+import { aiTool } from "./ai"; // Claude-powered: coding, planning, definition, general
 
-/** All registered tools, in priority order */
 const ALL_TOOLS: Tool[] = [
   casualTool,
   identityTool,
   memoryUpdateTool,
-  codingTool,
   mathTool,
-  kbTool,          // knowledge_base — explicit KB queries
-  tasksTool,       // task_management
-  planningTool,
+  kbTool,
+  tasksTool,
   researchTool,
-  knowledgeTool,   // handles "definition" and "general" — keep last as fallback
+  aiTool,       // handles definition, general, coding, planning — keep last as broadest fallback
 ];
 
-// Build a lookup map: intent → tool
 const intentMap = new Map<IntentType, Tool>();
 for (const tool of ALL_TOOLS) {
   for (const intent of tool.handles) {
@@ -49,15 +46,10 @@ for (const tool of ALL_TOOLS) {
   }
 }
 
-/**
- * Returns the tool that handles the given intent.
- * Falls back to knowledgeTool if no specific tool is registered.
- */
 export function getTool(intent: IntentType): Tool {
-  return intentMap.get(intent) ?? knowledgeTool;
+  return intentMap.get(intent) ?? aiTool;
 }
 
-/** Returns all registered tools (used for introspection / debug output) */
 export function getAllTools(): Tool[] {
   return ALL_TOOLS;
 }

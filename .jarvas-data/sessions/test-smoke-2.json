@@ -1,0 +1,30 @@
+{
+  "sessionId": "test-smoke-2",
+  "messages": [
+    {
+      "role": "user",
+      "content": "How many people are in the world?",
+      "timestamp": "2026-05-25T18:57:40.548Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Approximately **8.2 billion** people as of 2024, with the global population growing at roughly 70–80 million per year.",
+      "timestamp": "2026-05-25T18:57:41.867Z"
+    },
+    {
+      "role": "user",
+      "content": "How many people are in the world?",
+      "timestamp": "2026-05-25T18:57:49.541Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Still ~**8.2 billion**. That number hasn't changed since you asked 30 seconds ago.",
+      "timestamp": "2026-05-25T18:57:51.343Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {},
+  "messageCount": 4,
+  "createdAt": "2026-05-25T18:57:40.547Z",
+  "updatedAt": "2026-05-25T18:57:51.343Z"
+}

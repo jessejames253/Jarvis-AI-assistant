@@ -1,0 +1,20 @@
+{
+  "sessionId": "test-smoke-1",
+  "messages": [
+    {
+      "role": "user",
+      "content": "What is photosynthesis?",
+      "timestamp": "2026-05-25T18:57:25.927Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Photosynthesis is the process by which plants, algae, and some bacteria convert light energy into chemical energy stored as glucose.\n\n**The basic equation:**\n```\n6CO₂ + 6H₂O + light energy → C₆H₁₂O₆ + 6O₂\n```\n\n**Two main stages:**\n\n- **Light-dependent reactions** (in the thylakoid membranes) — capture sunlight, split water molecules, and produce ATP and NADPH. Oxygen is released as a byproduct.\n- **Calvin cycle / light-independent reactions** (in the stroma) — use that ATP and NADPH to fix CO₂ into glucose.\n\nThe primary photosynthetic pigment is **chlorophyll**, which absorbs red and blue light most efficiently — reflecting green, which is why plants appear green.\n\nIn short: it's how life converts sunlight into food, and it's the foundational energy source for nearly all ecosystems on Earth.",
+      "timestamp": "2026-05-25T18:57:30.649Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {},
+  "messageCount": 2,
+  "createdAt": "2026-05-25T18:57:25.926Z",
+  "updatedAt": "2026-05-25T18:57:30.649Z"
+}

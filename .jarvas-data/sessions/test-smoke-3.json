@@ -1,0 +1,30 @@
+{
+  "sessionId": "test-smoke-3",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Write a JS function that adds two numbers",
+      "timestamp": "2026-05-25T18:57:43.115Z"
+    },
+    {
+      "role": "assistant",
+      "content": "```javascript\nfunction add(a, b) {\n  return a + b;\n}\n```\n\n**Usage:**\n```javascript\nadd(3, 5);  // 8\nadd(-2, 7); // 5\n```",
+      "timestamp": "2026-05-25T18:57:44.509Z"
+    },
+    {
+      "role": "user",
+      "content": "Write a JS function that adds two numbers",
+      "timestamp": "2026-05-25T18:57:51.621Z"
+    },
+    {
+      "role": "assistant",
+      "content": "```javascript\nfunction add(a, b) {\n  return a + b;\n}\n```",
+      "timestamp": "2026-05-25T18:57:54.100Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {},
+  "messageCount": 4,
+  "createdAt": "2026-05-25T18:57:43.114Z",
+  "updatedAt": "2026-05-25T18:57:54.100Z"
+}

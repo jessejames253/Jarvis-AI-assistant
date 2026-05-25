@@ -1,1 +1,2 @@
-- [Jarvas architecture](jarvas-architecture.md) — full stack overview, data dirs, tool registry pattern, and AI-swap points.
+- [AI backbone](ai-backbone.md) — Jarvis uses Claude (claude-sonnet-4-6) via Replit Anthropic integration; all knowledge/coding/planning routes through aiTool
+- [Search pipeline](search-pipeline.md) — Research intent: Brave Search → Claude synthesis; no SEARCH_API_KEY → Claude from training knowledge; never fake/demo responses

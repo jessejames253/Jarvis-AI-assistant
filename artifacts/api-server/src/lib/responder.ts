@@ -57,7 +57,7 @@ export async function complete(input: ChatInput): Promise<ChatOutput> {
 
   return {
     response: result.response,
-    model: "jarvas-agent-v2",
+    model: "claude-sonnet-4-6",
     sources: result.sources,
     isSearch: result.isSearch,
     isFakeSearch: result.isFakeSearch,
