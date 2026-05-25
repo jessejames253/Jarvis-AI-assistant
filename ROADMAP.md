@@ -1,12 +1,12 @@
-# Jarvas — Project Roadmap
+# Jarvis — Project Roadmap
 
-A living document that explains what Jarvas is, what's been built, what comes next, and the long-term goal of turning it into a real mobile app.
+A living document that explains what Jarvis is, what's been built, what comes next, and the long-term goal of turning it into a real mobile app.
 
 ---
 
-## What is Jarvas?
+## What is Jarvis?
 
-Jarvas is a futuristic AI assistant web app. Users type questions into a chat interface, and Jarvas answers directly — drawing on a knowledge base for general questions and the live web for current information.
+Jarvis is a futuristic AI assistant web app. Users type questions into a chat interface, and Jarvis answers directly — drawing on a knowledge base for general questions and the live web for current information.
 
 The app has a dark, futuristic visual design and is fully mobile-responsive.
 
@@ -52,7 +52,7 @@ artifacts/api-server/
 │   ├── app.ts           ← Express app setup — registers middleware and routes
 │   ├── lib/
 │   │   ├── logger.ts    ← Structured logging using Pino
-│   │   └── responder.ts ← Core AI response engine (the "brain" of Jarvas)
+│   │   └── responder.ts ← Core AI response engine (the "brain" of Jarvis)
 │   └── routes/
 │       ├── index.ts     ← Registers all routes with the Express router
 │       ├── health.ts    ← Health check endpoint (used to verify the server is alive)
@@ -131,15 +131,15 @@ Render AI responses as formatted markdown — headings, bullet points, code bloc
 Add a copy-to-clipboard button on each assistant message. Add a share button that generates a shareable link to a response.
 
 **10. File uploads**
-Allow users to upload a document or image and ask Jarvas questions about it.
+Allow users to upload a document or image and ask Jarvis questions about it.
 
 ### Level 3 — Major Features
 
 **11. Image generation**
-Add a `/api/image` endpoint that calls DALL·E or Stable Diffusion when the user asks Jarvas to generate an image.
+Add a `/api/image` endpoint that calls DALL·E or Stable Diffusion when the user asks Jarvis to generate an image.
 
 **12. Voice input / output**
-Use the browser's Web Speech API to let users speak their questions. Use a text-to-speech API to have Jarvas speak responses aloud.
+Use the browser's Web Speech API to let users speak their questions. Use a text-to-speech API to have Jarvis speak responses aloud.
 
 **13. Admin dashboard**
 A private page (password-protected or behind auth) showing usage stats — total messages, search queries, popular topics, error rates.
@@ -149,9 +149,9 @@ Instead of waiting for the full response, stream tokens to the UI as they arrive
 
 ---
 
-## Building Jarvas Step by Step
+## Building Jarvis Step by Step
 
-If you want to keep developing Jarvas, here's a recommended order:
+If you want to keep developing Jarvis, here's a recommended order:
 
 ```
 Step 1  →  Add SEARCH_API_KEY (Brave) for live web search         [5 minutes]
@@ -168,13 +168,13 @@ Step 10 →  Convert to mobile app (see below)                      [1-2 weeks]
 
 ---
 
-## Future Goal: Converting Jarvas to a Mobile App
+## Future Goal: Converting Jarvis to a Mobile App
 
-The long-term goal is to ship Jarvas as a native mobile app on iOS and Android. Here's the plan:
+The long-term goal is to ship Jarvis as a native mobile app on iOS and Android. Here's the plan:
 
 ### Technology Choice: Expo (React Native)
 
-Since Jarvas is already built in React, the natural migration path is **Expo** — a framework that lets you write React components that compile to native iOS and Android code. Most of what you already know transfers directly.
+Since Jarvis is already built in React, the natural migration path is **Expo** — a framework that lets you write React components that compile to native iOS and Android code. Most of what you already know transfers directly.
 
 ### What Changes
 

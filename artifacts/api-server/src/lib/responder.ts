@@ -1,5 +1,5 @@
 /**
- * lib/responder.ts — Public API for the Jarvas agent system
+ * lib/responder.ts — Public API for the Jarvis agent system
  *
  * This is the single entry point that routes/chat.ts calls.
  * It delegates everything to lib/router.ts, which handles

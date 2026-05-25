@@ -20,7 +20,7 @@
  *
  * Response:
  *   {
- *     response:   string       — Jarvas's reply
+ *     response:   string       — Jarvis's reply
  *     model:      string       — engine that produced the response
  *     sources?:   Source[]     — web search results (when intent = research)
  *     isSearch?:  boolean      — true when sources are included

@@ -1,5 +1,5 @@
 /**
- * App.tsx — Root component for the Jarvas web app
+ * App.tsx — Root component for the Jarvis web app
  *
  * This file sets up the global "wiring" that wraps every page in the app:
  *

@@ -1,7 +1,7 @@
 /**
  * lib/router.ts — Action router
  *
- * The central orchestrator of the Jarvas agent system.
+ * The central orchestrator of the Jarvis agent system.
  * Given a message and its context, it:
  *   1. Classifies the user's intent
  *   2. Selects the appropriate tool from the registry
@@ -64,7 +64,7 @@ export async function route(input: RouterInput): Promise<RouterOutput> {
 
   // Step 3b: KB injection — search the personal Knowledge Base and attach
   // relevant notes to memoryContext.kbNotes so any tool can reference them.
-  // This is what makes Jarvas consult your own notes before external sources.
+  // This is what makes Jarvis consult your own notes before external sources.
   const sessionId = toolInput.memoryContext?.sessionId;
   if (sessionId && classification.intent !== "casual" && classification.intent !== "identity") {
     try {

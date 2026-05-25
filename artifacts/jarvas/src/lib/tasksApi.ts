@@ -1,5 +1,5 @@
 /**
- * lib/tasksApi.ts — Typed API client for the Jarvas task management endpoints
+ * lib/tasksApi.ts — Typed API client for the Jarvis task management endpoints
  *
  * All functions return the raw response data. Use with TanStack Query for
  * caching and refetching:

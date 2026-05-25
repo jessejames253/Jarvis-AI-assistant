@@ -1,5 +1,5 @@
 /**
- * lib/tasks/types.ts — Data models for the Jarvas task management system
+ * lib/tasks/types.ts — Data models for the Jarvis task management system
  *
  * All types are designed to be AI-ready:
  *   - Tasks can be created/classified by an AI

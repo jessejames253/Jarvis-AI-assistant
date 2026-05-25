@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "Jarvas AI"
+title = "Jarvis AI"
 version = "1.0.0"
 id = "artifacts/jarvas"
 router = "path"

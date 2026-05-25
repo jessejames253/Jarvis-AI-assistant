@@ -1,5 +1,5 @@
 /**
- * lib/types.ts — Shared types across the Jarvas agent system
+ * lib/types.ts — Shared types across the Jarvis agent system
  *
  * Centralising these here means every module (intent classifier, tools,
  * router, responder) imports from one place, keeping the codebase consistent
@@ -8,10 +8,10 @@
 
 // ─── Intent ───────────────────────────────────────────────────────────────────
 
-/** Every possible intent Jarvas can detect in a user message */
+/** Every possible intent Jarvis can detect in a user message */
 export type IntentType =
   | "casual"           // Greetings, small talk, wellbeing, thanks, farewell
-  | "identity"         // "who are you", "what is Jarvas"
+  | "identity"         // "who are you", "what is Jarvis"
   | "coding"           // Code, debug, scripts, syntax, frameworks
   | "research"         // Web search, current events, news, live data
   | "memory_update"    // "my name is", "remember that", preference updates

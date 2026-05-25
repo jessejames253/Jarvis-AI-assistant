@@ -1,5 +1,5 @@
 /**
- * main.tsx — Entry point for the Jarvas web app
+ * main.tsx — Entry point for the Jarvis web app
  *
  * This is the very first file that runs when someone opens the app in a browser.
  * It finds the <div id="root"> element in index.html and "mounts" the React app

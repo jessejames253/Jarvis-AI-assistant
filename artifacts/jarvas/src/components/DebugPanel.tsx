@@ -1,7 +1,7 @@
 /**
  * components/DebugPanel.tsx — Agent debug inspector
  *
- * Shows what happened inside the Jarvas agent system for a given response:
+ * Shows what happened inside the Jarvis agent system for a given response:
  *   - Intent detected and confidence level
  *   - Secondary intent (if any)
  *   - Reasoning path (step-by-step)

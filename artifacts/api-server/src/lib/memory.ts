@@ -1,5 +1,5 @@
 /**
- * lib/memory.ts — Jarvas persistent memory store
+ * lib/memory.ts — Jarvis persistent memory store
  *
  * Manages long-term memory for each chat session:
  *   - Stores the full message history (user + assistant turns)

@@ -1,5 +1,5 @@
 /**
- * pages/Dashboard.tsx — Jarvas productivity & task management dashboard
+ * pages/Dashboard.tsx — Jarvis productivity & task management dashboard
  *
  * Sections:
  *   - Stats bar (total, completed today, rate, overdue)

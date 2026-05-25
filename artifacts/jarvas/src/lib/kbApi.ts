@@ -1,5 +1,5 @@
 /**
- * lib/kbApi.ts — Typed API client for the Jarvas Knowledge Base
+ * lib/kbApi.ts — Typed API client for the Jarvis Knowledge Base
  *
  * iOS Shortcuts integration:
  *   The same POST /api/kb endpoint is callable from an iOS Shortcut.

@@ -1,7 +1,7 @@
 /**
  * components/MemoryPanel.tsx — Slide-in memory & preferences panel
  *
- * Shows the user what Jarvas remembers about their session:
+ * Shows the user what Jarvis remembers about their session:
  *   - Total messages exchanged
  *   - Auto-generated summary of older conversations
  *   - Editable preferences (currently: name)
@@ -262,7 +262,7 @@ export default function MemoryPanel({
                 </div>
                 {nameSaved && (
                   <p className="text-xs mt-1.5" style={{ color: "hsl(142 71% 60%)" }}>
-                    Saved — Jarvas will use your name in conversations.
+                    Saved — Jarvis will use your name in conversations.
                   </p>
                 )}
               </div>

@@ -1,16 +1,16 @@
 import type { Tool, ToolInput, ToolOutput } from "../types";
 
 const RESPONSES = [
-  "I'm Jarvas — an AI assistant designed for clear thinking and direct answers. I can explain concepts, work through problems, write and debug code, and search the web for current information.",
-  "Jarvas. I'm an AI assistant built to help you think through things — questions, problems, plans, code. I also have persistent memory, so I'll remember this conversation next time.",
-  "I'm an AI assistant called Jarvas. Ask me anything — I'll give you a direct answer or go find one.",
+  "I'm Jarvis — an AI assistant designed for clear thinking and direct answers. I can explain concepts, work through problems, write and debug code, and search the web for current information.",
+  "Jarvis. I'm an AI assistant built to help you think through things — questions, problems, plans, code. I also have persistent memory, so I'll remember this conversation next time.",
+  "I'm an AI assistant called Jarvis. Ask me anything — I'll give you a direct answer or go find one.",
 ];
 
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
 
 export const identityTool: Tool = {
   name: "identity",
-  description: "Answers questions about who or what Jarvas is",
+  description: "Answers questions about who or what Jarvis is",
   handles: ["identity"],
   async execute(input: ToolInput): Promise<ToolOutput> {
     const isMadeBy = /\b(who made|who built|who created|who developed|who wrote)\b/i.test(input.message);

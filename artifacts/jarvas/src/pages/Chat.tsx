@@ -1,5 +1,5 @@
 /**
- * pages/Chat.tsx — Main Jarvas chat interface
+ * pages/Chat.tsx — Main Jarvis chat interface
  *
  * All messages now go through a single POST /api/chat endpoint.
  * The backend handles intent classification, tool routing, web search,
@@ -285,7 +285,7 @@ const WELCOME = (name?: string): Message => ({
   role: "assistant",
   content: name
     ? `Hello, ${name}. I remember you. What can I help with today?`
-    : "Hello. I'm Jarvas — ask me anything. I'll search the web, write code, help plan, or just talk.",
+    : "Hello. I'm Jarvis — ask me anything. I'll search the web, write code, help plan, or just talk.",
   timestamp: new Date(),
 });
 
@@ -475,7 +475,7 @@ export default function Chat() {
               className="font-display font-bold text-xl sm:text-2xl tracking-widest glow-primary-text"
               style={{ color: "hsl(194 100% 60%)" }}
             >
-              JARVAS
+              JARVIS
             </h1>
             <p
               className="text-xs tracking-widest"
@@ -663,7 +663,7 @@ export default function Chat() {
               data-testid="input-message"
               className="flex-1 bg-transparent resize-none outline-none text-sm leading-relaxed placeholder:text-muted-foreground min-h-[24px] max-h-[120px] scrollbar-thin"
               style={{ color: "hsl(196 80% 85%)" }}
-              placeholder="Ask anything — Jarvas detects intent automatically..."
+              placeholder="Ask anything — Jarvis detects intent automatically..."
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}

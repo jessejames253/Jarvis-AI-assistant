@@ -1,5 +1,5 @@
 /**
- * pages/KnowledgeBase.tsx — Jarvas personal Knowledge Base
+ * pages/KnowledgeBase.tsx — Jarvis personal Knowledge Base
  *
  * Features:
  *   - Create notes, research links, and facts
@@ -91,7 +91,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
         KNOWLEDGE BASE EMPTY
       </h3>
       <p className="text-sm text-muted-foreground mb-6 max-w-sm">
-        Add notes, research links, and facts here. Jarvas will check your Knowledge Base before searching the web or using built-in answers.
+        Add notes, research links, and facts here. Jarvis will check your Knowledge Base before searching the web or using built-in answers.
       </p>
       <button
         onClick={onAdd}
