@@ -297,11 +297,13 @@
   line-height: 1.65;
   color: hsl(196 80% 80%);
   min-width: 0;
+  /* Cap prose line length for readability; doesn't widen the bubble */
+  max-width: 65ch;
 }
 
 /* Paragraphs */
 .jarvis-md-p {
-  margin: 0 0 0.65em 0;
+  margin: 0 0 0.85em 0;
   color: hsl(196 80% 80%);
 }
 .jarvis-md-p:last-child { margin-bottom: 0; }
@@ -428,7 +430,7 @@
 
 /* Fenced code block wrapper */
 .jarvis-code-block {
-  margin: 0.6em 0;
+  margin: 1em 0;
   border-radius: 10px;
   border: 1px solid hsl(194 100% 40% / 0.25);
   background: hsl(222 28% 6%);
