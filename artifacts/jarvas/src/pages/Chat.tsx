@@ -19,7 +19,13 @@ import {
   Terminal,
   LayoutDashboard,
   BookOpen,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
+import { useSpeechInput } from "@/hooks/useSpeechInput";
+import { useSpeechOutput } from "@/hooks/useSpeechOutput";
 import { useLocation } from "wouter";
 import MemoryPanel, { type SessionMemory } from "@/components/MemoryPanel";
 import DebugPanel, { type DebugInfo } from "@/components/DebugPanel";
@@ -245,10 +251,16 @@ function MessageBubble({
   message,
   showDebug,
   isStreaming,
+  isSpeaking,
+  onSpeak,
+  onStopSpeak,
 }: {
   message: Message;
   showDebug: boolean;
   isStreaming: boolean;
+  isSpeaking: boolean;
+  onSpeak: () => void;
+  onStopSpeak: () => void;
 }) {
   const isUser = message.role === "user";
   const timeStr = message.timestamp.toLocaleTimeString([], {
@@ -331,7 +343,23 @@ function MessageBubble({
           </div>
         )}
 
-        <span className="text-xs text-muted-foreground px-1">{timeStr}</span>
+        <div className="flex items-center gap-2 px-1">
+          <span className="text-xs text-muted-foreground">{timeStr}</span>
+          {!isStreaming && (
+            <button
+              onClick={isSpeaking ? onStopSpeak : onSpeak}
+              aria-label={isSpeaking ? "Stop speaking" : "Read aloud"}
+              title={isSpeaking ? "Stop" : "Read aloud"}
+              className="flex items-center justify-center w-5 h-5 rounded opacity-40 hover:opacity-100 transition-opacity duration-150"
+              style={{ color: isSpeaking ? "hsl(355 80% 62%)" : "hsl(194 100% 55%)" }}
+            >
+              {isSpeaking
+                ? <VolumeX className="w-3.5 h-3.5" />
+                : <Volume2 className="w-3.5 h-3.5" />
+              }
+            </button>
+          )}
+        </div>
 
         {/* Debug panel — shown only when debug mode is on */}
         {showDebug && message.debug && <DebugPanel debug={message.debug} />}
@@ -366,6 +394,13 @@ export default function Chat() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
+
+  // ── Voice ────────────────────────────────────────────────────────────────
+  const speechInput = useSpeechInput();
+  const speechOutput = useSpeechOutput();
+  // Base text in input box before voice recording started (so interim results
+  // replace correctly and don't duplicate already-typed text)
+  const micBaseTextRef = useRef<string>("");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -438,6 +473,40 @@ export default function Chat() {
       return next;
     });
   }, []);
+
+  // ── Mic toggle ─────────────────────────────────────────────────────────────
+  const toggleMic = useCallback(() => {
+    if (speechInput.isListening) {
+      speechInput.stop();
+      return;
+    }
+    // Snapshot text already in the box before we start appending voice
+    micBaseTextRef.current = input;
+
+    speechInput.start({
+      onInterim: (text) => {
+        // Show live preview: base + interim (doesn't commit yet)
+        setInput(micBaseTextRef.current + (micBaseTextRef.current ? " " : "") + text);
+      },
+      onFinal: (text) => {
+        // Commit the final word(s): advance the base so next interim is relative
+        const prefix = micBaseTextRef.current
+          ? micBaseTextRef.current + " "
+          : "";
+        const committed = prefix + text;
+        micBaseTextRef.current = committed;
+        setInput(committed);
+        // auto-resize textarea
+        requestAnimationFrame(() => {
+          const ta = textareaRef.current;
+          if (ta) { ta.style.height = "auto"; ta.style.height = `${ta.scrollHeight}px`; }
+        });
+      },
+      onDenied: () => {
+        // permission denied — nothing extra needed; isListening already false
+      },
+    });
+  }, [speechInput, input]);
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
@@ -762,6 +831,9 @@ export default function Chat() {
               message={msg}
               showDebug={debugMode}
               isStreaming={isStreaming && msg.id === streamingMsgId}
+              isSpeaking={speechOutput.speakingMsgId === msg.id}
+              onSpeak={() => speechOutput.speak(msg.id, msg.content)}
+              onStopSpeak={speechOutput.stop}
             />
           ))}
 
@@ -787,6 +859,46 @@ export default function Chat() {
               onKeyDown={handleKeyDown}
               rows={1}
             />
+
+            {/* Mic button — hidden if speech not supported */}
+            {speechInput.isSupported && (
+              <div className="relative flex-shrink-0">
+                {speechInput.isListening && (
+                  <span className="mic-recording-ring" aria-hidden="true" />
+                )}
+                <button
+                  data-testid="button-mic"
+                  onClick={toggleMic}
+                  disabled={isTyping || isStreaming}
+                  aria-label={speechInput.isListening ? "Stop recording" : "Voice input"}
+                  title={
+                    speechInput.permissionDenied
+                      ? "Microphone access denied"
+                      : speechInput.isListening
+                        ? "Stop recording"
+                        : "Voice input"
+                  }
+                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+                  style={{
+                    background: speechInput.isListening
+                      ? "hsl(355 80% 28% / 0.4)"
+                      : "hsl(194 100% 55% / 0.12)",
+                    border: `1px solid ${speechInput.isListening ? "hsl(355 80% 50%)" : "hsl(194 100% 55% / 0.3)"}`,
+                    color: speechInput.isListening
+                      ? "hsl(355 80% 62%)"
+                      : speechInput.permissionDenied
+                        ? "hsl(196 20% 35%)"
+                        : "hsl(194 100% 55%)",
+                  }}
+                >
+                  {speechInput.isListening
+                    ? <MicOff className={`w-4 h-4 mic-recording`} />
+                    : <Mic className="w-4 h-4" />
+                  }
+                </button>
+              </div>
+            )}
+
             <button
               data-testid="button-send"
               onClick={sendMessage}
