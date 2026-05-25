@@ -190,7 +190,7 @@ export default function KnowledgeBase() {
       <div className="fixed inset-0 bg-grid opacity-40 pointer-events-none" />
 
       {/* ── Header ── */}
-      <header className="sticky top-0 z-20 flex-shrink-0 flex items-center justify-between gap-3 px-4 sm:px-8 py-4 border-b border-border/60 bg-background/90 backdrop-blur-sm">
+      <header className="sticky top-0 z-20 flex-shrink-0 flex items-center justify-between gap-3 px-4 sm:px-8 py-3 sm:py-4 border-b border-border/60 bg-background/90 backdrop-blur-sm pt-safe">
         <div className="flex items-center gap-4 min-w-0">
           <button
             onClick={() => navigate("/")}
@@ -205,8 +205,9 @@ export default function KnowledgeBase() {
             <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/40 flex items-center justify-center flex-shrink-0">
               <span className="font-display text-primary font-black text-sm">J</span>
             </div>
-            <h1 className="font-display font-bold text-base sm:text-lg tracking-widest truncate" style={{ color: "hsl(194 100% 60%)" }}>
-              KNOWLEDGE BASE
+            <h1 className="font-display font-bold text-base sm:text-lg tracking-widest" style={{ color: "hsl(194 100% 60%)" }}>
+              <span className="sm:hidden">NOTES</span>
+              <span className="hidden sm:inline">KNOWLEDGE BASE</span>
             </h1>
           </div>
         </div>
@@ -227,11 +228,12 @@ export default function KnowledgeBase() {
 
           <button
             onClick={openCreate}
-            className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold tracking-wider transition-all hover:opacity-80 glow-primary"
+            className="flex items-center gap-1.5 rounded-xl px-3 sm:px-4 py-2 text-xs font-semibold tracking-wider transition-all hover:opacity-80 active:scale-95 glow-primary"
             style={{ background: "hsl(194 100% 55%)", color: "hsl(220 20% 6%)" }}
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>ADD NOTE</span>
+            <span className="sm:hidden">NEW</span>
+            <span className="hidden sm:inline">ADD NOTE</span>
           </button>
         </div>
       </header>
@@ -274,7 +276,7 @@ export default function KnowledgeBase() {
         </div>
       )}
 
-      <div className="relative z-10 flex-1 px-4 sm:px-8 py-6 max-w-6xl mx-auto w-full">
+      <div className="relative z-10 flex-1 px-4 sm:px-8 py-5 sm:py-6 max-w-6xl mx-auto w-full pb-safe" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom, 0px))" }}>
 
         {/* ── Search + filter bar ── */}
         <div className="flex gap-2 mb-5">

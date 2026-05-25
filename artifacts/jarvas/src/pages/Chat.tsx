@@ -456,29 +456,29 @@ export default function Chat() {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen w-full bg-background scan-overlay overflow-hidden">
+    <div className="flex flex-col h-[100dvh] w-full bg-background scan-overlay overflow-hidden">
       <div className="fixed inset-0 bg-grid opacity-60 pointer-events-none" />
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-96 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
       <div className="fixed bottom-24 right-8 w-64 h-64 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
 
       {/* ── Header ── */}
-      <header className="relative z-10 flex-shrink-0 flex items-center justify-between px-4 sm:px-8 py-4 border-b border-border/60 bg-background/80 backdrop-blur-sm">
-        <div className="flex items-center gap-3">
-          <div className="relative w-10 h-10 rounded-xl bg-primary/10 border border-primary/40 flex items-center justify-center glow-primary">
-            <span className="font-display text-primary font-black text-lg">
-              J
-            </span>
+      <header
+        className="relative z-10 flex-shrink-0 flex items-center justify-between px-4 sm:px-8 py-3 sm:py-4 border-b border-border/60 bg-background/90 backdrop-blur-sm pt-safe"
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="relative w-9 h-9 rounded-xl bg-primary/10 border border-primary/40 flex items-center justify-center glow-primary flex-shrink-0">
+            <span className="font-display text-primary font-black text-base">J</span>
             <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-primary rounded-full animate-pulse" />
           </div>
           <div>
             <h1
-              className="font-display font-bold text-xl sm:text-2xl tracking-widest glow-primary-text"
+              className="font-display font-bold text-lg sm:text-2xl tracking-widest glow-primary-text leading-none"
               style={{ color: "hsl(194 100% 60%)" }}
             >
               JARVIS
             </h1>
             <p
-              className="text-xs tracking-widest"
+              className="hidden sm:block text-xs tracking-widest mt-0.5"
               style={{ color: "hsl(196 40% 50%)" }}
             >
               AGENT v2 · INTENT ROUTING · WEB SEARCH
@@ -486,107 +486,64 @@ export default function Chat() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* ONLINE badge — desktop only */}
           <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary/30 bg-primary/5">
             <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            <span
-              className="text-xs font-medium tracking-wider"
-              style={{ color: "hsl(142 71% 60%)" }}
-            >
+            <span className="text-xs font-medium tracking-wider" style={{ color: "hsl(142 71% 60%)" }}>
               ONLINE
             </span>
           </div>
 
-          {/* Knowledge Base link */}
+          {/* Knowledge Base */}
           <button
             onClick={() => navigate("/kb")}
-            title="Open Knowledge Base"
-            className="w-9 h-9 rounded-xl border border-border/60 bg-card flex items-center justify-center hover:border-primary/40 transition-colors"
+            title="Notes"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-border/60 bg-card flex items-center justify-center hover:border-primary/40 active:scale-95 transition-all"
             aria-label="Open Knowledge Base"
           >
-            <BookOpen
-              className="w-4 h-4"
-              style={{ color: "hsl(264 80% 70%)" }}
-            />
+            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: "hsl(264 80% 70%)" }} />
           </button>
 
-          {/* Dashboard link */}
+          {/* Dashboard */}
           <button
             onClick={() => navigate("/dashboard")}
-            title="Open Dashboard"
-            className="w-9 h-9 rounded-xl border border-border/60 bg-card flex items-center justify-center hover:border-primary/40 transition-colors"
+            title="Dashboard"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-border/60 bg-card flex items-center justify-center hover:border-primary/40 active:scale-95 transition-all"
             aria-label="Open dashboard"
           >
-            <LayoutDashboard
-              className="w-4 h-4"
-              style={{ color: "hsl(194 100% 55%)" }}
-            />
+            <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: "hsl(194 100% 55%)" }} />
           </button>
 
-          {/* Debug mode toggle */}
+          {/* Debug — hidden on mobile to reduce clutter */}
           <button
             onClick={toggleDebug}
             data-testid="button-toggle-debug"
-            title={debugMode ? "Hide debug panel" : "Show debug panel"}
-            className="w-9 h-9 rounded-xl border flex items-center justify-center transition-all duration-200"
+            title={debugMode ? "Hide debug" : "Show debug"}
+            className="hidden sm:flex w-9 h-9 rounded-xl border items-center justify-center transition-all duration-200"
             style={{
               background: debugMode ? "hsl(38 100% 55% / 0.15)" : "transparent",
-              borderColor: debugMode
-                ? "hsl(38 100% 55% / 0.4)"
-                : "hsl(210 15% 25%)",
+              borderColor: debugMode ? "hsl(38 100% 55% / 0.4)" : "hsl(210 15% 25%)",
             }}
             aria-label="Toggle debug mode"
           >
-            <Terminal
-              className="w-4 h-4"
-              style={{
-                color: debugMode ? "hsl(38 100% 65%)" : "hsl(196 40% 45%)",
-              }}
-            />
+            <Terminal className="w-4 h-4" style={{ color: debugMode ? "hsl(38 100% 65%)" : "hsl(196 40% 45%)" }} />
           </button>
 
-          {/* Memory panel toggle */}
+          {/* Memory */}
           <button
             onClick={() => setPanelOpen(true)}
             data-testid="button-open-memory"
-            className="relative w-9 h-9 rounded-xl border border-border/60 bg-card flex items-center justify-center hover:border-primary/40 transition-colors"
+            className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-border/60 bg-card flex items-center justify-center hover:border-primary/40 active:scale-95 transition-all"
             aria-label="Open memory panel"
           >
-            <Brain className="w-4 h-4" style={{ color: "hsl(194 100% 55%)" }} />
+            <Brain className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: "hsl(194 100% 55%)" }} />
             {(memory?.messageCount ?? 0) > 0 && (
               <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-primary rounded-full" />
             )}
           </button>
         </div>
       </header>
-
-      {/* Mobile-safe nav shortcuts.
-          Sit outside the header so they cannot get squeezed off-screen on iPhone. */}
-      <div className="fixed top-20 right-4 z-50 flex flex-col gap-2">
-        <button
-          onClick={() => navigate("/kb")}
-          title="Open Knowledge Base"
-          className="px-3 py-2 rounded-xl border-2 bg-black/90 text-xs font-bold tracking-wider shadow-lg"
-          style={{ borderColor: "hsl(264 80% 70%)", color: "hsl(264 80% 75%)" }}
-          aria-label="Open Knowledge Base"
-        >
-          <span className="inline-flex items-center gap-2">
-            <BookOpen className="w-4 h-4" />
-            Notes
-          </span>
-        </button>
-        <button
-          onClick={() => navigate("/dashboard")}
-          title="Open Dashboard"
-          className="px-3 py-2 rounded-xl border-2 border-cyan-400 bg-black/90 text-cyan-300 text-xs font-bold tracking-wider shadow-lg"
-          aria-label="Open dashboard"
-        >
-          <span className="inline-flex items-center gap-2">
-            <LayoutDashboard className="w-4 h-4" />
-            Dashboard
-          </span>
-        </button>
-      </div>
 
       {/* Loading banner */}
       {isLoadingHistory && (
@@ -655,15 +612,17 @@ export default function Chat() {
       </main>
 
       {/* ── Input bar ── */}
-      <footer className="relative z-10 flex-shrink-0 border-t border-border/60 bg-background/80 backdrop-blur-sm px-4 sm:px-8 py-4">
+      <footer className="relative z-10 flex-shrink-0 border-t border-border/60 bg-background/90 backdrop-blur-sm px-3 sm:px-8 pt-3 pb-safe"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
+      >
         <div className="max-w-3xl mx-auto">
-          <div className="flex items-end gap-3 bg-card border border-border rounded-2xl px-4 py-3 focus-within:border-primary/60 focus-within:glow-primary transition-all duration-200">
+          <div className="flex items-end gap-2.5 bg-card border border-border rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 focus-within:border-primary/60 focus-within:glow-primary transition-all duration-200">
             <textarea
               ref={textareaRef}
               data-testid="input-message"
               className="flex-1 bg-transparent resize-none outline-none text-sm leading-relaxed placeholder:text-muted-foreground min-h-[24px] max-h-[120px] scrollbar-thin"
               style={{ color: "hsl(196 80% 85%)" }}
-              placeholder="Ask anything — Jarvis detects intent automatically..."
+              placeholder="Ask Jarvis anything…"
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
@@ -673,18 +632,15 @@ export default function Chat() {
               data-testid="button-send"
               onClick={sendMessage}
               disabled={!input.trim() || isTyping}
-              className="flex-shrink-0 w-9 h-9 rounded-xl bg-primary flex items-center justify-center transition-all duration-200 hover:bg-primary/80 disabled:opacity-30 disabled:cursor-not-allowed glow-primary"
+              className="flex-shrink-0 w-9 h-9 rounded-xl bg-primary flex items-center justify-center transition-all duration-200 hover:bg-primary/80 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed glow-primary"
               aria-label="Send message"
             >
               <Send className="w-4 h-4" style={{ color: "hsl(220 20% 6%)" }} />
             </button>
           </div>
-          <p
-            className="text-center text-xs mt-2 tracking-wider"
-            style={{ color: "hsl(196 30% 40%)" }}
-          >
-            Intent-routed · Web search · Persistent memory · Press ⌘ to toggle
-            debug
+          {/* Footer hint — desktop only */}
+          <p className="hidden sm:block text-center text-xs mt-2 tracking-wider" style={{ color: "hsl(196 30% 40%)" }}>
+            Intent-routed · Web search · Persistent memory · Press ⌘ to toggle debug
           </p>
         </div>
       </footer>

@@ -75,7 +75,7 @@ function StatCard({ icon, label, value, sub, accent }: {
 }) {
   return (
     <div
-      className="flex-1 min-w-0 rounded-xl border p-4"
+      className="rounded-xl border p-3 sm:p-4"
       style={{ background: "hsl(220 20% 7%)", borderColor: "hsl(210 15% 20%)" }}
     >
       <div className="flex items-center gap-2 mb-2">
@@ -248,7 +248,7 @@ export default function Dashboard() {
       <div className="fixed inset-0 bg-grid opacity-40 pointer-events-none" />
 
       {/* ── Header ── */}
-      <header className="sticky top-0 z-20 flex-shrink-0 flex items-center justify-between px-4 sm:px-8 py-4 border-b border-border/60 bg-background/90 backdrop-blur-sm">
+      <header className="sticky top-0 z-20 flex-shrink-0 flex items-center justify-between px-4 sm:px-8 py-3 sm:py-4 border-b border-border/60 bg-background/90 backdrop-blur-sm pt-safe">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate("/")}
@@ -282,7 +282,7 @@ export default function Dashboard() {
       <div className="relative z-10 flex-1 px-4 sm:px-8 py-6 max-w-6xl mx-auto w-full">
 
         {/* ── Stats bar ── */}
-        <div className="flex gap-3 mb-8 overflow-x-auto pb-1">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
           <StatCard
             icon={<ListTodo className="w-4 h-4" />}
             label="OPEN TASKS"

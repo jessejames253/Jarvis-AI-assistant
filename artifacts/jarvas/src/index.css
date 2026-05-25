@@ -264,12 +264,18 @@
   content: '';
   position: fixed;
   top: 0; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(0,200,255,0.6), transparent);
-  animation: scan-line 6s linear infinite;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,200,255,0.22), transparent);
+  animation: scan-line 20s linear infinite;
   pointer-events: none;
   z-index: 50;
 }
+
+/* iOS safe-area utilities */
+.pt-safe  { padding-top:    env(safe-area-inset-top,    0px); }
+.pb-safe  { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.pl-safe  { padding-left:   env(safe-area-inset-left,   0px); }
+.pr-safe  { padding-right:  env(safe-area-inset-right,  0px); }
 
 .typing-dot {
   display: inline-block;
