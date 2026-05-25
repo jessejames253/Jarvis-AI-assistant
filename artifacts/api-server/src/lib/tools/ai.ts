@@ -32,15 +32,30 @@ const SYSTEM_PROMPT = `You are Jarvis — a calm, intelligent, and direct AI ass
 function buildMessages(input: ToolInput): Array<{ role: "user" | "assistant"; content: string }> {
   const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
 
-  // Inject memory context as an early system-style user/assistant exchange
   const contextParts: string[] = [];
 
+  // ── Session memory ──────────────────────────────────────────────────────────
   if (input.memoryContext?.summary) {
     contextParts.push(`[Conversation summary: ${input.memoryContext.summary}]`);
   }
   if (input.memoryContext?.preferences?.name) {
     contextParts.push(`[User's name: ${input.memoryContext.preferences.name}]`);
   }
+
+  // ── Long-term memory facts ──────────────────────────────────────────────────
+  if (input.memoryContext?.ltmFacts && input.memoryContext.ltmFacts.length > 0) {
+    const grouped: Record<string, string[]> = {};
+    for (const fact of input.memoryContext.ltmFacts) {
+      if (!grouped[fact.category]) grouped[fact.category] = [];
+      grouped[fact.category].push(fact.content);
+    }
+    const lines = Object.entries(grouped)
+      .map(([cat, facts]) => `  ${cat}:\n${facts.map((f) => `    • ${f}`).join("\n")}`)
+      .join("\n");
+    contextParts.push(`[Long-term memories about this user:\n${lines}\n]`);
+  }
+
+  // ── KB notes ────────────────────────────────────────────────────────────────
   if (input.memoryContext?.kbNotes && input.memoryContext.kbNotes.length > 0) {
     const notesText = input.memoryContext.kbNotes
       .map((n) => `• ${n.title}: ${n.content.slice(0, 300)}`)
@@ -48,21 +63,13 @@ function buildMessages(input: ToolInput): Array<{ role: "user" | "assistant"; co
     contextParts.push(`[Relevant notes from user's Knowledge Base:\n${notesText}]`);
   }
 
-  // Prior conversation history
+  // Prior conversation history (last 20 turns)
   for (const h of input.history.slice(-20)) {
-    // last 20 turns max
     messages.push({ role: h.role, content: h.content });
   }
 
-  // If we have context to inject and history exists, prepend to first user message
-  // Otherwise add as a separate context block before the current message
-  if (contextParts.length > 0 && messages.length === 0) {
-    messages.push({
-      role: "user",
-      content: `${contextParts.join("\n")}\n\n${input.message}`,
-    });
-  } else if (contextParts.length > 0) {
-    // Prepend context to the current message
+  // Prepend context to the current user message (whether or not there's history)
+  if (contextParts.length > 0) {
     messages.push({
       role: "user",
       content: `${contextParts.join("\n")}\n\n${input.message}`,

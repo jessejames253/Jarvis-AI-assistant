@@ -1,0 +1,22 @@
+{
+  "sessionId": "ltm-test2-abcdef01",
+  "messages": [
+    {
+      "role": "user",
+      "content": "My name is Jordan and I am a Python backend engineer building an AI-powered resume screening tool called HireBot.",
+      "timestamp": "2026-05-25T20:17:09.374Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Got it — I'll call you Jordan and from now on. I've saved that to your session preferences.",
+      "timestamp": "2026-05-25T20:17:09.375Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {
+    "name": "Jordan and"
+  },
+  "messageCount": 2,
+  "createdAt": "2026-05-25T20:17:09.373Z",
+  "updatedAt": "2026-05-25T20:17:09.376Z"
+}

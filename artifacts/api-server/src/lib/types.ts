@@ -64,6 +64,14 @@ export interface KBNoteSnapshot {
   url?: string;
 }
 
+/** A long-term memory fact injected into context */
+export interface LTMFactSnapshot {
+  id: string;
+  category: "personal" | "coding" | "projects" | "preferences";
+  content: string;
+  tags: string[];
+}
+
 /** What every tool receives as input */
 export interface ToolInput {
   message: string;
@@ -71,8 +79,9 @@ export interface ToolInput {
   memoryContext?: {
     summary?: string;
     preferences?: Record<string, string>;
-    sessionId?: string;       // Passed so tools (e.g. tasks) can look up session data
+    sessionId?: string;         // Passed so tools (e.g. tasks) can look up session data
     kbNotes?: KBNoteSnapshot[]; // Top KB search hits — injected by the router
+    ltmFacts?: LTMFactSnapshot[]; // Long-term memory facts — injected by the chat route
   };
   classification: ClassificationResult;
 }
@@ -110,6 +119,7 @@ export interface DebugInfo {
   action: string;
   mode: string;
   memoryUsed: boolean;
+  ltmHits?: string[];  // Long-term memory entries injected into this response
   reasoning: string[];
   processingMs: number;
 }

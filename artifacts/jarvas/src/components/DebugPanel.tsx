@@ -7,7 +7,8 @@
  *   - Reasoning path (step-by-step)
  *   - Action taken by the tool
  *   - Mode the assistant was in
- *   - Whether memory context was used
+ *   - Whether session memory was used
+ *   - Long-term memory facts that were injected (ltmHits)
  *   - Which signals triggered the intent
  *   - Processing time in milliseconds
  *
@@ -16,7 +17,7 @@
  */
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Brain } from "lucide-react";
 
 export interface DebugInfo {
   intent: string;
@@ -26,6 +27,7 @@ export interface DebugInfo {
   action: string;
   mode: string;
   memoryUsed: boolean;
+  ltmHits?: string[];
   reasoning: string[];
   processingMs: number;
 }
@@ -34,7 +36,6 @@ interface DebugPanelProps {
   debug: DebugInfo;
 }
 
-// Intent badge colours (matching the futuristic palette)
 const INTENT_STYLES: Record<string, { bg: string; border: string; text: string }> = {
   casual:        { bg: "hsl(142 60% 40% / 0.15)", border: "hsl(142 60% 40% / 0.4)", text: "hsl(142 71% 60%)" },
   identity:      { bg: "hsl(264 70% 60% / 0.15)", border: "hsl(264 70% 60% / 0.4)", text: "hsl(264 80% 75%)" },
@@ -45,6 +46,13 @@ const INTENT_STYLES: Record<string, { bg: string; border: string; text: string }
   planning:      { bg: "hsl(330 70% 60% / 0.15)", border: "hsl(330 70% 60% / 0.4)", text: "hsl(330 80% 72%)"  },
   definition:    { bg: "hsl(194 90% 45% / 0.15)", border: "hsl(194 90% 45% / 0.4)", text: "hsl(194 100% 60%)" },
   general:       { bg: "hsl(210 15% 45% / 0.15)", border: "hsl(210 15% 45% / 0.4)", text: "hsl(210 20% 65%)"  },
+};
+
+const CATEGORY_COLORS: Record<string, string> = {
+  personal:    "hsl(264 80% 72%)",
+  coding:      "hsl(210 100% 70%)",
+  projects:    "hsl(142 71% 60%)",
+  preferences: "hsl(38 100% 65%)",
 };
 
 function getIntentStyle(intent: string) {
@@ -86,6 +94,7 @@ function ConfidenceBar({ value }: { value: number }) {
 
 export default function DebugPanel({ debug }: DebugPanelProps) {
   const [expanded, setExpanded] = useState(false);
+  const ltmHits = debug.ltmHits ?? [];
 
   return (
     <div
@@ -100,38 +109,40 @@ export default function DebugPanel({ debug }: DebugPanelProps) {
     >
       {/* ── Collapsed header (always visible) ── */}
       <div className="flex items-center gap-2 px-3 py-2 flex-wrap">
-        {/* Label */}
         <span className="text-xs tracking-widest" style={{ color: "hsl(196 40% 40%)" }}>
           DBG
         </span>
-
-        {/* Intent badge */}
         <IntentBadge intent={debug.intent} />
-
-        {/* Secondary intent */}
         {debug.secondaryIntent && (
           <span className="text-xs" style={{ color: "hsl(210 20% 45%)" }}>
             ↳ {debug.secondaryIntent}
           </span>
         )}
-
-        {/* Confidence bar */}
         <ConfidenceBar value={debug.confidence} />
-
-        {/* Mode */}
         <span className="text-xs" style={{ color: "hsl(196 40% 45%)" }}>
           {debug.mode}
         </span>
 
-        {/* Spacer */}
-        <div className="flex-1" />
+        {/* LTM hit indicator — compact chip in collapsed view */}
+        {ltmHits.length > 0 && (
+          <span
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono border"
+            style={{
+              background: "hsl(264 70% 55% / 0.12)",
+              borderColor: "hsl(264 70% 55% / 0.35)",
+              color: "hsl(264 80% 72%)",
+            }}
+            title={`${ltmHits.length} long-term memor${ltmHits.length === 1 ? "y" : "ies"} injected`}
+          >
+            <Brain className="w-2.5 h-2.5" />
+            {ltmHits.length}
+          </span>
+        )}
 
-        {/* Timing */}
+        <div className="flex-1" />
         <span className="text-xs font-mono" style={{ color: "hsl(210 20% 40%)" }}>
           {debug.processingMs}ms
         </span>
-
-        {/* Expand toggle */}
         {expanded
           ? <ChevronUp className="w-3 h-3" style={{ color: "hsl(210 20% 40%)" }} />
           : <ChevronDown className="w-3 h-3" style={{ color: "hsl(210 20% 40%)" }} />
@@ -141,7 +152,6 @@ export default function DebugPanel({ debug }: DebugPanelProps) {
       {/* ── Expanded detail ── */}
       {expanded && (
         <>
-          {/* Divider */}
           <div style={{ height: 1, background: "hsl(210 15% 15%)" }} />
 
           {/* Reasoning path */}
@@ -166,7 +176,41 @@ export default function DebugPanel({ debug }: DebugPanelProps) {
             </div>
           </div>
 
-          {/* Signals */}
+          {/* Long-term memory hits */}
+          {ltmHits.length > 0 && (
+            <>
+              <div style={{ height: 1, background: "hsl(210 15% 15%)" }} />
+              <div className="px-3 py-2">
+                <p className="text-xs mb-1.5 tracking-wider flex items-center gap-1.5" style={{ color: "hsl(196 40% 38%)" }}>
+                  <Brain className="w-3 h-3" style={{ color: "hsl(264 80% 65%)" }} />
+                  LONG-TERM MEMORY INJECTED
+                </p>
+                <div className="flex flex-col gap-1">
+                  {ltmHits.map((hit, i) => {
+                    const catMatch = hit.match(/^\[(\w+)\]\s*/);
+                    const cat = catMatch?.[1] ?? "general";
+                    const text = catMatch ? hit.slice(catMatch[0].length) : hit;
+                    const color = CATEGORY_COLORS[cat] ?? "hsl(196 40% 60%)";
+                    return (
+                      <div key={i} className="flex items-start gap-2">
+                        <span
+                          className="flex-shrink-0 px-1 rounded text-xs font-mono font-bold uppercase tracking-wider"
+                          style={{ background: `${color}18`, color }}
+                        >
+                          {cat.slice(0, 4)}
+                        </span>
+                        <span className="text-xs leading-snug" style={{ color: "hsl(196 40% 60%)" }}>
+                          {text}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Classification signals */}
           {debug.signals.length > 0 && (
             <>
               <div style={{ height: 1, background: "hsl(210 15% 15%)" }} />
@@ -189,22 +233,25 @@ export default function DebugPanel({ debug }: DebugPanelProps) {
           <div style={{ height: 1, background: "hsl(210 15% 15%)" }} />
           <div className="flex items-center gap-4 px-3 py-2 flex-wrap">
             <div>
-              <span className="text-xs tracking-wider" style={{ color: "hsl(196 40% 38%)" }}>
-                ACTION{" "}
-              </span>
-              <span className="text-xs font-mono" style={{ color: "hsl(194 100% 55%)" }}>
-                {debug.action}
-              </span>
+              <span className="text-xs tracking-wider" style={{ color: "hsl(196 40% 38%)" }}>ACTION </span>
+              <span className="text-xs font-mono" style={{ color: "hsl(194 100% 55%)" }}>{debug.action}</span>
             </div>
             <div>
-              <span className="text-xs tracking-wider" style={{ color: "hsl(196 40% 38%)" }}>
-                MEMORY{" "}
-              </span>
+              <span className="text-xs tracking-wider" style={{ color: "hsl(196 40% 38%)" }}>MEMORY </span>
               <span
                 className="text-xs font-mono font-bold"
                 style={{ color: debug.memoryUsed ? "hsl(142 71% 55%)" : "hsl(210 20% 40%)" }}
               >
                 {debug.memoryUsed ? "ACTIVE" : "—"}
+              </span>
+            </div>
+            <div>
+              <span className="text-xs tracking-wider" style={{ color: "hsl(196 40% 38%)" }}>LTM </span>
+              <span
+                className="text-xs font-mono font-bold"
+                style={{ color: ltmHits.length > 0 ? "hsl(264 80% 72%)" : "hsl(210 20% 40%)" }}
+              >
+                {ltmHits.length > 0 ? `${ltmHits.length} FACT${ltmHits.length > 1 ? "S" : ""}` : "—"}
               </span>
             </div>
           </div>

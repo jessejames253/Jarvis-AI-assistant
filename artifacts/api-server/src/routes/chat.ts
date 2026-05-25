@@ -1,32 +1,19 @@
 /**
  * routes/chat.ts — Conversation endpoint
  *
- * POST /api/chat
+ * POST /api/chat          — standard (single-response)
+ * POST /api/chat/stream   — SSE streaming
  *
- * Full pipeline:
+ * Both routes share the same pipeline:
  *   1. Validate input
- *   2. Load session history from memory (if sessionId provided)
- *   3. Save the user's message to memory
- *   4. Run the agent: classify intent → route to tool → generate response
- *   5. Save the assistant's response to memory
- *   6. Apply any side effects (e.g. preference updates from the memory tool)
- *   7. Return response + sources + debug info
- *
- * Request body:
- *   {
- *     message:   string   — the user's message (required)
- *     sessionId: string   — UUID identifying the session (optional)
- *   }
- *
- * Response:
- *   {
- *     response:   string       — Jarvis's reply
- *     model:      string       — engine that produced the response
- *     sources?:   Source[]     — web search results (when intent = research)
- *     isSearch?:  boolean      — true when sources are included
- *     isFakeSearch?: boolean   — true when running in demo search mode
- *     debug:      DebugInfo    — intent, action, reasoning path, timing
- *   }
+ *   2. Intercept "forget" commands (delete LTM entries before any AI call)
+ *   3. Load session history + long-term memory (LTM)
+ *   4. Rank and inject relevant LTM facts into context
+ *   5. Save the user's message
+ *   6. Run the agent: classify intent → route to tool → generate response
+ *   7. Save the assistant's response
+ *   8. Apply side effects (preference updates)
+ *   9. Asynchronously extract new LTM facts from the exchange (fire-and-forget)
  */
 
 import { Router } from "express";
@@ -37,9 +24,48 @@ import { classifyIntent } from "../lib/intent";
 import { searchNotes } from "../lib/kb/manager";
 import { streamAiCompletion } from "../lib/tools/ai";
 import { streamResearchCompletion } from "../lib/tools/research";
+import { getLTM, rankEntries, addOrUpdateEntry, deleteMatchingEntries, deleteRecentEntries, clearLTM } from "../lib/ltm/store";
+import { shouldExtract, extractFacts } from "../lib/ltm/extractor";
 import type { ToolInput } from "../lib/types";
 
 const router = Router();
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const CLAUDE_INTENTS = new Set(["definition", "general", "coding", "planning", "research"]);
+
+// Forget command patterns
+const FORGET_ALL_RE  = /^(forget|clear|delete|erase|wipe)\s+(everything|all|my (memory|memories|data)|it all)\b/i;
+const FORGET_THIS_RE = /^forget\s+(this|that)\b/i;
+const FORGET_TOPIC_RE = /^forget\s+(?!everything|all|my|this|that\b)(.+)$/i;
+
+/**
+ * Fire-and-forget LTM extraction after each exchange.
+ * Never throws — extraction failures must not affect chat responses.
+ */
+async function runExtraction(sessionId: string, userMessage: string): Promise<void> {
+  try {
+    if (!shouldExtract(userMessage)) return;
+    const facts = await extractFacts(userMessage);
+    await Promise.all(
+      facts.map((f) =>
+        addOrUpdateEntry(sessionId, {
+          category: f.category,
+          content: f.content,
+          source: "auto",
+          tags: f.tags,
+        }),
+      ),
+    );
+    if (facts.length > 0) {
+      logger.info({ sessionId, count: facts.length }, "LTM facts extracted");
+    }
+  } catch (err) {
+    logger.warn({ err, sessionId }, "LTM extraction failed (non-fatal)");
+  }
+}
+
+// ─── POST /api/chat ───────────────────────────────────────────────────────────
 
 router.post("/chat", async (req, res) => {
   const { message, sessionId } = req.body as {
@@ -56,9 +82,49 @@ router.post("/chat", async (req, res) => {
   const hasSession = !!(sessionId && /^[a-zA-Z0-9\-]{8,64}$/.test(sessionId));
 
   try {
+    // ── Intercept forget commands ────────────────────────────────────────────
+    if (hasSession) {
+      if (FORGET_ALL_RE.test(trimmedMessage)) {
+        await clearLTM(sessionId!);
+        res.json({
+          response: "Done — I've cleared all long-term memories for this session. Starting fresh.",
+          model: "internal",
+          sources: [],
+          isSearch: false,
+          debug: { intent: "memory_update", confidence: 0.97, signals: ["forget all command"], action: "ltm_clear_all", mode: "memory_manager", memoryUsed: false, ltmHits: [], reasoning: ["User requested full LTM wipe", "All long-term memory entries deleted"], processingMs: 0 },
+        });
+        return;
+      }
+      if (FORGET_THIS_RE.test(trimmedMessage)) {
+        const deleted = await deleteRecentEntries(sessionId!, 2);
+        res.json({
+          response: deleted > 0
+            ? `Forgotten — I've removed the ${deleted} most recently stored memor${deleted === 1 ? "y" : "ies"}.`
+            : "There's nothing recent in long-term memory to forget.",
+          model: "internal", sources: [], isSearch: false,
+          debug: { intent: "memory_update", confidence: 0.95, signals: ["forget this/that command"], action: "ltm_delete_recent", mode: "memory_manager", memoryUsed: false, ltmHits: [], reasoning: [`Deleted ${deleted} recent LTM entries`], processingMs: 0 },
+        });
+        return;
+      }
+      const forgetTopicMatch = trimmedMessage.match(FORGET_TOPIC_RE);
+      if (forgetTopicMatch) {
+        const topic = forgetTopicMatch[1].trim();
+        const deleted = await deleteMatchingEntries(sessionId!, topic);
+        res.json({
+          response: deleted > 0
+            ? `Got it — I've removed ${deleted} memor${deleted === 1 ? "y" : "ies"} related to "${topic}".`
+            : `I don't have anything stored about "${topic}" in long-term memory.`,
+          model: "internal", sources: [], isSearch: false,
+          debug: { intent: "memory_update", confidence: 0.95, signals: [`forget topic: "${topic}"`], action: "ltm_delete_topic", mode: "memory_manager", memoryUsed: false, ltmHits: [], reasoning: [`Searched LTM for topic: "${topic}"`, `Deleted ${deleted} matching entries`], processingMs: 0 },
+        });
+        return;
+      }
+    }
+
     // ── Load memory context ──────────────────────────────────────────────────
     let history: Array<{ role: "user" | "assistant"; content: string }> = [];
     let memoryContext: { summary?: string; preferences?: Record<string, string> } = {};
+    let ltmHits: string[] = [];
 
     if (hasSession) {
       const session = await getOrCreateSession(sessionId!);
@@ -67,9 +133,20 @@ router.post("/chat", async (req, res) => {
       if (Object.keys(session.preferences).length > 0) {
         memoryContext.preferences = session.preferences as Record<string, string>;
       }
-      // Pass sessionId so tools like tasks can load session-scoped data
       (memoryContext as Record<string, unknown>).sessionId = sessionId!;
-      // Save the user message before generating (so it's in memory even on error)
+
+      // ── Long-term memory ───────────────────────────────────────────────────
+      const ltmStore = await getLTM(sessionId!);
+      if (ltmStore.entries.length > 0) {
+        const ranked = rankEntries(ltmStore.entries, trimmedMessage, 8);
+        if (ranked.length > 0) {
+          (memoryContext as Record<string, unknown>).ltmFacts = ranked.map((e) => ({
+            id: e.id, category: e.category, content: e.content, tags: e.tags,
+          }));
+          ltmHits = ranked.map((e) => `[${e.category}] ${e.content}`);
+        }
+      }
+
       await appendMessage(sessionId!, "user", trimmedMessage);
     }
 
@@ -79,22 +156,21 @@ router.post("/chat", async (req, res) => {
     // ── Persist the response ─────────────────────────────────────────────────
     if (hasSession) {
       await appendMessage(sessionId!, "assistant", output.response);
-
-      // Apply side effects — e.g. the memory update tool sets a name preference
       if (output.sideEffects?.updatePreferences) {
         await updatePreferences(sessionId!, output.sideEffects.updatePreferences);
-        logger.info({ sessionId, prefs: output.sideEffects.updatePreferences }, "Preferences updated via tool");
+        logger.info({ sessionId, prefs: output.sideEffects.updatePreferences }, "Preferences updated");
       }
+      // Extract and store new facts (async, never blocks response)
+      void runExtraction(sessionId!, trimmedMessage);
     }
 
-    // ── Respond ──────────────────────────────────────────────────────────────
     res.json({
       response: output.response,
       model: output.model,
       sources: output.sources,
       isSearch: output.isSearch,
       isFakeSearch: output.isFakeSearch,
-      debug: output.debug,
+      debug: { ...output.debug, ltmHits },
     });
   } catch (err) {
     logger.error({ err, message: trimmedMessage }, "Chat pipeline error");
@@ -102,13 +178,7 @@ router.post("/chat", async (req, res) => {
   }
 });
 
-// ─── Streaming endpoint ───────────────────────────────────────────────────────
-// POST /api/chat/stream — SSE endpoint that streams tokens as they arrive.
-// Claude intents (definition/general/coding/planning/research) stream token by
-// token. All other tools (math, tasks, KB, memory, casual, identity) run
-// normally and their response is emitted as a single token event.
-
-const CLAUDE_INTENTS = new Set(["definition", "general", "coding", "planning", "research"]);
+// ─── POST /api/chat/stream ────────────────────────────────────────────────────
 
 router.post("/chat/stream", async (req, res) => {
   const { message, sessionId } = req.body as { message?: string; sessionId?: string };
@@ -118,11 +188,11 @@ router.post("/chat/stream", async (req, res) => {
     return;
   }
 
-  // ── SSE headers ─────────────────────────────────────────────────────────────
+  // ── SSE headers ──────────────────────────────────────────────────────────────
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no"); // disable nginx buffering
+  res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders();
 
   const send = (data: object) => {
@@ -134,9 +204,43 @@ router.post("/chat/stream", async (req, res) => {
   const startTime = Date.now();
 
   try {
+    // ── Intercept forget commands ────────────────────────────────────────────
+    if (hasSession) {
+      if (FORGET_ALL_RE.test(trimmedMessage)) {
+        await clearLTM(sessionId!);
+        send({ type: "token", text: "Done — I've cleared all long-term memories for this session. Starting fresh." });
+        send({ type: "done", model: "internal", isSearch: false, isFakeSearch: false, sources: [],
+          debug: { intent: "memory_update", confidence: 0.97, signals: ["forget all command"], action: "ltm_clear_all", mode: "memory_manager", memoryUsed: false, ltmHits: [], reasoning: ["User requested full LTM wipe", "All LTM entries deleted"], processingMs: Date.now() - startTime } });
+        res.end(); return;
+      }
+      if (FORGET_THIS_RE.test(trimmedMessage)) {
+        const deleted = await deleteRecentEntries(sessionId!, 2);
+        const txt = deleted > 0
+          ? `Forgotten — I've removed the ${deleted} most recently stored memor${deleted === 1 ? "y" : "ies"}.`
+          : "There's nothing recent in long-term memory to forget.";
+        send({ type: "token", text: txt });
+        send({ type: "done", model: "internal", isSearch: false, isFakeSearch: false, sources: [],
+          debug: { intent: "memory_update", confidence: 0.95, signals: ["forget this/that"], action: "ltm_delete_recent", mode: "memory_manager", memoryUsed: false, ltmHits: [], reasoning: [`Deleted ${deleted} recent LTM entries`], processingMs: Date.now() - startTime } });
+        res.end(); return;
+      }
+      const forgetTopicMatch = trimmedMessage.match(FORGET_TOPIC_RE);
+      if (forgetTopicMatch) {
+        const topic = forgetTopicMatch[1].trim();
+        const deleted = await deleteMatchingEntries(sessionId!, topic);
+        const txt = deleted > 0
+          ? `Got it — I've removed ${deleted} memor${deleted === 1 ? "y" : "ies"} related to "${topic}".`
+          : `I don't have anything stored about "${topic}" in long-term memory.`;
+        send({ type: "token", text: txt });
+        send({ type: "done", model: "internal", isSearch: false, isFakeSearch: false, sources: [],
+          debug: { intent: "memory_update", confidence: 0.95, signals: [`forget topic: "${topic}"`], action: "ltm_delete_topic", mode: "memory_manager", memoryUsed: false, ltmHits: [], reasoning: [`Deleted ${deleted} matching LTM entries for: "${topic}"`], processingMs: Date.now() - startTime } });
+        res.end(); return;
+      }
+    }
+
     // ── Load memory context ──────────────────────────────────────────────────
     let history: Array<{ role: "user" | "assistant"; content: string }> = [];
     const memoryContext: Record<string, unknown> = {};
+    let ltmHits: string[] = [];
 
     if (hasSession) {
       const session = await getOrCreateSession(sessionId!);
@@ -144,13 +248,26 @@ router.post("/chat/stream", async (req, res) => {
       if (session.summary) memoryContext.summary = session.summary;
       if (Object.keys(session.preferences).length > 0) memoryContext.preferences = session.preferences;
       memoryContext.sessionId = sessionId!;
+
+      // ── Long-term memory ───────────────────────────────────────────────────
+      const ltmStore = await getLTM(sessionId!);
+      if (ltmStore.entries.length > 0) {
+        const ranked = rankEntries(ltmStore.entries, trimmedMessage, 8);
+        if (ranked.length > 0) {
+          memoryContext.ltmFacts = ranked.map((e) => ({
+            id: e.id, category: e.category, content: e.content, tags: e.tags,
+          }));
+          ltmHits = ranked.map((e) => `[${e.category}] ${e.content}`);
+        }
+      }
+
       await appendMessage(sessionId!, "user", trimmedMessage);
     }
 
     // ── Classify intent ──────────────────────────────────────────────────────
     const classification = classifyIntent(trimmedMessage, history);
 
-    // ── Build tool input + inject KB notes (mirrors router.ts) ───────────────
+    // ── Build tool input + inject KB notes ────────────────────────────────────
     const toolInput: ToolInput = {
       message: trimmedMessage,
       history,
@@ -180,13 +297,11 @@ router.post("/chat/stream", async (req, res) => {
     let sideEffects: { updatePreferences?: Record<string, string> } | undefined;
 
     if (CLAUDE_INTENTS.has(classification.intent) && classification.intent !== "research") {
-      // ── Stream from AI tool ────────────────────────────────────────────────
       streamMeta = await streamAiCompletion(toolInput, (text) => {
         fullResponse += text;
         send({ type: "token", text });
       });
     } else if (classification.intent === "research") {
-      // ── Web search + stream synthesis ─────────────────────────────────────
       const meta = await streamResearchCompletion(toolInput, (text) => {
         fullResponse += text;
         send({ type: "token", text });
@@ -196,7 +311,6 @@ router.post("/chat/stream", async (req, res) => {
       isSearch = meta.isSearch;
       isFakeSearch = meta.isFakeSearch;
     } else {
-      // ── Instant tool (math, tasks, KB, memory, casual, identity) ──────────
       const output = await complete({ message: trimmedMessage, history, memoryContext: memoryContext as Parameters<typeof complete>[0]["memoryContext"] });
       fullResponse = output.response;
       sources = output.sources;
@@ -216,8 +330,10 @@ router.post("/chat/stream", async (req, res) => {
       await appendMessage(sessionId!, "assistant", fullResponse);
       if (sideEffects?.updatePreferences) {
         await updatePreferences(sessionId!, sideEffects.updatePreferences);
-        logger.info({ sessionId, prefs: sideEffects.updatePreferences }, "Preferences updated via tool (stream)");
+        logger.info({ sessionId, prefs: sideEffects.updatePreferences }, "Preferences updated (stream)");
       }
+      // Extract and store new LTM facts (async, never blocks stream)
+      void runExtraction(sessionId!, trimmedMessage);
     }
 
     // ── Done event ───────────────────────────────────────────────────────────
@@ -235,6 +351,7 @@ router.post("/chat/stream", async (req, res) => {
         action: streamMeta.action,
         mode: streamMeta.mode,
         memoryUsed: !!(memoryContext.summary || memoryContext.preferences),
+        ltmHits,
         reasoning: streamMeta.reasoning,
         processingMs: Date.now() - startTime,
       },

@@ -1,0 +1,32 @@
+{
+  "sessionId": "ltm-test3-mplnfvni",
+  "messages": [
+    {
+      "role": "user",
+      "content": "My name is Jordan. I am a Python backend engineer building an AI-powered resume screening tool called HireBot. I prefer dark mode and use Neovim.",
+      "timestamp": "2026-05-25T20:18:50.270Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Got it — I'll call you Jordan from now on. I've saved that to your session preferences.",
+      "timestamp": "2026-05-25T20:18:50.277Z"
+    },
+    {
+      "role": "user",
+      "content": "What do you know about me?",
+      "timestamp": "2026-05-25T20:19:00.314Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Based on what's been shared in this conversation:\n\n- **Name:** Jordan\n- **Role:** Python backend engineer\n- **Project:** Building an AI-powered resume screening tool called **HireBot**\n- **Editor:** Neovim\n- **Preference:** Dark mode\n\nThat's the full picture — nothing beyond what you've told me directly.",
+      "timestamp": "2026-05-25T20:19:02.472Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {
+    "name": "Jordan"
+  },
+  "messageCount": 4,
+  "createdAt": "2026-05-25T20:18:50.267Z",
+  "updatedAt": "2026-05-25T20:19:02.472Z"
+}

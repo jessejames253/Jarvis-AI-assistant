@@ -1,0 +1,32 @@
+{
+  "sessionId": "ltm-test-session-abc1",
+  "messages": [
+    {
+      "role": "user",
+      "content": "My name is Alex and I am a senior TypeScript developer building a SaaS invoicing product called PayFlow",
+      "timestamp": "2026-05-25T20:15:38.346Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Got it — I'll call you Alex and from now on. I've saved that to your session preferences.",
+      "timestamp": "2026-05-25T20:15:38.356Z"
+    },
+    {
+      "role": "user",
+      "content": "What am I working on?",
+      "timestamp": "2026-05-25T20:15:41.386Z"
+    },
+    {
+      "role": "assistant",
+      "content": "You're Alex, a senior TypeScript developer building **PayFlow** — a SaaS invoicing product.",
+      "timestamp": "2026-05-25T20:15:42.324Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {
+    "name": "Alex and"
+  },
+  "messageCount": 4,
+  "createdAt": "2026-05-25T20:15:38.344Z",
+  "updatedAt": "2026-05-25T20:15:42.324Z"
+}
