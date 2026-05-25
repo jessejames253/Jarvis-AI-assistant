@@ -2,71 +2,6 @@
   "sessionId": "cfb6c397-6057-4b84-99be-0d5123d51466",
   "messages": [
     {
-      "role": "assistant",
-      "content": "You have **1 open task**:\n\n🟠 **add a high priority work task to finish Jarvas dashboard tomorrow** [Work]",
-      "timestamp": "2026-05-25T08:00:25.042Z"
-    },
-    {
-      "role": "user",
-      "content": "what should I work on?",
-      "timestamp": "2026-05-25T08:00:35.562Z"
-    },
-    {
-      "role": "assistant",
-      "content": "You have **1 open task**:\n\n🟠 **add a high priority work task to finish Jarvas dashboard tomorrow** [Work]",
-      "timestamp": "2026-05-25T08:00:35.564Z"
-    },
-    {
-      "role": "user",
-      "content": "mark finish Jarvas dashboard done",
-      "timestamp": "2026-05-25T08:00:48.935Z"
-    },
-    {
-      "role": "assistant",
-      "content": "I couldn't find a task matching \"finish Jarvas dashboard done\". Your open tasks:\n• add a high priority work task to finish Jarvas dashboard tomorrow",
-      "timestamp": "2026-05-25T08:00:48.937Z"
-    },
-    {
-      "role": "user",
-      "content": "Who are you?",
-      "timestamp": "2026-05-25T18:20:12.197Z"
-    },
-    {
-      "role": "assistant",
-      "content": "I'm Jarvas — an AI assistant designed for clear thinking and direct answers. I can explain concepts, work through problems, write and debug code, and search the web for current information.",
-      "timestamp": "2026-05-25T18:20:12.204Z"
-    },
-    {
-      "role": "user",
-      "content": "Who are you?",
-      "timestamp": "2026-05-25T18:22:13.862Z"
-    },
-    {
-      "role": "assistant",
-      "content": "I'm an AI assistant called Jarvas. Ask me anything — I'll give you a direct answer or go find one.",
-      "timestamp": "2026-05-25T18:22:13.865Z"
-    },
-    {
-      "role": "user",
-      "content": "Who are you?",
-      "timestamp": "2026-05-25T18:25:59.340Z"
-    },
-    {
-      "role": "assistant",
-      "content": "I'm an AI assistant called Jarvis. Ask me anything — I'll give you a direct answer or go find one.",
-      "timestamp": "2026-05-25T18:25:59.349Z"
-    },
-    {
-      "role": "user",
-      "content": "What is the weather gonna be like today?",
-      "timestamp": "2026-05-25T18:38:12.427Z"
-    },
-    {
-      "role": "assistant",
-      "content": "[DEMO MODE — add SEARCH_API_KEY for live results]\n\nScanning available data for: \"What is the weather gonna be like today?\". Retrieved 3 relevant results.",
-      "timestamp": "2026-05-25T18:38:12.431Z"
-    },
-    {
       "role": "user",
       "content": "What is your name?",
       "timestamp": "2026-05-25T18:38:25.889Z"
@@ -95,13 +30,63 @@
       "role": "assistant",
       "content": "I'm an AI assistant called Jarvis. Ask me anything — I'll give you a direct answer or go find one.",
       "timestamp": "2026-05-25T18:39:09.194Z"
+    },
+    {
+      "role": "user",
+      "content": "Who are you",
+      "timestamp": "2026-05-25T18:49:22.905Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Jarvis — your AI assistant. I handle questions, code, web search, planning, and I remember our conversations between sessions.",
+      "timestamp": "2026-05-25T18:49:22.914Z"
+    },
+    {
+      "role": "user",
+      "content": "What is photosynthesis?",
+      "timestamp": "2026-05-25T18:49:39.658Z"
+    },
+    {
+      "role": "assistant",
+      "content": "I don't have \"photosynthesis\" in my built-in knowledge. Say **\"search photosynthesis\"** and I'll pull a current answer from the web.",
+      "timestamp": "2026-05-25T18:49:39.665Z"
+    },
+    {
+      "role": "user",
+      "content": "How many people are in the world?",
+      "timestamp": "2026-05-25T18:50:06.564Z"
+    },
+    {
+      "role": "assistant",
+      "content": "I don't have \"How many people are in world\" in my built-in knowledge. Say **\"search How many people are in world\"** and I'll pull a current answer from the web.",
+      "timestamp": "2026-05-25T18:50:06.566Z"
+    },
+    {
+      "role": "user",
+      "content": "Write a simple JavaScript function that adds two numbers.",
+      "timestamp": "2026-05-25T18:50:23.152Z"
+    },
+    {
+      "role": "assistant",
+      "content": "What should this JavaScript code do? Describe the inputs, outputs, and any constraints — I'll write it.",
+      "timestamp": "2026-05-25T18:50:23.154Z"
+    },
+    {
+      "role": "user",
+      "content": "What is the weather today?",
+      "timestamp": "2026-05-25T18:50:35.754Z"
+    },
+    {
+      "role": "assistant",
+      "content": "[DEMO MODE — add SEARCH_API_KEY for live results]\n\nScanning available data for: \"What is the weather today?\". Retrieved 3 relevant results.",
+      "timestamp": "2026-05-25T18:50:35.756Z"
     }
   ],
-  "summary": "Earlier in this conversation, the user asked about:\n- \"Hello\"\n- \"What is 99*3\"\n- \"My name is JesseJames\"\n- \"plan a 3 step roadmap for improving Jarvas\"\n- \"Latest news today\"\n- \"add a high priority work task to finish Jarvas dashboard tomorrow\"\n- \"show me my tasks\"",
+  "summary": "Earlier in this conversation, the user asked about:\n- \"Hello\"\n- \"What is 99*3\"\n- \"My name is JesseJames\"\n- \"plan a 3 step roadmap for improving Jarvas\"\n- \"Latest news today\"\n- \"add a high priority work task to finish Jarvas dashboard tomorrow\"\n- \"show me my tasks\"\n\nAdditionally, the user asked about:\n- \"what should I work on?\"\n- \"mark finish Jarvas dashboard done\"\n- \"Who are you?\"\n- \"Who are you?\"\n- \"Who are you?\"\n- \"What is the weather gonna be like today?\"",
   "preferences": {
     "name": "JesseJames"
   },
-  "messageCount": 32,
+  "messageCount": 42,
   "createdAt": "2026-05-25T07:41:51.243Z",
-  "updatedAt": "2026-05-25T18:39:09.194Z"
+  "updatedAt": "2026-05-25T18:50:35.756Z"
 }
