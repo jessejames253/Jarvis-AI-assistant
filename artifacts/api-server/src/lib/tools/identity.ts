@@ -1,10 +1,21 @@
 import type { Tool, ToolInput, ToolOutput } from "../types";
 
-const RESPONSES = [
-  "I'm Jarvis — an AI assistant designed for clear thinking and direct answers. I can explain concepts, work through problems, write and debug code, and search the web for current information.",
-  "Jarvis. I'm an AI assistant built to help you think through things — questions, problems, plans, code. I also have persistent memory, so I'll remember this conversation next time.",
-  "I'm an AI assistant called Jarvis. Ask me anything — I'll give you a direct answer or go find one.",
+const IDENTITY_RESPONSES = [
+  "Jarvis — your AI assistant. I handle questions, code, web search, planning, and I remember our conversations between sessions.",
+  "I'm Jarvis. Ask me anything — I'll either answer directly or find the information. I also remember context across sessions.",
+  "Jarvis. I think clearly, work fast, and remember what matters. What do you need?",
 ];
+
+const CAPABILITY_RESPONSE = `Here's what I can do:
+
+• Answer questions and explain concepts
+• Write, debug, and review code in any language
+• Search the web for current information
+• Help with planning, breakdowns, and task lists
+• Remember your name and preferences across sessions
+• Store notes in your personal Knowledge Base
+
+What would you like to start with?`;
 
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
 
@@ -14,34 +25,27 @@ export const identityTool: Tool = {
   handles: ["identity"],
   async execute(input: ToolInput): Promise<ToolOutput> {
     const isMadeBy = /\b(who made|who built|who created|who developed|who wrote)\b/i.test(input.message);
-    const isCapabilities = /\b(what can you|what do you|your abilities|your capabilities|your features)\b/i.test(input.message);
+    const isCapabilities = /\b(what can you|what do you|your abilities|your capabilities|your features|what are you capable)\b/i.test(input.message);
 
     let response: string;
     let action: string;
-    const reasoning: string[] = ["Intent: identity question", ""];
 
     if (isMadeBy) {
-      reasoning[1] = "Sub-type: origin/creator question";
       action = "creator_disclosure";
-      response = "I was built as a learning project — a modular AI assistant with persistent memory and tool-based routing. The architecture is designed so a real AI model can be connected by changing a single function.";
+      response = "I was built as a modular AI assistant — intent routing, persistent memory, web search, and a personal knowledge base. The architecture is designed so a real AI model can be dropped in at any point.";
     } else if (isCapabilities) {
-      reasoning[1] = "Sub-type: capabilities question";
       action = "capability_disclosure";
-      response =
-        "Here's what I can do:\n\n" +
-        "• Answer questions and explain concepts\n" +
-        "• Write, debug, and review code\n" +
-        "• Search the web for current information\n" +
-        "• Help with planning and task breakdowns\n" +
-        "• Remember your conversation across sessions\n" +
-        "• Store your preferences (like your name)\n\n" +
-        "What would you like to start with?";
+      response = CAPABILITY_RESPONSE;
     } else {
-      reasoning[1] = "Sub-type: general identity question";
       action = "identity_disclosure";
-      response = pick(RESPONSES);
+      response = pick(IDENTITY_RESPONSES);
     }
 
-    return { response, action, mode: "informational", reasoning };
+    return {
+      response,
+      action,
+      mode: "informational",
+      reasoning: ["identity question", action],
+    };
   },
 };

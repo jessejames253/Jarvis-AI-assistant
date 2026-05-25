@@ -1,36 +1,33 @@
 import type { Tool, ToolInput, ToolOutput } from "../types";
 
-// Built-in knowledge base for common topics.
-// When a real AI model is connected, this entire map can be removed — the AI
-// will answer from its training data instead.
 const KNOWLEDGE_BASE: Record<string, string> = {
-  ai: "Artificial intelligence refers to software systems that perform tasks typically requiring human-like reasoning — recognising patterns, making decisions, generating language, or solving problems. Modern AI is largely built on machine learning: statistical models trained on large datasets rather than hand-coded rules.",
+  ai: "Artificial intelligence is software that performs tasks requiring human-like reasoning — recognising patterns, making decisions, generating language, solving problems. Modern AI is built on machine learning: statistical models trained on large datasets rather than hand-coded rules.",
   "machine learning":
-    "Machine learning is a branch of AI where models learn patterns from data rather than following explicit instructions. Given enough examples, a model can generalise to new inputs — the basis of everything from image recognition to language models.",
+    "Machine learning is AI where models learn patterns from data rather than explicit instructions. Given enough examples, a model generalises to new inputs — the basis of image recognition, language models, recommendations, and more.",
   "large language model":
-    "A large language model (LLM) is a neural network trained on massive text datasets to predict and generate human language. Models like GPT-4 and Claude are LLMs — they learn grammar, facts, reasoning patterns, and style from their training data.",
-  llm: "A large language model — a neural network trained to understand and generate human language at scale.",
+    "A large language model (LLM) is a neural network trained on massive text datasets to predict and generate human language. GPT-4, Claude, and Gemini are LLMs — they learn grammar, facts, reasoning, and style from training data.",
+  llm: "A large language model — a neural network trained to understand and generate human language at scale. Think GPT-4, Claude, Gemini.",
   "neural network":
-    "A neural network is a computational model loosely inspired by the brain. It consists of layers of interconnected nodes that transform inputs through learned weights. Deep neural networks — many layers stacked together — are the foundation of modern AI.",
-  api: "An API (Application Programming Interface) is a defined contract between software components. One system exposes endpoints — functions it's willing to perform — and other systems call them. REST APIs use HTTP and are how most web services communicate.",
-  rest: "REST (Representational State Transfer) is an architectural style for web APIs. Key principles: stateless requests, standard HTTP methods (GET/POST/PUT/DELETE), and resource-oriented URLs.",
+    "A neural network is a computational model loosely inspired by the brain. It layers interconnected nodes that transform inputs through learned weights. Deep networks — many stacked layers — are the foundation of modern AI.",
+  api: "An API (Application Programming Interface) is a contract between software components. One system exposes endpoints and other systems call them. REST APIs use HTTP and are how most web services communicate.",
+  rest: "REST is an architectural style for web APIs: stateless requests, standard HTTP methods (GET/POST/PUT/DELETE), resource-oriented URLs. Most public APIs are RESTful.",
   javascript:
-    "JavaScript is the primary language of the web browser, and — via Node.js — a popular server-side language. It's dynamically typed, event-driven, and asynchronous by design. TypeScript is a typed superset that compiles to JavaScript.",
+    "JavaScript is the language of the web browser — and via Node.js, the server too. Dynamically typed, event-driven, asynchronous by design. TypeScript is a typed superset that compiles down to JavaScript.",
   typescript:
-    "TypeScript is JavaScript with static types. It adds compile-time type checking, interfaces, and tooling support without changing runtime behaviour. It's the standard for large-scale JavaScript projects.",
+    "TypeScript is JavaScript with static types. It adds compile-time checking, interfaces, and better tooling without changing runtime behaviour. Standard choice for large-scale JavaScript projects.",
   python:
-    "Python is a general-purpose, readable scripting language widely used in data science, machine learning, automation, and web backends. Its simplicity and rich library ecosystem (NumPy, Pandas, PyTorch) make it the dominant language for AI research.",
+    "Python is a general-purpose scripting language dominant in data science, ML, automation, and web backends. Its readability and rich ecosystem (NumPy, PyTorch, FastAPI) make it the first language for AI research.",
   react:
-    "React is a JavaScript library for building user interfaces. It uses a component-based model where UI is broken into reusable pieces, and a virtual DOM for efficient updates. Developed by Meta, it's one of the most widely-used frontend frameworks.",
+    "React is a JavaScript library for building UIs. Component-based architecture, virtual DOM for efficient updates, developed by Meta. One of the most widely deployed frontend frameworks.",
   blockchain:
-    "A blockchain is a distributed ledger — a database replicated across many nodes, where records are grouped into blocks and linked cryptographically. Once written, entries are extremely difficult to alter. It underlies cryptocurrencies and some decentralised applications.",
+    "A blockchain is a distributed ledger replicated across many nodes, where records are grouped into blocks and cryptographically linked. Extremely difficult to alter once written. Underlies cryptocurrencies and some decentralised apps.",
   quantum:
-    "Quantum computing uses quantum mechanical phenomena — superposition and entanglement — to process information in ways classical computers can't. While still early-stage, quantum systems show promise for cryptography, simulation, and optimisation problems.",
+    "Quantum computing uses superposition and entanglement to process information in ways classical computers cannot. Still early-stage but shows promise for cryptography, simulation, and optimisation.",
   "open source":
-    "Open source software is software whose source code is publicly available for anyone to inspect, modify, and distribute. It's the foundation of much of the modern internet — Linux, Git, PostgreSQL, React, and Python are all open source.",
+    "Open source software has publicly available source code that anyone can inspect, modify, and distribute. Linux, Git, PostgreSQL, React, Python — the foundation of most of the modern internet is open source.",
   docker:
-    "Docker is a platform for packaging applications into containers — lightweight, isolated environments that include everything the app needs to run. Containers make apps portable across different machines and environments.",
-  git: "Git is a distributed version control system. It tracks changes to files over time, lets multiple people collaborate on code, and makes it possible to revert mistakes. GitHub and GitLab host Git repositories online.",
+    "Docker packages applications into containers — lightweight, isolated environments with everything the app needs to run. Containers make software portable across machines and environments.",
+  git: "Git is a distributed version control system. It tracks file changes over time, enables collaboration, and makes mistakes reversible. GitHub and GitLab host Git repositories.",
 };
 
 function findInKnowledgeBase(subject: string): string | null {
@@ -38,7 +35,6 @@ function findInKnowledgeBase(subject: string): string | null {
   for (const [topic, content] of Object.entries(KNOWLEDGE_BASE)) {
     if (key.includes(topic) || topic.includes(key)) return content;
   }
-  // Try word-by-word match for multi-word topics
   const words = key.split(/\s+/);
   for (const word of words) {
     if (word.length > 3 && KNOWLEDGE_BASE[word]) return KNOWLEDGE_BASE[word];
@@ -62,8 +58,6 @@ function detectSubtype(msg: string): "definition" | "comparison" | "howto" | "ge
   return "general";
 }
 
-function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
-
 export const knowledgeTool: Tool = {
   name: "knowledge",
   description: "Explains concepts, definitions, comparisons, and how-to questions",
@@ -71,12 +65,8 @@ export const knowledgeTool: Tool = {
   async execute(input: ToolInput): Promise<ToolOutput> {
     const subtype = detectSubtype(input.message);
     const subject = extractSubject(input.message);
-    const isFollowUp = input.history.length > 2;
 
-    // ── Personal KB check (highest priority source) ──────────────────────────
-    // The router injects relevant KB notes into memoryContext.kbNotes.
-    // If there are relevant notes, use them BEFORE the built-in knowledge base
-    // and BEFORE suggesting a web search. This is the core "KB-first" behaviour.
+    // ── Personal KB check (highest priority) ─────────────────────────────────
     const kbNotes = input.memoryContext?.kbNotes;
     if (kbNotes && kbNotes.length > 0) {
       const items = kbNotes
@@ -92,60 +82,51 @@ export const knowledgeTool: Tool = {
         response: `From your Knowledge Base:\n\n${items}`,
         action: "from_personal_kb",
         mode: "knowledge_base",
-        reasoning: [
-          `Personal KB had ${kbNotes.length} relevant note(s)`,
-          `Top note: "${kbNotes[0].title}"`,
-          "Returned KB content (KB-first policy)",
-        ],
+        reasoning: [`Personal KB: ${kbNotes.length} relevant note(s)`, "KB-first policy applied"],
       };
     }
-
-    const reasoning: string[] = [
-      `Intent: ${input.classification.intent}`,
-      `Sub-type: ${subtype}`,
-      subject ? `Subject extracted: "${subject.slice(0, 50)}"` : "Subject: not clear",
-      "Personal KB: no relevant notes found",
-      "Checking built-in knowledge base",
-    ];
 
     let response: string;
     let action: string;
 
     if (subtype === "comparison") {
       action = "concept_comparison";
-      reasoning.push("Routing to comparison handler");
-      response = pick([
-        `Both have genuine merits — the right choice for "${subject}" depends on your specific use case and constraints. What are you deciding between them for?`,
-        `Good comparison to make. The short version: neither is universally better for "${subject}" — it comes down to use case, scale, and team context. Want me to break down the key tradeoffs?`,
-        `For "${subject}", the answer shifts based on what you're optimising for. Tell me more about the situation and I can give a direct recommendation.`,
-      ]);
+      const known = findInKnowledgeBase(subject);
+      if (known) {
+        response = known + "\n\nWant me to compare it against something specific, or search for a more in-depth breakdown?";
+      } else {
+        response = `The right answer for "${subject}" depends on your constraints — scale, team, use case. If you share more context I can give a direct recommendation. Or I can search the web for a current comparison.`;
+      }
     } else if (subtype === "howto") {
       action = "howto_guide";
-      reasoning.push("Routing to how-to handler");
-      response = pick([
-        `To ${subject}, the general approach is to start by understanding what you're working with, break it into steps, then tackle each one. Could you share more context so I can make this more specific?`,
-        `For "${subject}": the right method depends on your setup. What are you using and what have you already tried?`,
-        `Good question on "${subject}". Share a bit more context — what you're using or what you've tried — and I'll give you something concrete.`,
-      ]);
+      const known = findInKnowledgeBase(subject);
+      if (known) {
+        response = known + "\n\nNeed more detail on a specific part of this?";
+      } else {
+        response = `For "${subject}", the approach depends on your setup. Share what you're working with and what you've tried, and I'll give you something specific. Or say "search how to ${subject}" and I'll look it up live.`;
+      }
     } else {
-      // Definition / general — check knowledge base first
+      // Definition / general
       const known = findInKnowledgeBase(subject);
       if (known) {
         action = "definition_from_kb";
-        reasoning.push(`Knowledge base: found entry for "${subject}"`);
         response = known;
       } else {
-        action = "definition_unknown";
-        reasoning.push(`Knowledge base: no entry for "${subject}" — asking for context`);
-        response = isFollowUp
-          ? `In the context of what we've been discussing: could you be more specific about what you mean by "${subject}"? I want to give you an accurate answer.`
-          : pick([
-              `"${subject}" is something I can speak to more precisely with a bit more context. Are you looking for a technical definition, a conceptual overview, or something practical?`,
-              `Good question. On "${subject}" — what angle are you coming from? Technical, conceptual, or applied?`,
-            ]);
+        action = "definition_search_suggestion";
+        response = `I don't have "${subject}" in my built-in knowledge. Say **"search ${subject}"** and I'll pull a current answer from the web.`;
       }
     }
 
-    return { response, action, mode: "knowledge_base", reasoning };
+    return {
+      response,
+      action,
+      mode: "knowledge_base",
+      reasoning: [
+        `subtype: ${subtype}`,
+        subject ? `subject: "${subject.slice(0, 50)}"` : "no subject",
+        "personal KB: no matches",
+        action,
+      ],
+    };
   },
 };

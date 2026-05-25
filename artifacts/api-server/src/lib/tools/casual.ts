@@ -1,24 +1,38 @@
 import type { Tool, ToolInput, ToolOutput } from "../types";
 
 const GREETINGS = [
-  "Hello{name}. What can I help you with today?",
-  "Hi{name} — what's on your mind?",
-  "Hey{name}. Ready when you are.",
+  "Hey{name}. What are we working on?",
+  "Hello{name}. What's on your mind?",
+  "Hi{name} — ready when you are.",
+  "Good to hear from you{name}. What can I help with?",
 ];
+
 const WELLBEING = [
-  "Functioning well, thanks. What can I help you with?",
-  "All good on my end. What are you working on?",
-  "Doing fine — what's on your mind?",
+  "Running well. What do you need?",
+  "All systems nominal. What are we tackling?",
+  "Good — what are you working on?",
+  "Sharp as ever. What's the question?",
 ];
+
 const THANKS = [
-  "Happy to help. Let me know if there's anything else.",
-  "You're welcome. What else can I do for you?",
-  "Anytime — feel free to ask.",
+  "Anytime.",
+  "Of course. What else?",
+  "Happy to help.",
+  "That's what I'm here for.",
 ];
+
 const FAREWELLS = [
-  "Take care. I'll remember our conversation for next time.",
-  "See you. Good luck with what you're working on.",
-  "Goodbye. Come back anytime — I'll have your history ready.",
+  "Take care. I'll have this conversation ready next time.",
+  "See you. Good luck with what you're building.",
+  "Until next time.",
+  "Goodbye — come back when you need me.",
+];
+
+const SMALLTALK = [
+  "What's on your mind?",
+  "Go ahead.",
+  "I'm listening.",
+  "What are we looking at?",
 ];
 
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
@@ -41,13 +55,6 @@ export const casualTool: Tool = {
     const name = input.memoryContext?.preferences?.name;
     const nameTag = name ? `, ${name}` : "";
 
-    const reasoning: string[] = [
-      `Intent classified as: casual`,
-      `Subtype detected: ${subtype}`,
-      name ? `Memory: user name "${name}" loaded` : "Memory: no name preference set",
-      `Response pool selected: ${subtype}`,
-    ];
-
     let response: string;
     let action: string;
 
@@ -55,7 +62,6 @@ export const casualTool: Tool = {
       case "greeting":
         response = pick(GREETINGS).replace("{name}", nameTag);
         action = "greeting_response";
-        reasoning.push("Applied name personalization to greeting template");
         break;
       case "wellbeing":
         response = pick(WELLBEING);
@@ -68,15 +74,17 @@ export const casualTool: Tool = {
       case "farewell":
         response = pick(FAREWELLS);
         action = "farewell_response";
-        reasoning.push("Added memory continuity message to farewell");
         break;
       default:
-        response = name
-          ? `Hey ${name}. What's on your mind?`
-          : "What's on your mind?";
+        response = name ? `${pick(SMALLTALK)} ${name}.`.replace(". .", ".") : pick(SMALLTALK);
         action = "small_talk";
     }
 
-    return { response, action, mode: "conversational", reasoning };
+    return {
+      response,
+      action,
+      mode: "conversational",
+      reasoning: [`casual/${subtype}`, name ? `name: ${name}` : "no name set"],
+    };
   },
 };

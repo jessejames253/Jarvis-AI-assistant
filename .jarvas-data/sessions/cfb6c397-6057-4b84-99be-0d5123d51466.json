@@ -55,13 +55,53 @@
       "role": "assistant",
       "content": "I'm an AI assistant called Jarvis. Ask me anything — I'll give you a direct answer or go find one.",
       "timestamp": "2026-05-25T18:25:59.349Z"
+    },
+    {
+      "role": "user",
+      "content": "What is the weather gonna be like today?",
+      "timestamp": "2026-05-25T18:38:12.427Z"
+    },
+    {
+      "role": "assistant",
+      "content": "[DEMO MODE — add SEARCH_API_KEY for live results]\n\nScanning available data for: \"What is the weather gonna be like today?\". Retrieved 3 relevant results.",
+      "timestamp": "2026-05-25T18:38:12.431Z"
+    },
+    {
+      "role": "user",
+      "content": "What is your name?",
+      "timestamp": "2026-05-25T18:38:25.889Z"
+    },
+    {
+      "role": "assistant",
+      "content": "In the context of what we've been discussing: could you be more specific about what you mean by \"your name\"? I want to give you an accurate answer.",
+      "timestamp": "2026-05-25T18:38:25.892Z"
+    },
+    {
+      "role": "user",
+      "content": "How many people are in the world?",
+      "timestamp": "2026-05-25T18:38:49.884Z"
+    },
+    {
+      "role": "assistant",
+      "content": "In the context of what we've been discussing: could you be more specific about what you mean by \"How many people are in world\"? I want to give you an accurate answer.",
+      "timestamp": "2026-05-25T18:38:49.886Z"
+    },
+    {
+      "role": "user",
+      "content": "Who are you",
+      "timestamp": "2026-05-25T18:39:09.192Z"
+    },
+    {
+      "role": "assistant",
+      "content": "I'm an AI assistant called Jarvis. Ask me anything — I'll give you a direct answer or go find one.",
+      "timestamp": "2026-05-25T18:39:09.194Z"
     }
   ],
   "summary": "Earlier in this conversation, the user asked about:\n- \"Hello\"\n- \"What is 99*3\"\n- \"My name is JesseJames\"\n- \"plan a 3 step roadmap for improving Jarvas\"\n- \"Latest news today\"\n- \"add a high priority work task to finish Jarvas dashboard tomorrow\"\n- \"show me my tasks\"",
   "preferences": {
     "name": "JesseJames"
   },
-  "messageCount": 24,
+  "messageCount": 32,
   "createdAt": "2026-05-25T07:41:51.243Z",
-  "updatedAt": "2026-05-25T18:25:59.349Z"
+  "updatedAt": "2026-05-25T18:39:09.194Z"
 }

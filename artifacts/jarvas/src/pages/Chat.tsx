@@ -26,6 +26,24 @@ import DebugPanel, { type DebugInfo } from "@/components/DebugPanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type AgentStatus = "idle" | "thinking" | "researching" | "processing" | "error";
+
+const STATUS_CONFIG: Record<AgentStatus, { label: string; color: string; glow: string }> = {
+  idle:        { label: "READY",         color: "hsl(194 100% 55%)", glow: "0 0 8px rgba(0,200,255,0.5), 0 0 24px rgba(0,200,255,0.2)" },
+  thinking:    { label: "THINKING",      color: "hsl(264 80% 72%)",  glow: "0 0 12px rgba(140,80,255,0.6), 0 0 28px rgba(140,80,255,0.2)" },
+  researching: { label: "SEARCHING WEB", color: "hsl(194 100% 70%)", glow: "0 0 16px rgba(0,220,255,0.7), 0 0 36px rgba(0,220,255,0.3)" },
+  processing:  { label: "PROCESSING",    color: "hsl(38 100% 62%)",  glow: "0 0 12px rgba(255,160,0,0.55), 0 0 28px rgba(255,160,0,0.2)" },
+  error:       { label: "ERROR",         color: "hsl(355 80% 62%)",  glow: "0 0 12px rgba(255,60,60,0.55), 0 0 28px rgba(255,60,60,0.2)" },
+};
+
+function inferStatus(message: string): AgentStatus {
+  if (/\b(latest|current|recent|today|news|search|find|look up|weather|stock|price|happening)\b/i.test(message))
+    return "researching";
+  if (/\b(code|debug|function|bug|error|script|javascript|typescript|python|react|css|html|api|fix)\b/i.test(message))
+    return "processing";
+  return "thinking";
+}
+
 interface Source {
   title: string;
   url: string;
@@ -106,21 +124,25 @@ async function loadSession(
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function TypingIndicator() {
+function TypingIndicator({ status }: { status: AgentStatus }) {
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.thinking;
   return (
-    <div
-      className="flex items-end gap-3 message-enter"
-      data-testid="typing-indicator"
-    >
-      <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/40 flex items-center justify-center flex-shrink-0 glow-primary">
-        <span className="font-display text-primary text-xs font-bold">J</span>
+    <div className="flex items-end gap-3 message-enter" data-testid="typing-indicator">
+      <div
+        className="w-8 h-8 rounded-full bg-primary/10 border border-primary/40 flex items-center justify-center flex-shrink-0 transition-all duration-500"
+        style={{ boxShadow: cfg.glow }}
+      >
+        <span className="font-display text-xs font-bold transition-colors duration-500" style={{ color: cfg.color }}>J</span>
       </div>
-      <div className="bg-card border border-card-border rounded-2xl rounded-bl-sm px-4 py-3">
-        <div className="flex items-center gap-1.5 h-5">
-          <span className="typing-dot w-1.5 h-1.5 bg-primary rounded-full" />
-          <span className="typing-dot w-1.5 h-1.5 bg-primary rounded-full" />
-          <span className="typing-dot w-1.5 h-1.5 bg-primary rounded-full" />
+      <div className="bg-card border border-card-border rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-3">
+        <div className="flex items-center gap-1.5">
+          <span className="typing-dot w-1.5 h-1.5 rounded-full transition-colors duration-500" style={{ background: cfg.color }} />
+          <span className="typing-dot w-1.5 h-1.5 rounded-full transition-colors duration-500" style={{ background: cfg.color }} />
+          <span className="typing-dot w-1.5 h-1.5 rounded-full transition-colors duration-500" style={{ background: cfg.color }} />
         </div>
+        <span className="text-xs font-display tracking-widest transition-colors duration-500" style={{ color: cfg.color, opacity: 0.65 }}>
+          {cfg.label}
+        </span>
       </div>
     </div>
   );
@@ -295,6 +317,7 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([WELCOME()]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [agentStatus, setAgentStatus] = useState<AgentStatus>("idle");
   const [panelOpen, setPanelOpen] = useState(false);
   const [debugMode, setDebugModeState] = useState(() => getDebugMode());
   const [memory, setMemory] = useState<SessionMemory | null>(null);
@@ -366,6 +389,7 @@ export default function Chat() {
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setIsTyping(true);
+    setAgentStatus(inferStatus(text));
     if (textareaRef.current) textareaRef.current.style.height = "auto";
     setMemory((prev) =>
       prev ? { ...prev, messageCount: prev.messageCount + 1 } : prev,
@@ -374,6 +398,7 @@ export default function Chat() {
     try {
       const data = await callChat(text, sessionId, BASE);
       setIsTyping(false);
+      setAgentStatus("idle");
 
       const assistantMsg: Message = {
         id: `assistant-${Date.now()}`,
@@ -399,6 +424,8 @@ export default function Chat() {
       }
     } catch {
       setIsTyping(false);
+      setAgentStatus("error");
+      setTimeout(() => setAgentStatus("idle"), 2500);
       setMessages((prev) => [
         ...prev,
         {
@@ -466,9 +493,18 @@ export default function Chat() {
         className="relative z-10 flex-shrink-0 flex items-center justify-between px-4 sm:px-8 py-3 sm:py-4 border-b border-border/60 bg-background/90 backdrop-blur-sm pt-safe"
       >
         <div className="flex items-center gap-2.5">
-          <div className="relative w-9 h-9 rounded-xl bg-primary/10 border border-primary/40 flex items-center justify-center glow-primary flex-shrink-0">
-            <span className="font-display text-primary font-black text-base">J</span>
-            <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-primary rounded-full animate-pulse" />
+          <div
+            className="relative w-9 h-9 rounded-xl bg-primary/10 border border-primary/40 flex items-center justify-center flex-shrink-0 transition-all duration-700"
+            style={{ boxShadow: STATUS_CONFIG[agentStatus].glow }}
+          >
+            <span
+              className="font-display font-black text-base transition-colors duration-700"
+              style={{ color: STATUS_CONFIG[agentStatus].color }}
+            >J</span>
+            <div
+              className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full animate-pulse transition-colors duration-700"
+              style={{ background: STATUS_CONFIG[agentStatus].color }}
+            />
           </div>
           <div>
             <h1
@@ -545,6 +581,25 @@ export default function Chat() {
         </div>
       </header>
 
+      {/* Status bar — shows while agent is active */}
+      {agentStatus !== "idle" && !isLoadingHistory && (
+        <div
+          className="relative z-10 flex-shrink-0 flex items-center gap-2 px-4 sm:px-8 py-1 border-b border-border/20 transition-all duration-500"
+          style={{ background: `${STATUS_CONFIG[agentStatus].color}08` }}
+        >
+          <div
+            className="w-1.5 h-1.5 rounded-full animate-pulse"
+            style={{ background: STATUS_CONFIG[agentStatus].color }}
+          />
+          <span
+            className="text-xs font-display tracking-widest"
+            style={{ color: STATUS_CONFIG[agentStatus].color, opacity: 0.75 }}
+          >
+            {STATUS_CONFIG[agentStatus].label}
+          </span>
+        </div>
+      )}
+
       {/* Loading banner */}
       {isLoadingHistory && (
         <div className="relative z-10 flex-shrink-0 flex items-center justify-center gap-2 py-2 bg-primary/5 border-b border-primary/20">
@@ -606,7 +661,7 @@ export default function Chat() {
             <MessageBubble key={msg.id} message={msg} showDebug={debugMode} />
           ))}
 
-          {isTyping && <TypingIndicator />}
+          {isTyping && <TypingIndicator status={agentStatus} />}
           <div ref={messagesEndRef} />
         </div>
       </main>
