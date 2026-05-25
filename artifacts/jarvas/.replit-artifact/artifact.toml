@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Jarvas AI"
+version = "1.0.0"
+id = "artifacts/jarvas"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20229
+
+[services.development]
+run = "pnpm --filter @workspace/jarvas run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/jarvas", "run", "build" ]
+publicDir = "artifacts/jarvas/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20229"
+BASE_PATH = "/"
