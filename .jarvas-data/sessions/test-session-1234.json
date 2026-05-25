@@ -1,0 +1,20 @@
+{
+  "sessionId": "test-session-1234",
+  "messages": [
+    {
+      "role": "user",
+      "content": "hello",
+      "timestamp": "2026-05-25T07:23:52.270Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Hey. Ready when you are. What would you like to work through?",
+      "timestamp": "2026-05-25T07:23:52.272Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {},
+  "messageCount": 2,
+  "createdAt": "2026-05-25T07:23:52.194Z",
+  "updatedAt": "2026-05-25T07:23:52.272Z"
+}
