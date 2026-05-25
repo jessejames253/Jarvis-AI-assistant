@@ -1,8 +1,37 @@
+/**
+ * routes/search.ts — Web search endpoint
+ *
+ * POST /api/search
+ *
+ * Accepts a search query and returns relevant web results plus a summary.
+ * Automatically switches between two modes depending on whether an API key exists:
+ *
+ *  LIVE MODE  — when the SEARCH_API_KEY secret is set
+ *               Calls the Brave Search API and returns real web results.
+ *               Get a free key at: https://brave.com/search/api/
+ *
+ *  DEMO MODE  — when no SEARCH_API_KEY is set
+ *               Returns clearly-labeled fake results so the UI still works
+ *               and developers can build without needing a key right away.
+ *
+ * Request body:
+ *   { query: string }
+ *
+ * Response:
+ *   {
+ *     query: string          — the original search query
+ *     results: Source[]      — list of web results (title, url, description)
+ *     answer: string         — a summary message for the chat UI
+ *     isFake: boolean        — true when running in demo mode
+ *   }
+ */
+
 import { Router } from "express";
 import { logger } from "../lib/logger";
 
 const router = Router();
 
+// Shape of a single search result
 interface SearchResult {
   title: string;
   url: string;
@@ -16,6 +45,7 @@ interface SearchResponse {
   isFake: boolean;
 }
 
+// Placeholder results used in demo mode (no API key set)
 const FAKE_RESULTS: Record<string, SearchResult[]> = {
   default: [
     {
@@ -39,6 +69,7 @@ const FAKE_RESULTS: Record<string, SearchResult[]> = {
   ],
 };
 
+// The message shown in the chat bubble when running in demo mode
 function buildFakeAnswer(query: string): string {
   return (
     `[DEMO MODE — Add a real SEARCH_API_KEY to get live results]\n\n` +
@@ -48,13 +79,15 @@ function buildFakeAnswer(query: string): string {
   );
 }
 
+// Calls the Brave Search REST API and returns formatted results.
+// Docs: https://api.search.brave.com/app/documentation/web-search/get-started
 async function braveSearch(query: string, apiKey: string): Promise<SearchResult[]> {
   const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=5`;
   const response = await fetch(url, {
     headers: {
       Accept: "application/json",
       "Accept-Encoding": "gzip",
-      "X-Subscription-Token": apiKey,
+      "X-Subscription-Token": apiKey, // API key stays on the server — never sent to the browser
     },
   });
 
@@ -66,6 +99,7 @@ async function braveSearch(query: string, apiKey: string): Promise<SearchResult[
     web?: { results?: Array<{ title: string; url: string; description?: string }> };
   };
 
+  // Normalise the API response into our SearchResult shape
   return (data.web?.results ?? []).map((r) => ({
     title: r.title,
     url: r.url,
@@ -76,14 +110,18 @@ async function braveSearch(query: string, apiKey: string): Promise<SearchResult[
 router.post("/search", async (req, res) => {
   const { query } = req.body as { query?: string };
 
+  // Validate input
   if (!query || typeof query !== "string" || query.trim().length === 0) {
     res.status(400).json({ error: "Missing or invalid query" });
     return;
   }
 
   const trimmedQuery = query.trim();
+
+  // Check whether the API key has been configured
   const apiKey = process.env.SEARCH_API_KEY;
 
+  // No key → demo mode
   if (!apiKey) {
     logger.info({ query: trimmedQuery }, "Search in demo mode (no SEARCH_API_KEY)");
     const response: SearchResponse = {
@@ -96,16 +134,16 @@ router.post("/search", async (req, res) => {
     return;
   }
 
+  // Key present → live mode
   try {
     logger.info({ query: trimmedQuery }, "Executing live Brave search");
     const results = await braveSearch(trimmedQuery, apiKey);
-    const topResults = results.slice(0, 4);
+    const topResults = results.slice(0, 4); // Show at most 4 sources in the chat UI
 
     const answer =
       topResults.length > 0
-        ? `Neural search complete. Located ${topResults.length} high-confidence data sources for: "${trimmedQuery}". ` +
-          `Synthesized from live internet signals — sources listed below.`
-        : `Search sweep complete for: "${trimmedQuery}". No strong signal nodes detected. Try refining your query.`;
+        ? `Search complete. Found ${topResults.length} sources for: "${trimmedQuery}". Sources listed below.`
+        : `Search complete for: "${trimmedQuery}". No strong results found — try rephrasing your query.`;
 
     const response: SearchResponse = {
       query: trimmedQuery,
