@@ -1,5 +1,6 @@
 - [AI backbone](ai-backbone.md) — Jarvis uses Claude (claude-sonnet-4-6) via Replit Anthropic integration; all knowledge/coding/planning routes through aiTool
 - [Search pipeline](search-pipeline.md) — Research intent: Brave Search → Claude synthesis; no SEARCH_API_KEY → Claude from training knowledge; never fake/demo responses
+- [SSE cancel detection](sse-cancel-detection.md) — Use res.on("close") not req.on("close") for SSE; req fires immediately after body-parser consumes POST body
 - [Agent tool system](agent-tools.md) — Agentic loop in runner.ts; AGENT_INTENTS route through runAgent(); tools stream SSE tool_start/tool_done/tool_error; DebugPanel shows toolCalls inline
 - [Speech session layer](speech-session.md) — Global SpeechManager singleton (lib/speechManager.ts) with 7-state machine, priority queue, iOS resilience; React via useSpeechSession; Chat.tsx uses speech.toggle/queue/unlock
 - [Runtime orchestrator](runtime-orchestrator.md) — JarvisRuntime singleton in lib/runtime/index.ts; EventBus + RuntimeLogger + subsystem health; bridges speech/network/visibility; RuntimeInspector shown in debug mode; NotificationToast always active

@@ -24,9 +24,21 @@
       "sessionId": "cfb6c397-6057-4b84-99be-0d5123d51466",
       "createdAt": "2026-05-25T21:24:17.689Z",
       "updatedAt": "2026-05-25T21:24:17.689Z"
+    },
+    {
+      "id": "28e76932-5211-4d63-9586-2f6f34830dcc",
+      "title": "Research daily workout plans, summarize the main points, then create a reminder for me to review it tomorrow.",
+      "category": "work",
+      "priority": "medium",
+      "status": "todo",
+      "subtasks": [],
+      "tags": [],
+      "sessionId": "cfb6c397-6057-4b84-99be-0d5123d51466",
+      "createdAt": "2026-05-25T21:32:10.458Z",
+      "updatedAt": "2026-05-25T21:32:10.458Z"
     }
   ],
   "projects": [],
   "goals": [],
-  "updatedAt": "2026-05-25T21:24:17.689Z"
+  "updatedAt": "2026-05-25T21:32:10.459Z"
 }

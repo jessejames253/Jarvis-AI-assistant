@@ -403,6 +403,7 @@ function MessageBubble({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 const BASE = import.meta.env.BASE_URL;
+console.log("[Jarvis] Chat module loaded v2 — BASE:", BASE);
 
 // Runtime singleton — no React dependency, survives re-renders
 const _rt = JarvisRuntime.getInstance();
@@ -551,6 +552,7 @@ export default function Chat() {
   }, [speechInput, input]);
 
   const sendMessage = useCallback(async () => {
+    console.log("[Chat] sendMessage entered — input:", JSON.stringify(input.trim()));
     const text = input.trim();
     if (!text || isTyping || isStreaming) return;
     speech.unlock();
@@ -743,8 +745,9 @@ export default function Chat() {
 
   const sendPlan = useCallback(async () => {
     const goal = input.trim();
-    console.log("[Planner] sendPlan called", { goal, isTyping, isStreaming });
+    console.log("[Planner] sendPlan entered — goal:", JSON.stringify(goal), "isTyping:", isTyping, "isStreaming:", isStreaming);
     if (!goal || isTyping || isStreaming) return;
+    console.log("[Planner] calling callPlanStream →", `${BASE}api/plan/stream`);
 
     speech.unlock();
     responseContentRef.current = "";
@@ -1239,22 +1242,36 @@ export default function Chat() {
               </div>
             )}
 
-            {/* Plan button */}
+            {/* ── Plan button ─────────────────────────────────────── */}
             <button
+              data-testid="button-plan"
               type="button"
-              onClick={sendPlan}
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log("[Planner] checklist clicked — input:", input.trim(), "isTyping:", isTyping, "isStreaming:", isStreaming);
+                sendPlan();
+              }}
               disabled={!input.trim() || isTyping || isStreaming}
-              title="Create a multi-step plan from this message"
+              title="Autonomous multi-step plan"
               aria-label="Create plan"
-              className="flex-shrink-0 w-9 h-9 rounded-xl border flex items-center justify-center transition-all duration-200 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
-              style={{ borderColor: "hsl(210 15% 22%)", background: "transparent" }}
+              className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+              style={{
+                border: "1px solid hsl(194 100% 40% / 0.5)",
+                background: "hsl(194 100% 50% / 0.08)",
+              }}
             >
-              <ListChecks className="w-4 h-4" style={{ color: "hsl(194 100% 50%)" }} />
+              <ListChecks className="w-4 h-4" style={{ color: "hsl(194 100% 60%)" }} />
             </button>
 
+            {/* ── Send button ──────────────────────────────────────── */}
             <button
               data-testid="button-send"
-              onClick={sendMessage}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log("[Chat] sendMessage entered from send button");
+                sendMessage();
+              }}
               disabled={!input.trim() || isTyping || isStreaming}
               className="flex-shrink-0 w-9 h-9 rounded-xl bg-primary flex items-center justify-center transition-all duration-200 hover:bg-primary/80 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed glow-primary"
               aria-label="Send message"

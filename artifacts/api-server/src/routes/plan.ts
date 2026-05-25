@@ -50,8 +50,15 @@ router.post("/plan/stream", async (req, res) => {
     } catch { /* client disconnected */ }
   };
 
+  // Use res.on("close") — NOT req.on("close").
+  // req "close" fires when the request BODY stream is consumed by body-parser,
+  // which happens immediately after JSON parsing and before any step runs.
+  // res "close" fires only when the actual HTTP connection is torn down.
   let cancelled = false;
-  req.on("close", () => { cancelled = true; });
+  res.on("close", () => {
+    logger.debug("SSE connection closed by client");
+    cancelled = true;
+  });
 
   const sid = sessionId ?? "";
   const goalTrimmed = goal.trim();
