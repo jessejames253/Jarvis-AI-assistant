@@ -2,71 +2,6 @@
   "sessionId": "cfb6c397-6057-4b84-99be-0d5123d51466",
   "messages": [
     {
-      "role": "user",
-      "content": "What is your name?",
-      "timestamp": "2026-05-25T18:38:25.889Z"
-    },
-    {
-      "role": "assistant",
-      "content": "In the context of what we've been discussing: could you be more specific about what you mean by \"your name\"? I want to give you an accurate answer.",
-      "timestamp": "2026-05-25T18:38:25.892Z"
-    },
-    {
-      "role": "user",
-      "content": "How many people are in the world?",
-      "timestamp": "2026-05-25T18:38:49.884Z"
-    },
-    {
-      "role": "assistant",
-      "content": "In the context of what we've been discussing: could you be more specific about what you mean by \"How many people are in world\"? I want to give you an accurate answer.",
-      "timestamp": "2026-05-25T18:38:49.886Z"
-    },
-    {
-      "role": "user",
-      "content": "Who are you",
-      "timestamp": "2026-05-25T18:39:09.192Z"
-    },
-    {
-      "role": "assistant",
-      "content": "I'm an AI assistant called Jarvis. Ask me anything — I'll give you a direct answer or go find one.",
-      "timestamp": "2026-05-25T18:39:09.194Z"
-    },
-    {
-      "role": "user",
-      "content": "Who are you",
-      "timestamp": "2026-05-25T18:49:22.905Z"
-    },
-    {
-      "role": "assistant",
-      "content": "Jarvis — your AI assistant. I handle questions, code, web search, planning, and I remember our conversations between sessions.",
-      "timestamp": "2026-05-25T18:49:22.914Z"
-    },
-    {
-      "role": "user",
-      "content": "What is photosynthesis?",
-      "timestamp": "2026-05-25T18:49:39.658Z"
-    },
-    {
-      "role": "assistant",
-      "content": "I don't have \"photosynthesis\" in my built-in knowledge. Say **\"search photosynthesis\"** and I'll pull a current answer from the web.",
-      "timestamp": "2026-05-25T18:49:39.665Z"
-    },
-    {
-      "role": "user",
-      "content": "How many people are in the world?",
-      "timestamp": "2026-05-25T18:50:06.564Z"
-    },
-    {
-      "role": "assistant",
-      "content": "I don't have \"How many people are in world\" in my built-in knowledge. Say **\"search How many people are in world\"** and I'll pull a current answer from the web.",
-      "timestamp": "2026-05-25T18:50:06.566Z"
-    },
-    {
-      "role": "user",
-      "content": "Write a simple JavaScript function that adds two numbers.",
-      "timestamp": "2026-05-25T18:50:23.152Z"
-    },
-    {
       "role": "assistant",
       "content": "What should this JavaScript code do? Describe the inputs, outputs, and any constraints — I'll write it.",
       "timestamp": "2026-05-25T18:50:23.154Z"
@@ -80,13 +15,43 @@
       "role": "assistant",
       "content": "[DEMO MODE — add SEARCH_API_KEY for live results]\n\nScanning available data for: \"What is the weather today?\". Retrieved 3 relevant results.",
       "timestamp": "2026-05-25T18:50:35.756Z"
+    },
+    {
+      "role": "user",
+      "content": "What is photosynthesis?",
+      "timestamp": "2026-05-25T19:06:26.537Z"
+    },
+    {
+      "role": "assistant",
+      "content": "**Photosynthesis** is the process by which plants, algae, and some bacteria convert light energy into chemical energy (food).\n\nThe basic equation:\n\n**CO₂ + H₂O + light energy → glucose (C₆H₁₂O₆) + O₂**\n\nKey details:\n- Occurs in the **chloroplasts** of plant cells\n- **Chlorophyll** is the pigment that absorbs sunlight (mostly red and blue wavelengths)\n- Produces **glucose** (used for energy and growth) and releases **oxygen** as a byproduct\n- Two main stages: the **light-dependent reactions** and the **Calvin cycle** (light-independent)\n\nIt's essentially how plants eat — and the foundation of almost every food chain on Earth.",
+      "timestamp": "2026-05-25T19:06:30.189Z"
+    },
+    {
+      "role": "user",
+      "content": "Write a simple JavaScript function that adds two numbers.",
+      "timestamp": "2026-05-25T19:07:44.005Z"
+    },
+    {
+      "role": "assistant",
+      "content": "```javascript\nfunction add(a, b) {\n  return a + b;\n}\n\n// Usage\nadd(3, 7); // returns 10\n```\n\nClean and simple. Want me to extend it — input validation, TypeScript types, or a version that handles multiple numbers?",
+      "timestamp": "2026-05-25T19:07:45.854Z"
+    },
+    {
+      "role": "user",
+      "content": "Who are you?",
+      "timestamp": "2026-05-25T19:07:59.761Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Jarvis. I think clearly, work fast, and remember what matters. What do you need?",
+      "timestamp": "2026-05-25T19:07:59.763Z"
     }
   ],
-  "summary": "Earlier in this conversation, the user asked about:\n- \"Hello\"\n- \"What is 99*3\"\n- \"My name is JesseJames\"\n- \"plan a 3 step roadmap for improving Jarvas\"\n- \"Latest news today\"\n- \"add a high priority work task to finish Jarvas dashboard tomorrow\"\n- \"show me my tasks\"\n\nAdditionally, the user asked about:\n- \"what should I work on?\"\n- \"mark finish Jarvas dashboard done\"\n- \"Who are you?\"\n- \"Who are you?\"\n- \"Who are you?\"\n- \"What is the weather gonna be like today?\"",
+  "summary": "Earlier in this conversation, the user asked about:\n- \"Hello\"\n- \"What is 99*3\"\n- \"My name is JesseJames\"\n- \"plan a 3 step roadmap for improving Jarvas\"\n- \"Latest news today\"\n- \"add a high priority work task to finish Jarvas dashboard tomorrow\"\n- \"show me my tasks\"\n\nAdditionally, the user asked about:\n- \"what should I work on?\"\n- \"mark finish Jarvas dashboard done\"\n- \"Who are you?\"\n- \"Who are you?\"\n- \"Who are you?\"\n- \"What is the weather gonna be like today?\"\n\nAdditionally, the user asked about:\n- \"What is your name?\"\n- \"How many people are in the world?\"\n- \"Who are you\"\n- \"Who are you\"\n- \"What is photosynthesis?\"\n- \"How many people are in the world?\"\n- \"Write a simple JavaScript function that adds two numbers.\"",
   "preferences": {
     "name": "JesseJames"
   },
-  "messageCount": 42,
+  "messageCount": 48,
   "createdAt": "2026-05-25T07:41:51.243Z",
-  "updatedAt": "2026-05-25T18:50:35.756Z"
+  "updatedAt": "2026-05-25T19:07:59.763Z"
 }

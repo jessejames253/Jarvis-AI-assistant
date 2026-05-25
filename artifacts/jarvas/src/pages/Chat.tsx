@@ -23,6 +23,7 @@ import {
 import { useLocation } from "wouter";
 import MemoryPanel, { type SessionMemory } from "@/components/MemoryPanel";
 import DebugPanel, { type DebugInfo } from "@/components/DebugPanel";
+import MarkdownContent from "@/components/MarkdownContent";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -268,13 +269,8 @@ function MessageBubble({
         )}
 
         {/* Main bubble */}
-        <div className="bg-card border border-card-border rounded-2xl rounded-tl-sm px-4 py-3">
-          <p
-            className="text-sm leading-relaxed whitespace-pre-line"
-            style={{ color: "hsl(196 80% 80%)" }}
-          >
-            {message.content}
-          </p>
+        <div className="bg-card border border-card-border rounded-2xl rounded-tl-sm px-4 py-3 min-w-0">
+          <MarkdownContent content={message.content} />
         </div>
 
         {/* Source cards */}

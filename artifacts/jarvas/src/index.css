@@ -290,6 +290,230 @@
 .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(0,200,255,0.3); border-radius: 2px; }
 .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(0,200,255,0.5); }
 
+/* ── Jarvis Markdown Renderer ─────────────────────────────────────────────── */
+
+.jarvis-md-root {
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: hsl(196 80% 80%);
+  min-width: 0;
+}
+
+/* Paragraphs */
+.jarvis-md-p {
+  margin: 0 0 0.65em 0;
+  color: hsl(196 80% 80%);
+}
+.jarvis-md-p:last-child { margin-bottom: 0; }
+
+/* Headings */
+.jarvis-md-h1 {
+  font-family: 'Orbitron', monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: hsl(194 100% 65%);
+  text-shadow: 0 0 10px rgba(0,200,255,0.4);
+  margin: 0.9em 0 0.45em 0;
+  letter-spacing: 0.04em;
+}
+.jarvis-md-h2 {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: hsl(194 100% 62%);
+  text-shadow: 0 0 8px rgba(0,200,255,0.3);
+  margin: 0.85em 0 0.4em 0;
+  letter-spacing: 0.03em;
+}
+.jarvis-md-h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: hsl(194 100% 60%);
+  margin: 0.75em 0 0.35em 0;
+}
+.jarvis-md-h1:first-child,
+.jarvis-md-h2:first-child,
+.jarvis-md-h3:first-child { margin-top: 0; }
+
+/* Lists */
+.jarvis-md-ul {
+  margin: 0.4em 0 0.65em 0;
+  padding-left: 1.35em;
+  list-style: none;
+}
+.jarvis-md-ul > .jarvis-md-li::before {
+  content: '▸';
+  color: hsl(194 100% 55%);
+  position: absolute;
+  left: -1.2em;
+  font-size: 0.7rem;
+  top: 0.25em;
+}
+.jarvis-md-ol {
+  margin: 0.4em 0 0.65em 0;
+  padding-left: 1.5em;
+  list-style: decimal;
+}
+.jarvis-md-ol > .jarvis-md-li::marker {
+  color: hsl(194 100% 55%);
+  font-weight: 600;
+}
+.jarvis-md-li {
+  position: relative;
+  margin-bottom: 0.3em;
+  color: hsl(196 75% 80%);
+  line-height: 1.55;
+}
+.jarvis-md-li:last-child { margin-bottom: 0; }
+
+/* Nested lists */
+.jarvis-md-li .jarvis-md-ul,
+.jarvis-md-li .jarvis-md-ol {
+  margin: 0.25em 0 0.1em 0;
+}
+
+/* Blockquote */
+.jarvis-md-blockquote {
+  margin: 0.6em 0;
+  padding: 0.5em 1em;
+  border-left: 2px solid hsl(194 100% 45%);
+  background: hsl(194 100% 50% / 0.06);
+  border-radius: 0 6px 6px 0;
+  color: hsl(196 60% 70%);
+  font-style: italic;
+}
+
+/* Strong / em */
+.jarvis-md-strong {
+  font-weight: 600;
+  color: hsl(196 100% 88%);
+}
+.jarvis-md-em {
+  font-style: italic;
+  color: hsl(264 70% 78%);
+}
+
+/* Horizontal rule */
+.jarvis-md-hr {
+  border: none;
+  border-top: 1px solid hsl(195 60% 20%);
+  margin: 0.75em 0;
+}
+
+/* Links */
+.jarvis-md-a {
+  color: hsl(194 100% 60%);
+  text-decoration: underline;
+  text-decoration-color: hsl(194 100% 40%);
+  text-underline-offset: 2px;
+  transition: color 0.15s, text-decoration-color 0.15s;
+}
+.jarvis-md-a:hover {
+  color: hsl(194 100% 75%);
+  text-decoration-color: hsl(194 100% 60%);
+}
+
+/* Inline code */
+.jarvis-inline-code {
+  font-family: Menlo, 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 0.8em;
+  padding: 0.15em 0.45em;
+  border-radius: 4px;
+  background: hsl(194 100% 50% / 0.1);
+  border: 1px solid hsl(194 100% 50% / 0.25);
+  color: hsl(194 100% 72%);
+  box-shadow: 0 0 6px rgba(0,200,255,0.15);
+  white-space: nowrap;
+}
+
+/* Fenced code block wrapper */
+.jarvis-code-block {
+  margin: 0.6em 0;
+  border-radius: 10px;
+  border: 1px solid hsl(194 100% 40% / 0.25);
+  background: hsl(222 28% 6%);
+  overflow: hidden;
+}
+.jarvis-code-block:first-child { margin-top: 0; }
+.jarvis-code-block:last-child  { margin-bottom: 0; }
+
+/* Code block header: language label + copy button */
+.jarvis-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4em 0.85em;
+  background: hsl(222 30% 8%);
+  border-bottom: 1px solid hsl(194 100% 40% / 0.18);
+}
+.jarvis-code-lang {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: hsl(194 100% 50%);
+  letter-spacing: 0.08em;
+  opacity: 0.85;
+}
+.code-copy-btn {
+  font-family: 'Orbitron', monospace;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: hsl(196 40% 50%);
+  background: transparent;
+  border: 1px solid hsl(196 40% 30%);
+  border-radius: 4px;
+  padding: 0.2em 0.6em;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  line-height: 1.5;
+}
+.code-copy-btn:hover {
+  color: hsl(194 100% 65%);
+  border-color: hsl(194 100% 40%);
+  background: hsl(194 100% 50% / 0.08);
+}
+
+/* Scrollable code area — horizontal scroll on mobile */
+.jarvis-code-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.jarvis-code-scroll::-webkit-scrollbar { height: 4px; }
+.jarvis-code-scroll::-webkit-scrollbar-track { background: transparent; }
+.jarvis-code-scroll::-webkit-scrollbar-thumb { background: rgba(0,200,255,0.25); border-radius: 2px; }
+
+/* Tables */
+.jarvis-md-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0.6em 0;
+  border-radius: 8px;
+  border: 1px solid hsl(195 60% 20%);
+}
+.jarvis-md-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.8rem;
+}
+.jarvis-md-th {
+  background: hsl(222 28% 8%);
+  color: hsl(194 100% 62%);
+  font-family: 'Orbitron', monospace;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 0.5em 0.85em;
+  text-align: left;
+  border-bottom: 1px solid hsl(195 60% 20%);
+}
+.jarvis-md-td {
+  color: hsl(196 70% 78%);
+  padding: 0.45em 0.85em;
+  border-bottom: 1px solid hsl(195 60% 15%);
+}
+tr:last-child .jarvis-md-td { border-bottom: none; }
+
 @layer utilities {
   input[type="search"]::-webkit-search-cancel-button { @apply hidden; }
   [contenteditable][data-placeholder]:empty::before {
