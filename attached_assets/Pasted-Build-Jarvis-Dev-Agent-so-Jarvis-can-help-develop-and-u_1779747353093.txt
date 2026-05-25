@@ -1,0 +1,137 @@
+Build Jarvis Dev Agent so Jarvis can help develop and update its own codebase without relying on Replit Agent long-term.
+
+Goal:
+Create a safe internal developer-agent system inside Jarvis that can read files, search code, propose edits, show diffs, apply approved changes, run checks, and report results.
+
+Requirements:
+
+1. Add a new Dev Agent mode
+
+* Add a clear UI button or command: “Dev Mode”
+* Dev Mode should be separate from normal chat and planner mode
+* Show a warning that Dev Mode can inspect and edit project files
+
+2. Add safe file tools
+    Create backend tools:
+
+* list_project_files
+* read_project_file
+* search_project_files
+* propose_file_patch
+* apply_file_patch
+* create_backup
+* restore_backup
+
+Safety rules:
+
+* Never edit files without user confirmation
+* Always create a backup before applying changes
+* Show a diff before applying changes
+* Only allow edits inside the project directory
+* Block destructive commands like rm -rf, delete-all, chmod -R, or editing secrets/env files unless explicitly approved
+
+3. Add terminal/build tools
+    Create backend tools:
+
+* run_typecheck
+* run_build
+* run_tests
+* read_server_logs
+* restart_dev_server
+
+Safety rules:
+
+* Terminal commands must be allowlisted
+* Default allowed commands:
+    * npm run check
+    * npm run build
+    * npm test
+    * npm run dev
+    * npm install package-name only after confirmation
+
+4. Add Dev Agent workflow
+    Jarvis should handle:
+
+* “fix this bug”
+* “add this feature”
+* “find where this text comes from”
+* “why is this broken?”
+* “make this UI better”
+* “run checks and fix errors”
+
+Workflow:
+
+* understand request
+* inspect relevant files
+* make a short plan
+* propose patch
+* show diff
+* ask for approval
+* apply patch only after approval
+* run typecheck/build
+* if errors happen, propose a fix
+* summarize what changed
+
+5. Add event streaming
+    Use the existing runtime/event bus/SSE system.
+    Emit:
+
+* dev:started
+* dev:file_read
+* dev:patch_proposed
+* dev:patch_applied
+* dev:check_started
+* dev:check_passed
+* dev:check_failed
+* dev:error
+* dev:done
+
+6. Add Dev Agent UI
+    Create:
+
+* DevAgentPanel
+* DiffViewer
+* FileChangeCard
+* Approval buttons: Apply / Reject
+* Status chips for read/edit/check/build
+
+Mobile-friendly:
+
+* keep compact cards
+* collapse long diffs by default
+* show changed file names clearly
+* keep full logs in debug panel only
+
+7. Add memory integration
+    Jarvis should remember:
+
+* architecture decisions
+* bugs fixed
+* files changed
+* common project patterns
+* what not to change
+
+8. Preserve existing systems
+    Do not break:
+
+* normal chat
+* planner
+* voice
+* memory
+* notes/KB
+* dashboard
+* runtime inspector
+* mobile layout
+
+9. Success test
+    After building, verify:
+
+* Ask: “Find where the Jarvis title is rendered”
+* Jarvis lists relevant files
+* Ask: “Propose changing the placeholder text”
+* Jarvis shows a diff first
+* Jarvis does not apply until approved
+* After approval, Jarvis applies patch and runs typecheck
+* If typecheck passes, Jarvis reports success
+
+Build this as the foundation for Jarvis becoming its own development assistant.

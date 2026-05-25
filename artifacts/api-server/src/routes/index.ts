@@ -21,6 +21,7 @@ import memoryRouter from "./memory";
 import tasksRouter from "./tasks";
 import kbRouter from "./kb";
 import planRouter from "./plan";
+import devRouter from "./dev";
 
 const router: IRouter = Router();
 
@@ -31,5 +32,6 @@ router.use(memoryRouter);
 router.use(tasksRouter);
 router.use(kbRouter);
 router.use(planRouter);
+router.use(devRouter);
 
 export default router;

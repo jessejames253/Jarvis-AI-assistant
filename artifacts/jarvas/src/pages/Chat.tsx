@@ -24,6 +24,7 @@ import {
   Volume2,
   VolumeX,
   ListChecks,
+  Code2,
 } from "lucide-react";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
 import { useSpeechSession } from "@/hooks/useSpeechSession";
@@ -38,6 +39,7 @@ import MemoryPanel, { type SessionMemory } from "@/components/MemoryPanel";
 import DebugPanel, { type DebugInfo } from "@/components/DebugPanel";
 import MarkdownContent from "@/components/MarkdownContent";
 import ToolStatusBubble, { type ToolCallInfo } from "@/components/ToolStatusBubble";
+import DevAgentPanel from "@/components/DevAgentPanel";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -350,6 +352,14 @@ function MessageBubble({
         data-testid={`message-user-${message.id}`}
       >
         <div className="flex flex-col items-end gap-1 max-w-[80%]">
+          {message.autoRouted && (
+            <span
+              className="text-xs font-mono px-2 py-0.5 rounded-full mb-0.5"
+              style={{ background: "hsl(270 80% 55% / 0.15)", color: "hsl(270 100% 78%)", border: "1px solid hsl(270 100% 65% / 0.3)" }}
+            >
+              ⚡ Auto-routed to Planner
+            </span>
+          )}
           <div className="bg-primary/15 border border-primary/30 rounded-2xl rounded-br-sm px-4 py-3 glow-primary">
             <p
               className="text-sm leading-relaxed"
@@ -485,6 +495,7 @@ export default function Chat() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
   const [autoPlannerEnabled, setAutoPlannerEnabled] = useState(() => getAutoPlannerEnabled());
+  const [devPanelOpen, setDevPanelOpen] = useState(false);
   const autoRoutedRef = useRef(false);
 
   // ── Voice ────────────────────────────────────────────────────────────────
@@ -807,7 +818,7 @@ export default function Chat() {
         }
       },
     );
-  }, [input, isTyping, isStreaming, sessionId, flushTokenBuffer]);
+  }, [input, isTyping, isStreaming, sessionId, flushTokenBuffer, autoPlannerEnabled]);
 
   // ── Plan execution ──────────────────────────────────────────────────────────
 
@@ -1124,6 +1135,20 @@ export default function Chat() {
             <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: "hsl(194 100% 55%)" }} />
           </button>
 
+          {/* Dev Agent */}
+          <button
+            onClick={() => setDevPanelOpen(true)}
+            title="Dev Agent — inspect and edit project files"
+            className="hidden sm:flex w-9 h-9 rounded-xl border items-center justify-center transition-all duration-200 active:scale-95"
+            style={{
+              background: devPanelOpen ? "hsl(194 100% 50% / 0.12)" : "transparent",
+              borderColor: devPanelOpen ? "hsl(194 100% 50% / 0.4)" : "hsl(210 15% 25%)",
+            }}
+            aria-label="Open Dev Agent"
+          >
+            <Code2 className="w-4 h-4" style={{ color: devPanelOpen ? "hsl(194 100% 65%)" : "hsl(196 40% 45%)" }} />
+          </button>
+
           {/* Debug — hidden on mobile to reduce clutter */}
           <button
             onClick={toggleDebug}
@@ -1271,6 +1296,20 @@ export default function Chat() {
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
       >
         <div className="max-w-3xl mx-auto">
+          {/* Auto-planner toggle row */}
+          <div className="flex items-center justify-between mb-2 px-1">
+            <span className="text-xs" style={{ color: "hsl(196 20% 38%)" }}>Auto-route complex tasks to Planner</span>
+            <button
+              type="button"
+              onClick={() => setAutoPlannerEnabled(v => { const n = !v; setAutoPlannerEnabledStorage(n); return n; })}
+              className="relative w-8 h-4 rounded-full transition-colors duration-200 flex-shrink-0"
+              style={{ background: autoPlannerEnabled ? "hsl(270 70% 50% / 0.7)" : "hsl(210 15% 20%)", border: `1px solid ${autoPlannerEnabled ? "hsl(270 100% 65% / 0.5)" : "hsl(210 15% 26%)"}` }}
+              aria-label={autoPlannerEnabled ? "Disable auto-planner" : "Enable auto-planner"}
+              title={autoPlannerEnabled ? "Auto-Planner ON" : "Auto-Planner OFF"}
+            >
+              <span className="absolute top-0.5 w-3 h-3 rounded-full transition-all duration-200" style={{ background: autoPlannerEnabled ? "hsl(270 100% 82%)" : "hsl(210 15% 42%)", left: autoPlannerEnabled ? "calc(100% - 13px)" : "1px" }} />
+            </button>
+          </div>
           <div className="flex items-end gap-2.5 bg-card border border-border rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 focus-within:border-primary/60 focus-within:glow-primary transition-all duration-200">
             <textarea
               ref={textareaRef}
@@ -1386,6 +1425,11 @@ export default function Chat() {
             clearSavedPlan(sessionId);
           }}
         />
+      )}
+
+      {/* Dev Agent panel */}
+      {devPanelOpen && (
+        <DevAgentPanel onClose={() => setDevPanelOpen(false)} />
       )}
 
       {/* Memory panel */}
