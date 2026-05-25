@@ -1,0 +1,34 @@
+{
+  "sessionId": "live-verify",
+  "tasks": [
+    {
+      "id": "e269c670-69d1-4c05-bf71-19bf70974f24",
+      "title": "📋 Daily Workout Plan Summary — Key Elements:\n1️⃣ WARM-UP (5–10 min): Light jogging, dynamic stretches (leg swings, arm circles, hip rotations). Never skip!\n2️⃣ CARDIO (20–45 min): Improves cardiovascular health. Mix steady-state (jogging, cycling) & HIIT.\n3️⃣ STRENGTH TRAINING (30–45 min): Compound lifts (squats, deadlifts, bench press). 3–5 sets, 6–12 reps. Rest 48h per muscle group.\n4️⃣ FLEXIBILITY / COOL-DOWN (5–10 min): Static stretches, yoga poses. Reduces soreness & improves range of motion.\n5️⃣ REST & RECOVERY: 1–2 rest days/week. Sleep 7–9 hrs. Hydrate (2–3L/day). Prioritize nutrition (protein ~0.8–1g per lb bodyweight).\n📌 Beginner: 3 days/week full body | Intermediate: 4 days upper/lower split | Advanced: 5–6 days PPL or bro split.",
+      "category": "personal",
+      "priority": "medium",
+      "status": "todo",
+      "dueDate": "tomorrow",
+      "subtasks": [],
+      "tags": [],
+      "sessionId": "live-verify",
+      "createdAt": "2026-05-25T21:45:22.988Z",
+      "updatedAt": "2026-05-25T21:45:22.988Z"
+    },
+    {
+      "id": "b16ccd02-991c-4ce5-aa81-822725388584",
+      "title": "Review saved daily workout plan summary",
+      "category": "personal",
+      "priority": "medium",
+      "status": "todo",
+      "dueDate": "tomorrow",
+      "subtasks": [],
+      "tags": [],
+      "sessionId": "live-verify",
+      "createdAt": "2026-05-25T21:45:29.024Z",
+      "updatedAt": "2026-05-25T21:45:29.024Z"
+    }
+  ],
+  "projects": [],
+  "goals": [],
+  "updatedAt": "2026-05-25T21:45:29.024Z"
+}
