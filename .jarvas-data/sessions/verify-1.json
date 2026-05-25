@@ -1,0 +1,20 @@
+{
+  "sessionId": "verify-1",
+  "messages": [
+    {
+      "role": "user",
+      "content": "What causes thunder?",
+      "timestamp": "2026-05-25T19:01:31.638Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Thunder is caused by the rapid expansion of air heated by a lightning bolt.\n\nLightning superheats the surrounding air to roughly **30,000 K** (about 5x hotter than the sun's surface) in microseconds. This extreme heat causes the air to expand explosively, creating a shockwave that we hear as thunder.\n\n**Why it rumbles:** The lightning channel is miles long, so sound from different parts of the bolt reaches your ears at different times, producing that rolling, extended rumble rather than a single crack.\n\n**The flash-to-bang rule:** Sound travels ~1 mile every 5 seconds, so counting seconds between the flash and thunder gives you the approximate distance to the strike.",
+      "timestamp": "2026-05-25T19:01:37.383Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {},
+  "messageCount": 2,
+  "createdAt": "2026-05-25T19:01:31.637Z",
+  "updatedAt": "2026-05-25T19:01:37.383Z"
+}
