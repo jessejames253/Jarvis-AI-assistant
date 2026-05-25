@@ -25,6 +25,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Chat from "@/pages/Chat";
+import Dashboard from "@/pages/Dashboard";
 import NotFound from "@/pages/not-found";
 
 // QueryClient is the central cache for all API data fetching in the app.
@@ -32,12 +33,14 @@ import NotFound from "@/pages/not-found";
 const queryClient = new QueryClient();
 
 // Router maps URL paths to page components.
-// "/" → Chat page (the main interface)
+// "/"           → Chat page (the main interface)
+// "/dashboard"  → Task management dashboard
 // anything else → NotFound page (404)
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Chat} />
+      <Route path="/dashboard" component={Dashboard} />
       <Route component={NotFound} />
     </Switch>
   );

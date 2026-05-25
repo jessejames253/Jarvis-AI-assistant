@@ -1,0 +1,91 @@
+{
+  "sessionId": "dashboard-test-001",
+  "tasks": [
+    {
+      "id": "c81e439e-c34e-42a2-929e-29b507993ea1",
+      "title": "Build the auth system",
+      "category": "coding",
+      "priority": "high",
+      "status": "done",
+      "dueDate": "2026-05-28",
+      "subtasks": [],
+      "tags": [],
+      "sessionId": "dashboard-test-001",
+      "createdAt": "2026-05-25T07:56:43.554Z",
+      "updatedAt": "2026-05-25T07:57:48.342Z",
+      "completedAt": "2026-05-25T07:57:48.342Z"
+    },
+    {
+      "id": "85f38a20-a62c-479b-a82d-7915948cbd2d",
+      "title": "review the deployment docs",
+      "category": "personal",
+      "priority": "medium",
+      "status": "todo",
+      "subtasks": [],
+      "tags": [],
+      "sessionId": "dashboard-test-001",
+      "createdAt": "2026-05-25T07:56:56.575Z",
+      "updatedAt": "2026-05-25T07:56:56.575Z"
+    },
+    {
+      "id": "a89e2950-e70f-4701-894b-1f56d2245356",
+      "title": "Write unit tests for memory module",
+      "category": "coding",
+      "priority": "medium",
+      "status": "todo",
+      "subtasks": [],
+      "tags": [],
+      "sessionId": "dashboard-test-001",
+      "createdAt": "2026-05-25T07:57:47.554Z",
+      "updatedAt": "2026-05-25T07:57:47.554Z"
+    },
+    {
+      "id": "c1966fa4-b00f-4b89-a105-1e07933ba7df",
+      "title": "Plan Q3 product roadmap",
+      "category": "work",
+      "priority": "urgent",
+      "status": "todo",
+      "dueDate": "2026-05-24",
+      "subtasks": [],
+      "tags": [],
+      "sessionId": "dashboard-test-001",
+      "createdAt": "2026-05-25T07:57:47.748Z",
+      "updatedAt": "2026-05-25T07:57:47.748Z"
+    },
+    {
+      "id": "9af03479-0fc3-4694-b3a5-35801289e922",
+      "title": "Explore AI memory compression idea",
+      "category": "ideas",
+      "priority": "low",
+      "status": "todo",
+      "subtasks": [],
+      "tags": [],
+      "sessionId": "dashboard-test-001",
+      "createdAt": "2026-05-25T07:57:47.942Z",
+      "updatedAt": "2026-05-25T07:57:47.942Z"
+    }
+  ],
+  "projects": [
+    {
+      "id": "98b8e867-a891-444a-8dbd-d31f30336efc",
+      "name": "Jarvas Mobile App",
+      "category": "coding",
+      "color": "hsl(194 100% 55%)",
+      "status": "active",
+      "sessionId": "dashboard-test-001",
+      "createdAt": "2026-05-25T07:56:43.739Z",
+      "updatedAt": "2026-05-25T07:56:43.739Z"
+    }
+  ],
+  "goals": [
+    {
+      "id": "f71df080-7ae0-4ac3-8a51-ddbae419b335",
+      "title": "Review PR before end of day",
+      "date": "2026-05-25",
+      "done": false,
+      "sessionId": "dashboard-test-001",
+      "createdAt": "2026-05-25T07:56:43.941Z"
+    }
+  ],
+  "updatedAt": "2026-05-25T07:57:48.342Z"
+}

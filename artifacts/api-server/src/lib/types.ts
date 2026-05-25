@@ -10,15 +10,16 @@
 
 /** Every possible intent Jarvas can detect in a user message */
 export type IntentType =
-  | "casual"         // Greetings, small talk, wellbeing, thanks, farewell
-  | "identity"       // "who are you", "what is Jarvas"
-  | "coding"         // Code, debug, scripts, syntax, frameworks
-  | "research"       // Web search, current events, news, live data
-  | "memory_update"  // "my name is", "remember that", preference updates
-  | "math"           // Arithmetic, calculations, equations
-  | "planning"       // Tasks, todos, project plans, steps
-  | "definition"     // "what is X", "explain X", concept explanations
-  | "general";       // Fallback for anything unclassified
+  | "casual"           // Greetings, small talk, wellbeing, thanks, farewell
+  | "identity"         // "who are you", "what is Jarvas"
+  | "coding"           // Code, debug, scripts, syntax, frameworks
+  | "research"         // Web search, current events, news, live data
+  | "memory_update"    // "my name is", "remember that", preference updates
+  | "math"             // Arithmetic, calculations, equations
+  | "planning"         // High-level plans, roadmaps, timelines
+  | "task_management"  // Create / list / update / complete tasks and goals
+  | "definition"       // "what is X", "explain X", concept explanations
+  | "general";         // Fallback for anything unclassified
 
 /** Result from the intent classifier */
 export interface ClassificationResult {
@@ -59,6 +60,7 @@ export interface ToolInput {
   memoryContext?: {
     summary?: string;
     preferences?: Record<string, string>;
+    sessionId?: string;   // Passed so tools (e.g. tasks) can look up session data
   };
   classification: ClassificationResult;
 }

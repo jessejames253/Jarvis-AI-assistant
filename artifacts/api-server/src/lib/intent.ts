@@ -125,6 +125,22 @@ const DESCRIPTORS: IntentDescriptor[] = [
     ],
   },
   {
+    intent: "task_management",
+    strongPatterns: [
+      /\b(add|create|new|make)\s+(a\s+)?(task|todo|to-do|reminder)\b/i,
+      /\b(mark|complete|finish|done\s+with)\b.{0,40}\b(task|todo|it|done)\b/i,
+      /\b(show|list|view|see|what)\b.{0,20}\b(my\s+)?(tasks|todos|to-do|open items)\b/i,
+      /\bwhat should i (work on|do|focus on|start)\b/i,
+      /\b(add goal|daily goal|today'?s? goal)\b/i,
+      /\b(check off|tick off|cross off)\b/i,
+    ],
+    weakPatterns: [
+      /\b(task|todo|to-do|checklist|action item)\b/i,
+      /\b(due date|deadline|priority|overdue)\b/i,
+      /\b(remind me|don'?t forget)\b/i,
+    ],
+  },
+  {
     intent: "definition",
     strongPatterns: [
       /^(what is|what are|what does|define|explain|describe)\b/i,

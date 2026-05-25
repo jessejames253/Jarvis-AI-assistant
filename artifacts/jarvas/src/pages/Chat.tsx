@@ -11,7 +11,8 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Search, ExternalLink, Brain, Terminal } from "lucide-react";
+import { Send, Search, ExternalLink, Brain, Terminal, LayoutDashboard } from "lucide-react";
+import { useLocation } from "wouter";
 import MemoryPanel, { type SessionMemory } from "@/components/MemoryPanel";
 import DebugPanel, { type DebugInfo } from "@/components/DebugPanel";
 
@@ -211,6 +212,7 @@ const WELCOME = (name?: string): Message => ({
 });
 
 export default function Chat() {
+  const [, navigate] = useLocation();
   const [sessionId, setSessionId] = useState(() => getOrCreateSessionId());
   const [messages, setMessages] = useState<Message[]>([WELCOME()]);
   const [input, setInput] = useState("");
@@ -378,6 +380,16 @@ export default function Chat() {
             <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
             <span className="text-xs font-medium tracking-wider" style={{ color: "hsl(142 71% 60%)" }}>ONLINE</span>
           </div>
+
+          {/* Dashboard link */}
+          <button
+            onClick={() => navigate("/dashboard")}
+            title="Open Dashboard"
+            className="w-9 h-9 rounded-xl border border-border/60 bg-card flex items-center justify-center hover:border-primary/40 transition-colors"
+            aria-label="Open dashboard"
+          >
+            <LayoutDashboard className="w-4 h-4" style={{ color: "hsl(194 100% 55%)" }} />
+          </button>
 
           {/* Debug mode toggle */}
           <button

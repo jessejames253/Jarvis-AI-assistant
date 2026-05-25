@@ -62,6 +62,8 @@ router.post("/chat", async (req, res) => {
       if (Object.keys(session.preferences).length > 0) {
         memoryContext.preferences = session.preferences as Record<string, string>;
       }
+      // Pass sessionId so tools like tasks can load session-scoped data
+      (memoryContext as Record<string, unknown>).sessionId = sessionId!;
       // Save the user message before generating (so it's in memory even on error)
       await appendMessage(sessionId!, "user", trimmedMessage);
     }

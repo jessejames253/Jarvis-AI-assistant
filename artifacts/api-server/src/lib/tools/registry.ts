@@ -21,6 +21,7 @@ import { mathTool } from "./math";
 import { planningTool } from "./planning";
 import { researchTool } from "./research";
 import { memoryUpdateTool } from "./memoryUpdate";
+import { tasksTool } from "./tasks";
 import { knowledgeTool } from "./knowledge"; // also acts as the general fallback
 
 /** All registered tools, in priority order */
@@ -30,9 +31,10 @@ const ALL_TOOLS: Tool[] = [
   memoryUpdateTool,
   codingTool,
   mathTool,
+  tasksTool,       // task_management — before planning so task queries don't fall through
   planningTool,
   researchTool,
-  knowledgeTool, // handles "definition" and "general" — keep last as fallback
+  knowledgeTool,   // handles "definition" and "general" — keep last as fallback
 ];
 
 // Build a lookup map: intent → tool

@@ -1,0 +1,1 @@
+- [Jarvas architecture](jarvas-architecture.md) — full stack overview, data dirs, tool registry pattern, and AI-swap points.

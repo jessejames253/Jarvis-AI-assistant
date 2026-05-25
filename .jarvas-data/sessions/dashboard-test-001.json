@@ -1,0 +1,50 @@
+{
+  "sessionId": "dashboard-test-001",
+  "messages": [
+    {
+      "role": "user",
+      "content": "add a task to review the deployment docs",
+      "timestamp": "2026-05-25T07:56:56.569Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Task added: **review the deployment docs**\n🟡 medium priority · Personal",
+      "timestamp": "2026-05-25T07:56:56.576Z"
+    },
+    {
+      "role": "user",
+      "content": "show me my tasks",
+      "timestamp": "2026-05-25T07:56:56.770Z"
+    },
+    {
+      "role": "assistant",
+      "content": "You have **2 open tasks**:\n\n🟠 **Build the auth system** [Coding] — due 2026-05-28\n🟡 **review the deployment docs** [Personal]",
+      "timestamp": "2026-05-25T07:56:56.776Z"
+    },
+    {
+      "role": "user",
+      "content": "what should I work on",
+      "timestamp": "2026-05-25T07:56:56.955Z"
+    },
+    {
+      "role": "assistant",
+      "content": "You have **2 open tasks**:\n\n🟠 **Build the auth system** [Coding] — due 2026-05-28\n🟡 **review the deployment docs** [Personal]",
+      "timestamp": "2026-05-25T07:56:56.957Z"
+    },
+    {
+      "role": "user",
+      "content": "mark the deployment docs task as done",
+      "timestamp": "2026-05-25T07:57:48.736Z"
+    },
+    {
+      "role": "assistant",
+      "content": "I couldn't find a task matching \"the deployment docs task\". Your open tasks:\n• review the deployment docs\n• Write unit tests for memory module\n• Plan Q3 product roadmap\n• Explore AI memory compression idea",
+      "timestamp": "2026-05-25T07:57:48.738Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {},
+  "messageCount": 8,
+  "createdAt": "2026-05-25T07:56:56.568Z",
+  "updatedAt": "2026-05-25T07:57:48.738Z"
+}
