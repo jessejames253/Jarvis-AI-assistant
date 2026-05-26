@@ -18,7 +18,7 @@
 FROM node:24-alpine AS base
 
 # Enable corepack so we can use the exact pnpm version from package.json
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9 --activate
 
 # Install git (required by the dev agent's git routes)
 RUN apk add --no-cache git
@@ -65,7 +65,7 @@ FROM node:24-alpine AS production
 # Install runtime tools
 RUN apk add --no-cache git && \
     corepack enable && \
-    corepack prepare pnpm@latest --activate
+    corepack prepare pnpm@9 --activate
 
 WORKDIR /workspace
 
