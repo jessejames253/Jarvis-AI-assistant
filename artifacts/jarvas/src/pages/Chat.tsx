@@ -25,6 +25,9 @@ import {
   VolumeX,
   ListChecks,
   Code2,
+  CheckCircle,
+  XCircle,
+  FileEdit,
 } from "lucide-react";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
 import { useSpeechSession } from "@/hooks/useSpeechSession";
@@ -40,6 +43,7 @@ import DebugPanel, { type DebugInfo } from "@/components/DebugPanel";
 import MarkdownContent from "@/components/MarkdownContent";
 import ToolStatusBubble, { type ToolCallInfo } from "@/components/ToolStatusBubble";
 import DevAgentPanel from "@/components/DevAgentPanel";
+import { approvePatch, rejectPatch as logRejectPatch, fetchPendingPatches, type PendingPatchSummary } from "@/lib/patchApproval";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -503,9 +507,45 @@ export default function Chat() {
   const [devPanelOpen, setDevPanelOpen] = useState(() => getDevPanelOpen());
   const autoRoutedRef = useRef(false);
 
+  // ── Patch notification bar ────────────────────────────────────────────────
+  const [pendingPatches,    setPendingPatches]    = useState<PendingPatchSummary[]>([]);
+  const [approvingPatchId,  setApprovingPatchId]  = useState<string | null>(null);
+  const [patchBarError,     setPatchBarError]     = useState<string | null>(null);
+  const [dismissedIds,      setDismissedIds]      = useState<Set<string>>(new Set());
+
   useEffect(() => {
     localStorage.setItem(DEV_PANEL_KEY, String(devPanelOpen));
   }, [devPanelOpen]);
+
+  // Poll for pending patches every 15 s so the bar stays in sync without
+  // requiring the DEV panel to be open.
+  useEffect(() => {
+    const poll = async () => {
+      const patches = await fetchPendingPatches();
+      setPendingPatches(patches);
+    };
+    poll();
+    const id = setInterval(poll, 15_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const handleApprovePatch = useCallback(async (patch: PendingPatchSummary) => {
+    setApprovingPatchId(patch.patchId);
+    setPatchBarError(null);
+    const result = await approvePatch(patch.patchId, patch.file);
+    setApprovingPatchId(null);
+    if (result.ok) {
+      setPendingPatches(prev => prev.filter(p => p.patchId !== patch.patchId));
+    } else {
+      setPatchBarError(result.error ?? "Apply failed");
+    }
+  }, []);
+
+  const handleRejectPatch = useCallback((patch: PendingPatchSummary) => {
+    logRejectPatch(patch.patchId, patch.file);
+    setDismissedIds(prev => new Set([...prev, patch.patchId]));
+    setPendingPatches(prev => prev.filter(p => p.patchId !== patch.patchId));
+  }, []);
 
   // ── Voice ────────────────────────────────────────────────────────────────
   const speechInput = useSpeechInput();
@@ -1300,6 +1340,64 @@ export default function Chat() {
           <div ref={messagesEndRef} />
         </div>
       </main>
+
+      {/* ── Pending patch notification bar ────────────────────────────────── */}
+      {pendingPatches.filter(p => !dismissedIds.has(p.patchId)).length > 0 && (
+        <div
+          data-testid="patch-notification-bar"
+          className="relative z-10 flex-shrink-0 border-t border-b flex flex-col gap-1.5 px-4 sm:px-8 py-2.5"
+          style={{ borderColor: "hsl(38 100% 55% / 0.35)", background: "hsl(38 100% 55% / 0.06)" }}
+        >
+          <div className="flex items-center gap-1.5">
+            <FileEdit className="w-3 h-3 flex-shrink-0" style={{ color: "hsl(38 100% 62%)" }} />
+            <span className="text-xs font-semibold tracking-wider" style={{ color: "hsl(38 100% 62%)" }}>
+              PENDING PATCHES — approve or reject:
+            </span>
+          </div>
+
+          {patchBarError && (
+            <p className="text-xs pl-4" style={{ color: "hsl(355 80% 62%)" }}>
+              {patchBarError}
+            </p>
+          )}
+
+          {pendingPatches
+            .filter(p => !dismissedIds.has(p.patchId))
+            .map(p => (
+              <div key={p.patchId} className="flex items-center gap-2 pl-4 min-w-0">
+                <span className="font-mono text-xs truncate flex-1 min-w-0" style={{ color: "hsl(196 50% 65%)" }}>
+                  {p.file.split("/").pop()}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => handleApprovePatch(p)}
+                  disabled={approvingPatchId === p.patchId}
+                  aria-label="Approve Patch"
+                  data-testid={`approve-patch-${p.patchId}`}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold active:scale-95 transition-all disabled:opacity-40 flex-shrink-0"
+                  style={{ background: "hsl(142 60% 35% / 0.22)", border: "1px solid hsl(142 60% 40% / 0.45)", color: "hsl(142 71% 65%)" }}
+                >
+                  <CheckCircle className="w-3 h-3" />
+                  {approvingPatchId === p.patchId ? "Applying…" : "Approve Patch"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleRejectPatch(p)}
+                  disabled={approvingPatchId === p.patchId}
+                  aria-label="Reject Patch"
+                  data-testid={`reject-patch-${p.patchId}`}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold active:scale-95 transition-all disabled:opacity-40 flex-shrink-0"
+                  style={{ background: "hsl(355 80% 40% / 0.12)", border: "1px solid hsl(355 80% 45% / 0.35)", color: "hsl(355 80% 62%)" }}
+                >
+                  <XCircle className="w-3 h-3" />
+                  Reject Patch
+                </button>
+              </div>
+            ))}
+        </div>
+      )}
 
       {/* ── Input bar ── */}
       <footer className="relative z-10 flex-shrink-0 border-t border-border/60 bg-background/90 backdrop-blur-sm px-3 sm:px-8 pt-3 pb-safe"

@@ -10,3 +10,4 @@
 - [Phase 4B execution engine](phase4b-execution.md) — runPlan/stepNext/pause/resume in orchestrator.ts; executionState/agentMessages/retryPolicy pure libs; 149/149 tests; TaskStatus extended with 6 new states
 - [Phase 5 intelligence layer](phase5-intelligence.md) — lib/memory/ (6 files), routes/intel.ts, IntelPanel.tsx, "intel" tab in DevAgentPanel; orchestrator injects memory into agent prompts; 210/210 tests; boolean/undefined filter predicate pitfall documented
 - [Phase 6 supervised autonomy](phase6-autonomy.md) — lib/autonomy/ (5 files), routes/autonomy.ts, AutonomyPanel.tsx, "autonomy" tab; 63 new tests; 273/273 total; manual-start only, budget hard stops, policy gates always block protected files
+- [Patch approval UX](patch-approval-ux.md) — shared lib/patchApproval.ts + PatchActionButtons component; three surfaces all use same handler; 31/31 tests

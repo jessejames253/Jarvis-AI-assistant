@@ -26,6 +26,8 @@ import IntelPanel      from "./IntelPanel";
 import AutonomyPanel   from "./AutonomyPanel";
 import MarkdownContent       from "./MarkdownContent";
 import InlinePatchActions     from "./InlinePatchActions";
+import PatchActionButtons     from "./PatchActionButtons";
+import { approvePatch, rejectPatch as logRejectPatch } from "@/lib/patchApproval";
 
 const BASE          = import.meta.env.BASE_URL;
 const STREAM_URL    = `${BASE}api/dev/stream`;
@@ -1496,49 +1498,35 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
   /* ── per-card actions ── */
   const handleApprove = useCallback(async (p: PendingPatchFull) => {
     setApplying(prev => ({ ...prev, [p.patchId]: true }));
-    try {
-      const project = p.file.startsWith("artifacts/api-server") ? "api-server" : "jarvas";
-      const r = await fetch(APPLY_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patchId: p.patchId, project }),
-      });
-      const d = await r.json() as {
-        ok: boolean; error?: string; snapshotId?: string;
-        validation?: { passed: boolean; summary: string };
-        autoFixResult?: AutoFixResultFE;
+    const d = await approvePatch(p.patchId, p.file);
+    const af = d.autoFixResult as AutoFixResultFE | undefined;
+    if (d.ok) {
+      const applied: AppliedPatch = {
+        ...p,
+        appliedAt: Date.now(),
+        snapshotId: d.snapshotId,
+        validationPassed: d.validation?.passed ?? false,
+        validationSummary: d.validation?.summary ?? "no summary",
       };
-      if (d.ok) {
-        const applied: AppliedPatch = {
-          ...p,
-          appliedAt: Date.now(),
-          snapshotId: d.snapshotId,
-          validationPassed: d.validation?.passed ?? false,
-          validationSummary: d.validation?.summary ?? "no summary",
-        };
-        setPatches(prev => prev.filter(x => x.patchId !== p.patchId));
-        setExpanded(prev => { const n = { ...prev }; delete n[p.patchId]; return n; });
-        setAppliedPatches(prev => [applied, ...prev].slice(0, 20));
-        // Capture AutoFix results (populated only on validation failure)
-        if (d.autoFixResult) {
-          setAutoFixResult(d.autoFixResult);
-          // Reload patch queue — AutoFix may have added review patches
-          load();
-        }
-        const afSuffix = d.autoFixResult
-          ? ` · AutoFix: ${d.autoFixResult.autoApplied} applied, ${d.autoFixResult.queued} queued`
-          : "";
-        onMessage(`✓ Applied \`${p.file}\` — TS check ${d.validation?.passed ? "passed ✓" : "failed ✗"}: ${d.validation?.summary ?? ""}${afSuffix}`);
-      } else {
-        onMessage(d.error ?? "Apply failed", true);
+      setPatches(prev => prev.filter(x => x.patchId !== p.patchId));
+      setExpanded(prev => { const n = { ...prev }; delete n[p.patchId]; return n; });
+      setAppliedPatches(prev => [applied, ...prev].slice(0, 20));
+      if (af) {
+        setAutoFixResult(af);
+        load();
       }
-    } catch (err) {
-      onMessage(`Network error: ${String(err)}`, true);
+      const afSuffix = af
+        ? ` · AutoFix: ${af.autoApplied} applied, ${af.queued} queued`
+        : "";
+      onMessage(`✓ Applied \`${p.file}\` — TS check ${d.validation?.passed ? "passed ✓" : "failed ✗"}: ${d.validation?.summary ?? ""}${afSuffix}`);
+    } else {
+      onMessage(d.error ?? "Apply failed", true);
     }
     setApplying(prev => ({ ...prev, [p.patchId]: false }));
-  }, [onMessage]);
+  }, [onMessage, load]);
 
-  const handleReject = useCallback((patchId: string) => {
+  const handleReject = useCallback((patchId: string, file: string) => {
+    logRejectPatch(patchId, file);
     setPatches(prev => prev.filter(p => p.patchId !== patchId));
     setExpanded(prev => { const n = { ...prev }; delete n[patchId]; return n; });
     onMessage("Patch rejected — removed from queue.");
@@ -1687,25 +1675,12 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
                   {p.riskLevel ?? "?"}
                 </span>
 
-                {/* ✓ Apply */}
-                <button type="button"
-                  onClick={() => handleApprove(p)}
-                  disabled={isApplying}
-                  title="Apply patch"
-                  className="flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold active:scale-95 transition-all disabled:opacity-40"
-                  style={{ background: "hsl(142 60% 35% / 0.22)", border: "1px solid hsl(142 60% 40% / 0.45)", color: "hsl(142 71% 65%)" }}>
-                  {isApplying ? "…" : "✓"}
-                </button>
-
-                {/* ✕ Reject */}
-                <button type="button"
-                  onClick={() => handleReject(p.patchId)}
-                  disabled={isApplying}
-                  title="Reject patch"
-                  className="flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold active:scale-95 transition-all disabled:opacity-40"
-                  style={{ background: "hsl(355 80% 40% / 0.12)", border: "1px solid hsl(355 80% 45% / 0.35)", color: "hsl(355 80% 62%)" }}>
-                  ✕
-                </button>
+                <PatchActionButtons
+                  patchId={p.patchId}
+                  isApplying={isApplying}
+                  onApprove={() => handleApprove(p)}
+                  onReject={() => handleReject(p.patchId, p.file)}
+                />
 
                 {/* ▼ / ▲ Expand */}
                 <button type="button"
@@ -1751,7 +1726,7 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
                       oldContent={p.oldContent}
                       newContent={p.newContent}
                       onApprove={() => handleApprove(p)}
-                      onReject={() => handleReject(p.patchId)}
+                      onReject={() => handleReject(p.patchId, p.file)}
                       applying={isApplying}
                       metadata={{ riskLevel: p.riskLevel, uiImpact: p.uiImpact, logicImpact: p.logicImpact, safeToTest: p.safeToTest }}
                       showHeader={false}
@@ -2232,28 +2207,10 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
    * validation events into the chat stream.
    */
   const tryApplyPatch = useCallback(async (patch: PatchData): Promise<string | null> => {
-    let res: Response;
-    try {
-      res = await fetch(APPLY_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patchId: patch.patchId, taskId, project: "jarvas" }),
-      });
-    } catch (err) {
-      return `Network error: ${String(err)}`;
-    }
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      return `Apply failed — HTTP ${res.status}: ${body.slice(0, 300)}`;
-    }
-
-    const data = await res.json() as {
-      ok: boolean; error?: string;
-      snapshotId?: string;
-      validation?: { passed: boolean; summary: string };
-      validationEvents?: Array<Record<string, unknown>>;
-    };
+    const data = await approvePatch(patch.patchId, patch.file, {
+      taskId: taskId ?? undefined,
+      project: patch.file.startsWith("artifacts/api-server") ? "api-server" : "jarvas",
+    });
 
     if (!data.ok) return data.error ?? "Apply failed";
 
