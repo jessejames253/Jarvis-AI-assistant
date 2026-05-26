@@ -164,6 +164,14 @@ router.post("/dev/rollback", async (req, res) => {
   res.json({ ok: true, restoredFrom: result.restoredFrom });
 });
 
+// ─── GET /dev/patches ─────────────────────────────────────────────────────────
+
+router.get("/dev/patches", async (_req, res) => {
+  const { pendingPatches } = await import("../lib/dev/tools");
+  const patches = Array.from(pendingPatches.values());
+  res.json({ ok: true, patches });
+});
+
 // ─── GET /dev/files ───────────────────────────────────────────────────────────
 
 router.get("/dev/files", async (req, res) => {

@@ -18,6 +18,7 @@ import {
   AlertTriangle, Trash2, RotateCcw, ClipboardCopy, Check,
   FolderOpen, Folder, FileText, ChevronRight, GitCommit,
   WifiOff, RefreshCw, BookOpen, Plus, Database,
+  Server, GitBranch, Layers, Archive, Play, HardDrive,
 } from "lucide-react";
 import DiffViewer from "./DiffViewer";
 import MarkdownContent from "./MarkdownContent";
@@ -32,6 +33,8 @@ const TASKS_URL     = `${BASE}api/dev/tasks`;
 const GIT_URL       = `${BASE}api/dev/git`;
 const MEMORY_URL    = `${BASE}api/dev/project-memory`;
 const SNAP_URL      = `${BASE}api/dev/snapshots`;
+const PATCHES_URL   = `${BASE}api/dev/patches`;
+const HEALTH_URL    = `${BASE}api/healthz`;
 
 const LS_MESSAGES   = "jarvas_dev_messages";
 const LS_TASK_ID    = "jarvas_dev_current_task";
@@ -117,7 +120,10 @@ function clearMessages(): void {
 }
 
 function getSavedTaskId(): string | null { return localStorage.getItem(LS_TASK_ID); }
-function saveTaskId(id: string): void    { localStorage.setItem(LS_TASK_ID, id); }
+function saveTaskId(id: string | null): void {
+  if (id) localStorage.setItem(LS_TASK_ID, id);
+  else localStorage.removeItem(LS_TASK_ID);
+}
 
 // ─── Small cards ─────────────────────────────────────────────────────────────
 
@@ -445,10 +451,296 @@ function MemoryTab() {
   );
 }
 
+// ─── Status Bar ───────────────────────────────────────────────────────────────
+
+interface StatusData {
+  apiOnline: boolean;
+  patchCount: number;
+  gitBranch: string;
+  gitDirty: boolean;
+  taskStatus: string | null;
+  tmpWarning: boolean;
+}
+
+function StatusBar({
+  onSwitchTab,
+  taskStatus,
+}: {
+  onSwitchTab: (t: PanelTab) => void;
+  taskStatus: string | null;
+}) {
+  const [status, setStatus] = useState<StatusData>({
+    apiOnline: false, patchCount: 0, gitBranch: "main",
+    gitDirty: false, taskStatus, tmpWarning: true,
+  });
+
+  const refresh = useCallback(async () => {
+    try {
+      const [health, patches, git] = await Promise.all([
+        fetch(HEALTH_URL).then(r => r.ok).catch(() => false),
+        fetch(PATCHES_URL).then(r => r.json() as Promise<{ ok: boolean; patches?: unknown[] }>).catch(() => ({ ok: false, patches: [] })),
+        fetch(`${GIT_URL}/status`).then(r => r.json() as Promise<{ branch?: string; changes?: number }>).catch(() => ({} as { branch?: string; changes?: number })),
+      ]);
+      setStatus({
+        apiOnline: health === true,
+        patchCount: (patches.patches ?? []).length,
+        gitBranch: git.branch ?? "main",
+        gitDirty: (git.changes ?? 0) > 0,
+        taskStatus,
+        tmpWarning: true,
+      });
+    } catch { /* ignore */ }
+  }, [taskStatus]);
+
+  useEffect(() => {
+    refresh();
+    const t = setInterval(refresh, 12000);
+    return () => clearInterval(t);
+  }, [refresh]);
+
+  useEffect(() => {
+    setStatus(s => ({ ...s, taskStatus }));
+  }, [taskStatus]);
+
+  const dot = (on: boolean) => (
+    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 inline-block"
+      style={{ background: on ? "hsl(142 71% 55%)" : "hsl(355 80% 55%)" }} />
+  );
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-1.5 border-b flex-shrink-0 text-[10px]"
+      style={{ borderColor: "hsl(210 15% 12%)", background: "hsl(220 20% 5.5%)" }}>
+
+      {/* API */}
+      <span className="flex items-center gap-1.5" style={{ color: status.apiOnline ? "hsl(142 71% 55%)" : "hsl(355 80% 62%)" }}>
+        {dot(status.apiOnline)}
+        <Server className="w-2.5 h-2.5" />
+        {status.apiOnline ? "API online" : "API offline"}
+      </span>
+
+      {/* Patches */}
+      <button type="button" onClick={() => onSwitchTab("patches")}
+        className="flex items-center gap-1.5 transition-opacity hover:opacity-100 opacity-80"
+        style={{ color: status.patchCount > 0 ? "hsl(38 100% 62%)" : "hsl(196 30% 50%)" }}>
+        <Layers className="w-2.5 h-2.5" />
+        {status.patchCount} patch{status.patchCount !== 1 ? "es" : ""} pending
+      </button>
+
+      {/* Git */}
+      <span className="flex items-center gap-1.5" style={{ color: status.gitDirty ? "hsl(38 80% 62%)" : "hsl(196 30% 50%)" }}>
+        <GitBranch className="w-2.5 h-2.5" />
+        {status.gitBranch}
+        {status.gitDirty ? " ·dirty" : " ·clean"}
+      </span>
+
+      {/* Task */}
+      {taskStatus && (
+        <span className="flex items-center gap-1.5"
+          style={{ color: taskStatus === "waiting_approval" ? "hsl(264 80% 72%)" : taskStatus === "running" ? "hsl(38 100% 62%)" : "hsl(196 30% 50%)" }}>
+          <Archive className="w-2.5 h-2.5" />
+          {taskStatus}
+        </span>
+      )}
+
+      {/* /tmp warning */}
+      <span className="flex items-center gap-1 ml-auto opacity-50 hidden sm:flex" style={{ color: "hsl(38 60% 55%)" }}>
+        <HardDrive className="w-2.5 h-2.5" />
+        data in /tmp (ephemeral)
+      </span>
+    </div>
+  );
+}
+
+// ─── Patches Tab (Approval Queue) ─────────────────────────────────────────────
+
+interface PendingPatchFull {
+  patchId: string;
+  file: string;
+  description: string;
+  oldContent: string;
+  newContent: string;
+  riskLevel?: "low" | "medium" | "high";
+  uiImpact?: string;
+  logicImpact?: string;
+  safeToTest?: boolean;
+  createdAt: number;
+}
+
+function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean) => void }) {
+  const [patches, setPatches]     = useState<PendingPatchFull[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [applying, setApplying]   = useState<Record<string, boolean>>({});
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(PATCHES_URL);
+      const d = await r.json() as { ok: boolean; patches?: PendingPatchFull[] };
+      if (d.ok) setPatches(d.patches ?? []);
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleApprove = async (p: PendingPatchFull) => {
+    setApplying(prev => ({ ...prev, [p.patchId]: true }));
+    try {
+      const r = await fetch(APPLY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patchId: p.patchId, project: "jarvas" }),
+      });
+      const d = await r.json() as { ok: boolean; error?: string; validation?: { passed: boolean; summary: string } };
+      if (d.ok) {
+        onMessage(`✓ Applied \`${p.file}\` — validation ${d.validation?.passed ? "passed" : "failed"}: ${d.validation?.summary ?? ""}`);
+        setPatches(prev => prev.filter(x => x.patchId !== p.patchId));
+      } else {
+        onMessage(d.error ?? "Apply failed", true);
+      }
+    } catch (err) {
+      onMessage(`Network error: ${String(err)}`, true);
+    }
+    setApplying(prev => ({ ...prev, [p.patchId]: false }));
+  };
+
+  const handleReject = (patchId: string) => {
+    setPatches(prev => prev.filter(p => p.patchId !== patchId));
+    onMessage("Patch rejected — removed from queue.");
+  };
+
+  const riskColor = (r?: string) =>
+    r === "high" ? "hsl(355 80% 62%)" : r === "medium" ? "hsl(38 100% 62%)" : "hsl(142 71% 55%)";
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between px-3 py-2 border-b flex-shrink-0"
+        style={{ borderColor: "hsl(210 15% 13%)" }}>
+        <span className="text-xs font-semibold" style={{ color: "hsl(38 100% 62%)" }}>
+          Pending Patches ({patches.length})
+        </span>
+        <button type="button" onClick={load}
+          className="p-1 rounded-lg opacity-60 hover:opacity-100 transition-opacity"
+          style={{ color: "hsl(196 30% 55%)" }}>
+          <RefreshCw className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto scrollbar-thin px-3 py-3 flex flex-col gap-4">
+        {loading && (
+          <div className="text-xs opacity-50 text-center py-4" style={{ color: "hsl(196 30% 55%)" }}>
+            Loading patches…
+          </div>
+        )}
+        {!loading && patches.length === 0 && (
+          <div className="flex flex-col items-center gap-2 py-8 opacity-50">
+            <CheckCircle className="w-6 h-6" style={{ color: "hsl(142 71% 55%)" }} />
+            <p className="text-xs" style={{ color: "hsl(196 30% 55%)" }}>No pending patches — queue is empty.</p>
+          </div>
+        )}
+
+        {patches.map(p => (
+          <div key={p.patchId} className="rounded-lg overflow-hidden"
+            style={{ border: "1px solid hsl(210 15% 18%)", background: "hsl(220 20% 6.5%)" }}>
+
+            {/* Header */}
+            <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b"
+              style={{ borderColor: "hsl(210 15% 14%)" }}>
+              <FileEdit className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(194 100% 55%)" }} />
+              <span className="font-mono text-xs truncate flex-1" style={{ color: "hsl(196 50% 65%)" }}>
+                {p.file}
+              </span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-mono"
+                style={{ background: `${riskColor(p.riskLevel)}18`, border: `1px solid ${riskColor(p.riskLevel)}40`, color: riskColor(p.riskLevel) }}>
+                {p.riskLevel ?? "medium"}
+              </span>
+            </div>
+
+            {/* Meta */}
+            <div className="px-3 py-2 flex flex-col gap-1 border-b" style={{ borderColor: "hsl(210 15% 13%)" }}>
+              <p className="text-xs" style={{ color: "hsl(196 40% 60%)" }}>{p.description}</p>
+              <div className="flex flex-wrap gap-3 text-[10px] opacity-70">
+                {p.uiImpact && p.uiImpact !== "none" && (
+                  <span style={{ color: "hsl(194 100% 60%)" }}>UI: {p.uiImpact}</span>
+                )}
+                {p.logicImpact && p.logicImpact !== "none" && (
+                  <span style={{ color: "hsl(264 80% 72%)" }}>Logic: {p.logicImpact}</span>
+                )}
+                <span style={{ color: "hsl(196 20% 45%)" }}>
+                  {new Date(p.createdAt).toLocaleTimeString()}
+                </span>
+              </div>
+            </div>
+
+            {/* Diff */}
+            <div className="px-3 py-2">
+              <DiffViewer
+                file={p.file}
+                description={p.description}
+                oldContent={p.oldContent}
+                newContent={p.newContent}
+                onApprove={() => handleApprove(p)}
+                onReject={() => handleReject(p.patchId)}
+                applying={applying[p.patchId]}
+                metadata={{ riskLevel: p.riskLevel, uiImpact: p.uiImpact, logicImpact: p.logicImpact, safeToTest: p.safeToTest }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Workspace Tab ─────────────────────────────────────────────────────────────
+
+function WorkspaceTab({ onInsertPath }: { onInsertPath: (p: string) => void }) {
+  const [gitInfo, setGitInfo] = useState<{ branch?: string; changes?: number; available?: boolean } | null>(null);
+  const [apiOk, setApiOk]     = useState<boolean | null>(null);
+
+  useEffect(() => {
+    Promise.all([
+      fetch(`${GIT_URL}/status`).then(r => r.json()).catch(() => null),
+      fetch(HEALTH_URL).then(r => r.ok).catch(() => false),
+    ]).then(([git, health]) => {
+      setGitInfo(git as { branch?: string; changes?: number; available?: boolean });
+      setApiOk(health === true);
+    });
+  }, []);
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Status strip */}
+      <div className="flex items-center gap-4 px-3 py-2 border-b flex-shrink-0 text-[10px]"
+        style={{ borderColor: "hsl(210 15% 13%)", background: "hsl(220 20% 5.5%)" }}>
+        <span className="flex items-center gap-1.5" style={{ color: apiOk ? "hsl(142 71% 55%)" : "hsl(355 80% 62%)" }}>
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: apiOk ? "hsl(142 71% 55%)" : "hsl(355 80% 55%)" }} />
+          <Server className="w-2.5 h-2.5" />
+          {apiOk === null ? "checking…" : apiOk ? "API online" : "API offline"}
+        </span>
+        {gitInfo?.available && (
+          <span className="flex items-center gap-1.5" style={{ color: (gitInfo.changes ?? 0) > 0 ? "hsl(38 80% 62%)" : "hsl(196 30% 50%)" }}>
+            <GitBranch className="w-2.5 h-2.5" />
+            {gitInfo.branch ?? "main"}
+            {(gitInfo.changes ?? 0) > 0 ? ` · ${gitInfo.changes} changed` : " · clean"}
+          </span>
+        )}
+        <span className="ml-auto flex items-center gap-1 opacity-40" style={{ color: "hsl(38 60% 55%)" }}>
+          <HardDrive className="w-2.5 h-2.5" />data in /tmp
+        </span>
+      </div>
+      {/* File browser */}
+      <div className="flex-1 overflow-hidden">
+        <FileBrowser onInsertPath={onInsertPath} />
+      </div>
+    </div>
+  );
+}
+
 // ─── Main panel ───────────────────────────────────────────────────────────────
 
 interface DevAgentPanelProps { onClose: () => void; }
-type PanelTab = "chat" | "files" | "memory";
+type PanelTab = "chat" | "workspace" | "patches" | "memory";
 
 export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
   const [tab, setTab]         = useState<PanelTab>("chat");
@@ -467,6 +759,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
   const [taskId, setTaskId]         = useState<string | null>(() => getSavedTaskId());
   const [gitAvailable, setGitAvailable] = useState(false);
   const [currentStage, setCurrentStage] = useState<string | null>(null);
+  const [taskStatus, setTaskStatus] = useState<string | null>(null);
 
   const bottomRef        = useRef<HTMLDivElement>(null);
   const inputRef         = useRef<HTMLTextAreaElement>(null);
@@ -693,6 +986,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
               const id = ev.taskId as string;
               setTaskId(id);
               saveTaskId(id);
+              setTaskStatus("running");
             } else if (t === "dev:token") {
               streamingTextRef.current += (ev.text as string) ?? "";
               setStreamingText(streamingTextRef.current);
@@ -701,9 +995,11 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
               if (streamingTextRef.current.trim()) addMsg({ type: "agent_text", text: streamingTextRef.current });
               streamingTextRef.current = "";
               setStreamingText("");
+              setTaskStatus("completed");
             } else if (t === "dev:file_op") {
               addMsg({ type: "file_op", op: ev.op as string, path: (ev.path as string) ?? "", pattern: ev.pattern as string });
             } else if (t === "dev:patch_proposed") {
+              setTaskStatus("waiting_approval");
               if (streamingTextRef.current.trim()) {
                 addMsg({ type: "agent_text", text: streamingTextRef.current });
                 streamingTextRef.current = "";
@@ -799,7 +1095,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
             </div>
             {/* Tabs */}
             <div className="flex items-center gap-0.5 ml-2">
-              {(["chat", "files", "memory"] as PanelTab[]).map(t => (
+              {(["chat", "workspace", "patches", "memory"] as PanelTab[]).map(t => (
                 <button key={t} type="button" onClick={() => setTab(t)}
                   className="text-xs px-2.5 py-1 rounded-lg transition-all font-medium"
                   style={{
@@ -807,7 +1103,10 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
                     color: tab === t ? "hsl(194 100% 65%)" : "hsl(196 30% 45%)",
                     border: `1px solid ${tab === t ? "hsl(194 100% 50% / 0.35)" : "transparent"}`,
                   }}>
-                  {t === "chat" ? "Chat" : t === "files" ? "Files" : <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" />Memory</span>}
+                  {t === "chat"      ? "Chat"
+                   : t === "workspace" ? <span className="flex items-center gap-1"><FolderOpen className="w-3 h-3" />Workspace</span>
+                   : t === "patches"   ? <span className="flex items-center gap-1"><Layers className="w-3 h-3" />Patches</span>
+                   : <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" />Memory</span>}
                 </button>
               ))}
             </div>
@@ -826,8 +1125,17 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
           </div>
         </div>
 
-        {/* Files tab */}
-        {tab === "files" && <div className="flex-1 overflow-hidden"><FileBrowser onInsertPath={insertPath} /></div>}
+        {/* Workspace tab */}
+        {tab === "workspace" && <div className="flex-1 overflow-hidden"><WorkspaceTab onInsertPath={insertPath} /></div>}
+
+        {/* Patches tab */}
+        {tab === "patches" && (
+          <div className="flex-1 overflow-hidden">
+            <PatchesTab onMessage={(msg, isErr) => {
+              addMsg({ type: isErr ? "error" : "agent_text", text: isErr ? undefined : msg, error: isErr ? msg : undefined } as DevMessage);
+            }} />
+          </div>
+        )}
 
         {/* Memory tab */}
         {tab === "memory" && <div className="flex-1 overflow-hidden"><MemoryTab /></div>}
@@ -835,6 +1143,37 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
         {/* Chat tab */}
         {tab === "chat" && (
           <>
+            {/* Always-visible status bar */}
+            <StatusBar onSwitchTab={setTab} taskStatus={taskStatus} />
+
+            {/* Resume / clear stuck task banner */}
+            {taskId && !isRunning && taskStatus === "waiting_approval" && (
+              <div className="flex items-center gap-2.5 mx-4 mt-3 px-3 py-2 rounded-lg flex-shrink-0"
+                style={{ background: "hsl(264 80% 60% / 0.08)", border: "1px solid hsl(264 80% 60% / 0.25)" }}>
+                <Layers className="w-4 h-4 flex-shrink-0" style={{ color: "hsl(264 80% 72%)" }} />
+                <div className="flex-1">
+                  <p className="text-xs font-semibold" style={{ color: "hsl(264 80% 80%)" }}>Patch ready for review</p>
+                  <p className="text-[10px] opacity-70" style={{ color: "hsl(264 60% 65%)" }}>A proposed patch is waiting in the queue.</p>
+                </div>
+                <button type="button" onClick={() => setTab("patches")}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg"
+                  style={{ background: "hsl(264 80% 55% / 0.15)", border: "1px solid hsl(264 80% 55% / 0.35)", color: "hsl(264 80% 80%)" }}>
+                  <Layers className="w-3 h-3" />Review
+                </button>
+                <button type="button"
+                  onClick={async () => {
+                    await fetch(`${TASKS_URL}/${taskId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "cancelled" }) });
+                    setTaskStatus(null);
+                    setTaskId(null);
+                    saveTaskId(null);
+                  }}
+                  className="flex items-center gap-1.5 text-xs px-2 py-1.5 rounded-lg opacity-60 hover:opacity-100 transition-opacity"
+                  style={{ color: "hsl(355 80% 62%)" }}>
+                  <X className="w-3 h-3" />Clear
+                </button>
+              </div>
+            )}
+
             {/* SSE reconnect banner */}
             {sseDropped && !isRunning && (
               <div className="flex items-center gap-2.5 mx-4 mt-3 px-3 py-2 rounded-lg flex-shrink-0" style={{ background: "hsl(38 100% 50% / 0.08)", border: "1px solid hsl(38 100% 50% / 0.25)" }}>

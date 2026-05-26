@@ -1,0 +1,84 @@
+Build Jarvis into its own self-contained dev platform so I can stop depending on Replit Agent for normal app updates.
+
+Goal:
+Inside the Jarvis site, Dev Agent should work like a mini Replit Agent for this project.
+
+Build these upgrades:
+
+1. FULL DEV WORKSPACE TAB
+Add a Workspace tab inside Dev Agent with:
+- file tree browser
+- file search
+- read file preview
+- “use file in prompt”
+- current route/API status
+- current git branch/status
+
+2. DIRECT EDIT MODE
+When I give an exact file path and exact change, skip searching and go straight to:
+- read target file once
+- create pending patch
+- show labeled diff
+- wait for approval
+- apply only after approval
+- validate automatically
+
+3. APPROVAL QUEUE
+Add a Pending Patches tab:
+- list every proposed patch
+- approve/reject each patch
+- show risk level, file path, UI impact, logic impact
+- preserve pending patches across restart
+
+4. TASK MEMORY
+Dev Agent should remember:
+- last unfinished task
+- current target file
+- already-read files
+- last proposed diff
+- last error
+- user rules like “show labels before diff”
+Persist this to disk/localStorage so refresh does not reset progress.
+
+5. ONE-CLICK RECOVERY
+Add buttons:
+- Retry last task
+- Resume unfinished task
+- Clear stuck task
+- Reconnect stream
+- Open last file
+- Show last diff
+
+6. SAFE PATCH SYSTEM
+Before applying:
+- create snapshot
+- create .devbak backup
+- apply patch
+- run validation
+- if validation fails, show rollback button
+- never auto-commit
+- never edit secrets/.env/auth unless explicitly approved
+
+7. BUILDER STATUS CARD
+Add a compact status card in Dev Agent:
+- API online/offline
+- stream connected/disconnected
+- pending patches count
+- last validation result
+- git dirty/clean
+- current task status
+
+8. PRODUCTION-READY STORAGE WARNING
+Show warning if dev data is still stored in /tmp.
+Recommend DB/object storage later, but do not migrate yet unless needed.
+
+9. TEST
+Verify with:
+- ask Dev Agent to change one placeholder
+- confirm it proposes patch without looping
+- approve patch
+- confirm validation runs
+- confirm rollback is available
+- refresh page and confirm Dev Agent still remembers the task history
+
+Report exact files changed and test results only.
