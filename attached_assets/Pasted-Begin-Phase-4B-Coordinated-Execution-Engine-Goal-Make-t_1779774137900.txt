@@ -1,0 +1,147 @@
+Begin Phase 4B: Coordinated Execution Engine.
+
+Goal:
+Make the existing multi-agent system coordinate real supervised workflows end-to-end through a safe execution engine.
+
+Requirements:
+
+1. Create orchestration engine
+Add:
+- lib/agents/orchestrator.ts
+- lib/agents/executionState.ts
+- lib/agents/agentMessages.ts
+- lib/agents/retryPolicy.ts
+
+The orchestrator should manage:
+- task dependency order
+- agent handoffs
+- task status transitions
+- validation checkpoints
+- retry limits
+- failure recovery
+- final execution summaries
+
+2. Execution states
+Support task states:
+- pending
+- ready
+- running
+- waiting_approval
+- validating
+- passed
+- failed
+- skipped
+- blocked
+- rolled_back
+
+3. Agent handoff flow
+Implement supervised flow:
+
+User goal
+→ PlannerAgent creates task graph
+→ ResearchAgent gathers relevant context
+→ BuilderAgent creates patch proposals
+→ TesterAgent runs validation
+→ AutoFix analyzes safe failures
+→ GitAgent handles checkpoint/rollback metadata
+→ Orchestrator creates final summary
+
+4. Dependency execution
+Tasks should only become ready when:
+- all dependencies passed
+- no blocked parent tasks exist
+- required permissions are available
+- approval requirements are satisfied
+
+5. Retry policy
+Add bounded retries:
+- max 2 retries per task
+- no retry on blocked/risky permission denial
+- retry only if failure is classified as safe/recoverable
+- all retries must be logged
+
+6. Agent messages
+Create structured agent-to-agent messages with:
+- fromAgent
+- toAgent
+- taskId
+- type
+- content
+- risk
+- timestamp
+- relatedPatchId
+- validationResult
+
+Message types:
+- plan_created
+- context_ready
+- patch_proposed
+- validation_requested
+- validation_passed
+- validation_failed
+- autofix_suggested
+- approval_required
+- rollback_requested
+- task_completed
+- task_failed
+
+7. Execution timeline
+Store a timeline of orchestration events:
+- task created
+- task started
+- handoff sent
+- proposal queued
+- validation started
+- validation result
+- retry attempted
+- approval requested
+- task completed
+- task failed
+
+8. UI updates
+Enhance Agents tab with:
+- Run Plan button
+- Step Next button
+- Pause/Resume controls
+- execution timeline
+- current active agent
+- task dependency view
+- failed task reason
+- retry count
+- final run summary
+
+9. Manual supervision
+No full autonomy yet.
+
+Rules:
+- User must click Run Plan to start
+- Risky patches still require approval
+- Permission boundaries stay enforced server-side
+- Orchestrator cannot grant new permissions
+- Agents cannot escalate themselves
+- All writes still use patch queue/checkpoints
+- Rollback remains available
+
+10. Partial failure recovery
+If one task fails:
+- dependent tasks become blocked
+- independent tasks may continue only if user clicks continue
+- final summary must clearly show passed, failed, skipped, blocked
+
+11. Tests
+Add tests for:
+- dependency ordering
+- task state transitions
+- agent handoff messages
+- retry limit enforcement
+- blocked dependency behavior
+- permission denial behavior
+- timeline logging
+- final summary generation
+- pause/resume behavior
+- no permission escalation
+- existing 99 tests still pass
+
+12. Stability
+Keep app buildable.
+Do not remove or weaken Phase 3B, 3C, or Phase 4 safety systems.

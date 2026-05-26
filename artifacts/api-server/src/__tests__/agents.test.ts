@@ -506,3 +506,465 @@ describe("rollback integrity", () => {
     expect(getReadyTasks().some(r => r.id === t.id)).toBe(false);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase 4B — Coordinated Execution Engine Tests
+// ═══════════════════════════════════════════════════════════════════════════
+
+import {
+  classifyFailure, canRetry, logRetry, getRetryLog, _clearRetryLog,
+} from "../lib/agents/retryPolicy";
+import {
+  getOrCreateRun, getOrchestrationRun, setRunState, setActiveTask,
+  addTimelineEvent, getTimeline, resetRun,
+} from "../lib/agents/executionState";
+import {
+  sendMessage, getMessages, getMessagesForTask, _clearMessages,
+  type AgentMessage,
+} from "../lib/agents/agentMessages";
+import { isTaskReady, isSuccess, isTerminal } from "../lib/agents/taskGraph";
+
+// ─── Retry Policy ────────────────────────────────────────────────────────────
+
+describe("Phase 4B — retryPolicy: classifyFailure", () => {
+  it("classifies PermissionDenied as permission_denied", () => {
+    expect(classifyFailure("PermissionDeniedError: READ_FILES denied")).toBe("permission_denied");
+  });
+
+  it("classifies network errors as recoverable", () => {
+    expect(classifyFailure("ECONNREFUSED connection refused")).toBe("recoverable");
+    expect(classifyFailure("Request timeout")).toBe("recoverable");
+    expect(classifyFailure("fetch failed: network error")).toBe("recoverable");
+  });
+
+  it("classifies Claude API errors as recoverable", () => {
+    expect(classifyFailure("anthropic API 503 overloaded")).toBe("recoverable");
+    expect(classifyFailure("rate limit 429")).toBe("recoverable");
+  });
+
+  it("classifies risky failures as risky", () => {
+    expect(classifyFailure("risky operation: cannot apply patch")).toBe("risky");
+    expect(classifyFailure("high risk level exceeded")).toBe("risky");
+    expect(classifyFailure("blocked.file: protected path")).toBe("risky");
+  });
+
+  it("classifies unknown errors as unrecoverable", () => {
+    expect(classifyFailure("unexpected assertion failure in core module")).toBe("unrecoverable");
+    expect(classifyFailure("null pointer exception in task runner")).toBe("unrecoverable");
+  });
+
+  it("classifies dependency errors as recoverable", () => {
+    expect(classifyFailure("unmet dependency: task-abc not done")).toBe("recoverable");
+  });
+});
+
+describe("Phase 4B — retryPolicy: canRetry", () => {
+  beforeEach(() => { _clearRetryLog(); });
+
+  const makeTask = (overrides: Partial<Task> = {}): Task => ({
+    id: "t1", title: "T", description: "d", agentId: "tester",
+    dependencies: [], status: "failed", priority: "medium",
+    riskScore: 10, retryCount: 0, maxRetries: 2, createdAt: Date.now(),
+    ...overrides,
+  });
+
+  it("allows retry when count < max and error is recoverable", () => {
+    expect(canRetry(makeTask({ retryCount: 0 }), "ECONNREFUSED")).toBe(true);
+  });
+
+  it("denies retry when retryCount >= maxRetries", () => {
+    expect(canRetry(makeTask({ retryCount: 2, maxRetries: 2 }), "ECONNREFUSED")).toBe(false);
+  });
+
+  it("denies retry on permission denial regardless of count", () => {
+    expect(canRetry(makeTask({ retryCount: 0 }), "PermissionDenied: PATCH_PROPOSAL")).toBe(false);
+  });
+
+  it("denies retry on risky failure", () => {
+    expect(canRetry(makeTask({ retryCount: 1 }), "risky operation blocked")).toBe(false);
+  });
+
+  it("denies retry on unrecoverable failure", () => {
+    expect(canRetry(makeTask({ retryCount: 0 }), "assertion error in logic")).toBe(false);
+  });
+});
+
+describe("Phase 4B — retryPolicy: logRetry", () => {
+  beforeEach(() => { _clearRetryLog(); });
+
+  it("logs retry entries with correct shape", () => {
+    const entry = logRetry("task-1", 1, "timeout");
+    expect(entry.taskId).toBe("task-1");
+    expect(entry.attempt).toBe(1);
+    expect(entry.error).toBe("timeout");
+    expect(entry.failureClass).toBe("recoverable");
+    expect(typeof entry.timestamp).toBe("number");
+  });
+
+  it("getRetryLog filters by taskId", () => {
+    logRetry("task-a", 1, "timeout");
+    logRetry("task-b", 1, "ECONNREFUSED");
+    logRetry("task-a", 2, "timeout");
+    expect(getRetryLog("task-a")).toHaveLength(2);
+    expect(getRetryLog("task-b")).toHaveLength(1);
+  });
+
+  it("getRetryLog returns all when no taskId given", () => {
+    logRetry("t1", 1, "timeout");
+    logRetry("t2", 1, "timeout");
+    expect(getRetryLog().length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ─── Execution State ──────────────────────────────────────────────────────────
+
+describe("Phase 4B — executionState: run lifecycle", () => {
+  const oid = "test-orch-" + Math.random().toString(36).slice(2);
+
+  beforeEach(() => { resetRun(oid); });
+
+  it("getOrCreateRun creates an idle run for new orchestrationId", () => {
+    const run = getOrCreateRun(oid);
+    expect(run.orchestrationId).toBe(oid);
+    expect(run.state).toBe("idle");
+    expect(run.timeline).toEqual([]);
+  });
+
+  it("setRunState transitions to running and records startedAt", () => {
+    const before = Date.now();
+    setRunState(oid, "running");
+    const run = getOrchestrationRun(oid)!;
+    expect(run.state).toBe("running");
+    expect(run.startedAt).toBeGreaterThanOrEqual(before);
+  });
+
+  it("setRunState does not overwrite startedAt on re-entry", () => {
+    setRunState(oid, "running");
+    const first = getOrchestrationRun(oid)!.startedAt!;
+    setRunState(oid, "running");
+    expect(getOrchestrationRun(oid)!.startedAt).toBe(first);
+  });
+
+  it("setRunState sets completedAt on completed/failed", () => {
+    setRunState(oid, "running");
+    setRunState(oid, "completed");
+    expect(getOrchestrationRun(oid)!.completedAt).toBeDefined();
+  });
+
+  it("setActiveTask sets currentAgentId and activeTaskId", () => {
+    setRunState(oid, "running");
+    setActiveTask(oid, "task-xyz", "builder");
+    const run = getOrchestrationRun(oid)!;
+    expect(run.activeTaskId).toBe("task-xyz");
+    expect(run.currentAgentId).toBe("builder");
+  });
+
+  it("setActiveTask can clear both fields with undefined", () => {
+    setRunState(oid, "running");
+    setActiveTask(oid, "task-xyz", "builder");
+    setActiveTask(oid, undefined, undefined);
+    const run = getOrchestrationRun(oid)!;
+    expect(run.activeTaskId).toBeUndefined();
+    expect(run.currentAgentId).toBeUndefined();
+  });
+});
+
+describe("Phase 4B — executionState: timeline", () => {
+  const oid = "timeline-test-" + Math.random().toString(36).slice(2);
+
+  beforeEach(() => { resetRun(oid); });
+
+  it("addTimelineEvent appends an event with correct shape", () => {
+    const ev = addTimelineEvent(oid, "plan_started", { message: "Go" });
+    expect(ev.orchestrationId).toBe(oid);
+    expect(ev.type).toBe("plan_started");
+    expect(ev.message).toBe("Go");
+    expect(typeof ev.id).toBe("string");
+    expect(typeof ev.timestamp).toBe("number");
+  });
+
+  it("getTimeline returns events sorted by timestamp", () => {
+    addTimelineEvent(oid, "task_started", { message: "A" });
+    addTimelineEvent(oid, "task_completed", { message: "B" });
+    addTimelineEvent(oid, "handoff_sent", { message: "C" });
+    const tl = getTimeline(oid);
+    expect(tl.length).toBe(3);
+    for (let i = 1; i < tl.length; i++)
+      expect(tl[i].timestamp).toBeGreaterThanOrEqual(tl[i - 1].timestamp);
+  });
+
+  it("addTimelineEvent uses type as default message when message omitted", () => {
+    const ev = addTimelineEvent(oid, "plan_paused");
+    expect(ev.message).toBe("plan paused");
+  });
+
+  it("getTimeline for unknown orchestrationId returns empty array", () => {
+    expect(getTimeline("no-such-id")).toEqual([]);
+  });
+
+  it("addTimelineEvent stores optional taskId and agentId", () => {
+    const ev = addTimelineEvent(oid, "task_failed", {
+      taskId: "t99", agentId: "builder", message: "Boom",
+    });
+    expect(ev.taskId).toBe("t99");
+    expect(ev.agentId).toBe("builder");
+  });
+});
+
+// ─── Agent Messages ───────────────────────────────────────────────────────────
+
+describe("Phase 4B — agentMessages: sendMessage / getMessages", () => {
+  const oid = "msg-test-" + Math.random().toString(36).slice(2);
+
+  beforeEach(() => { _clearMessages(); });
+
+  const makeMsg = (overrides: Partial<Omit<AgentMessage, "id" | "timestamp">> = {}) => ({
+    fromAgent: "planner", toAgent: "builder",
+    taskId: "t1", orchestrationId: oid,
+    type: "plan_created" as const, content: "Plan ready",
+    risk: "safe" as const,
+    ...overrides,
+  });
+
+  it("sendMessage returns a message with id and timestamp", () => {
+    const msg = sendMessage(makeMsg());
+    expect(typeof msg.id).toBe("string");
+    expect(typeof msg.timestamp).toBe("number");
+    expect(msg.fromAgent).toBe("planner");
+  });
+
+  it("getMessages returns messages for the given orchestrationId", () => {
+    sendMessage(makeMsg({ orchestrationId: oid }));
+    sendMessage(makeMsg({ orchestrationId: "other-orch" }));
+    const msgs = getMessages(oid);
+    expect(msgs.every(m => m.orchestrationId === oid)).toBe(true);
+  });
+
+  it("getMessages returns all messages when no orchestrationId given", () => {
+    sendMessage(makeMsg());
+    sendMessage(makeMsg({ orchestrationId: "other" }));
+    expect(getMessages().length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("getMessages respects the limit parameter", () => {
+    for (let i = 0; i < 10; i++) sendMessage(makeMsg({ content: `msg ${i}` }));
+    expect(getMessages(oid, 3)).toHaveLength(3);
+  });
+
+  it("getMessagesForTask filters by taskId", () => {
+    sendMessage(makeMsg({ taskId: "t-alpha" }));
+    sendMessage(makeMsg({ taskId: "t-beta" }));
+    sendMessage(makeMsg({ taskId: "t-alpha" }));
+    expect(getMessagesForTask("t-alpha")).toHaveLength(2);
+    expect(getMessagesForTask("t-beta")).toHaveLength(1);
+  });
+
+  it("supports all message types in the type union", () => {
+    const types = [
+      "plan_created", "context_ready", "patch_proposed",
+      "validation_requested", "validation_passed", "validation_failed",
+      "autofix_suggested", "approval_required", "rollback_requested",
+      "task_completed", "task_failed", "handoff_sent",
+    ] as const;
+    for (const type of types) {
+      const msg = sendMessage(makeMsg({ type }));
+      expect(msg.type).toBe(type);
+    }
+    expect(getMessages(oid).length).toBe(types.length);
+  });
+
+  it("supports relatedPatchId and validationResult fields", () => {
+    const msg = sendMessage(makeMsg({
+      type: "validation_failed",
+      relatedPatchId: "patch-123",
+      validationResult: { passed: false, errors: ["TS error"] },
+    }));
+    expect(msg.relatedPatchId).toBe("patch-123");
+    expect(msg.validationResult?.passed).toBe(false);
+    expect(msg.validationResult?.errors).toContain("TS error");
+  });
+});
+
+// ─── TaskGraph Phase 4B states ────────────────────────────────────────────────
+
+describe("Phase 4B — taskGraph: new status types", () => {
+  beforeEach(() => { clearTasks(); });
+
+  it("isSuccess returns true for done and passed", () => {
+    expect(isSuccess("done")).toBe(true);
+    expect(isSuccess("passed")).toBe(true);
+    expect(isSuccess("failed")).toBe(false);
+    expect(isSuccess("blocked")).toBe(false);
+    expect(isSuccess("pending")).toBe(false);
+  });
+
+  it("isTerminal returns true for all terminal statuses", () => {
+    for (const s of ["passed", "done", "failed", "skipped", "blocked", "rolled_back", "cancelled"] as const)
+      expect(isTerminal(s)).toBe(true);
+    for (const s of ["pending", "ready", "running", "waiting_approval", "validating"] as const)
+      expect(isTerminal(s)).toBe(false);
+  });
+
+  it("isTaskReady returns false for non-pending statuses", () => {
+    const t = createTask({ title: "T", description: "d", agentId: "planner" });
+    for (const s of ["running", "done", "failed", "blocked", "waiting_approval"] as const) {
+      updateTask(t.id, { status: s });
+      expect(isTaskReady(getTask(t.id)!)).toBe(false);
+    }
+  });
+
+  it("task can be set to waiting_approval status", () => {
+    const t = createTask({ title: "T", description: "d", agentId: "builder" });
+    updateTask(t.id, { status: "waiting_approval" });
+    expect(getTask(t.id)?.status).toBe("waiting_approval");
+    expect(getReadyTasks().some(r => r.id === t.id)).toBe(false);
+  });
+
+  it("task can be set to validating status", () => {
+    const t = createTask({ title: "T", description: "d", agentId: "tester" });
+    updateTask(t.id, { status: "validating" });
+    expect(getTask(t.id)?.status).toBe("validating");
+  });
+
+  it("task can be set to rolled_back status", () => {
+    const t = createTask({ title: "T", description: "d", agentId: "git" });
+    updateTask(t.id, { status: "rolled_back" });
+    expect(getTask(t.id)?.status).toBe("rolled_back");
+    expect(isTerminal("rolled_back")).toBe(true);
+  });
+
+  it("task can be set to skipped status", () => {
+    const t = createTask({ title: "T", description: "d", agentId: "researcher" });
+    updateTask(t.id, { status: "skipped" });
+    expect(getTask(t.id)?.status).toBe("skipped");
+    expect(isTerminal("skipped")).toBe(true);
+  });
+});
+
+describe("Phase 4B — taskGraph: dependency ordering", () => {
+  beforeEach(() => { clearTasks(); });
+
+  it("getReadyTasks only includes tasks with all deps done", () => {
+    const dep1 = createTask({ title: "Dep1", description: "d", agentId: "planner" });
+    const dep2 = createTask({ title: "Dep2", description: "d", agentId: "researcher" });
+    const child = createTask({
+      title: "Child", description: "d", agentId: "builder",
+      dependencies: [dep1.id, dep2.id],
+    });
+
+    // Neither dep done → child not ready
+    expect(getReadyTasks().map(t => t.id)).not.toContain(child.id);
+
+    // Only one dep done → still not ready
+    updateTask(dep1.id, { status: "done" });
+    expect(getReadyTasks().map(t => t.id)).not.toContain(child.id);
+
+    // Both deps done → child now ready
+    updateTask(dep2.id, { status: "passed" });
+    expect(getReadyTasks().map(t => t.id)).toContain(child.id);
+  });
+
+  it("isTaskReady accepts passed (Phase 4B success alias) in deps", () => {
+    const dep = createTask({ title: "Dep", description: "d", agentId: "planner" });
+    const child = createTask({
+      title: "Child", description: "d", agentId: "builder",
+      dependencies: [dep.id],
+    });
+    updateTask(dep.id, { status: "passed" });
+    expect(isTaskReady(getTask(child.id)!)).toBe(true);
+  });
+
+  it("blocked dep prevents child from being ready", () => {
+    const dep = createTask({ title: "Dep", description: "d", agentId: "planner" });
+    const child = createTask({
+      title: "Child", description: "d", agentId: "builder",
+      dependencies: [dep.id],
+    });
+    updateTask(dep.id, { status: "blocked" });
+    expect(isTaskReady(getTask(child.id)!)).toBe(false);
+    expect(getReadyTasks().map(t => t.id)).not.toContain(child.id);
+  });
+
+  it("three-level chain: grandchild only ready when both parents done", () => {
+    const gp = createTask({ title: "Grandparent", description: "d", agentId: "planner" });
+    const p  = createTask({ title: "Parent", description: "d", agentId: "researcher", dependencies: [gp.id] });
+    const gc = createTask({ title: "Grandchild", description: "d", agentId: "builder", dependencies: [p.id] });
+
+    expect(getReadyTasks().map(t => t.id)).toContain(gp.id);
+    expect(getReadyTasks().map(t => t.id)).not.toContain(p.id);
+    expect(getReadyTasks().map(t => t.id)).not.toContain(gc.id);
+
+    updateTask(gp.id, { status: "done" });
+    expect(getReadyTasks().map(t => t.id)).toContain(p.id);
+    expect(getReadyTasks().map(t => t.id)).not.toContain(gc.id);
+
+    updateTask(p.id, { status: "passed" });
+    expect(getReadyTasks().map(t => t.id)).toContain(gc.id);
+  });
+});
+
+// ─── No permission escalation ─────────────────────────────────────────────────
+
+describe("Phase 4B — no permission escalation", () => {
+  it("researcher cannot use PATCH_PROPOSAL permission", () => {
+    const researcher = {
+      permissions: [PERMISSIONS.READ_FILES, PERMISSIONS.READ_CONTEXT, PERMISSIONS.TASK_UPDATE],
+    };
+    expect(hasPermission(researcher.permissions, PERMISSIONS.PATCH_PROPOSAL)).toBe(false);
+  });
+
+  it("planner cannot use CHECKPOINT permission", () => {
+    const planner = {
+      permissions: [PERMISSIONS.READ_FILES, PERMISSIONS.READ_CONTEXT, PERMISSIONS.TASK_CREATE, PERMISSIONS.TASK_UPDATE],
+    };
+    expect(hasPermission(planner.permissions, PERMISSIONS.CHECKPOINT)).toBe(false);
+  });
+
+  it("builder cannot use ROLLBACK permission", () => {
+    const builder = {
+      permissions: [PERMISSIONS.READ_FILES, PERMISSIONS.READ_CONTEXT, PERMISSIONS.PATCH_PROPOSAL, PERMISSIONS.TASK_UPDATE],
+    };
+    expect(hasPermission(builder.permissions, PERMISSIONS.ROLLBACK)).toBe(false);
+  });
+
+  it("tester cannot use GIT_COMMIT permission", () => {
+    const tester = {
+      permissions: [PERMISSIONS.READ_FILES, PERMISSIONS.READ_CONTEXT, PERMISSIONS.TEST_RUNNER, PERMISSIONS.AUTOFIX_TRIGGER, PERMISSIONS.TASK_UPDATE],
+    };
+    expect(hasPermission(tester.permissions, PERMISSIONS.GIT_COMMIT)).toBe(false);
+  });
+
+  it("assertPermission throws PermissionDeniedError and records audit denial", () => {
+    const permsBefore = getPermissionDenials().length;
+    expect(() =>
+      assertPermission([PERMISSIONS.READ_FILES], PERMISSIONS.GIT_COMMIT, "researcher"),
+    ).toThrow(PermissionDeniedError);
+    expect(getPermissionDenials().length).toBeGreaterThan(permsBefore);
+  });
+});
+
+// ─── Pause / Resume state (unit) ──────────────────────────────────────────────
+
+describe("Phase 4B — executionState: pause/resume transitions", () => {
+  const oid = "pause-test-" + Math.random().toString(36).slice(2);
+
+  beforeEach(() => { resetRun(oid); });
+
+  it("setRunState can transition idle → running → paused → running", () => {
+    setRunState(oid, "running");
+    expect(getOrchestrationRun(oid)!.state).toBe("running");
+    setRunState(oid, "paused");
+    expect(getOrchestrationRun(oid)!.state).toBe("paused");
+    setRunState(oid, "running");
+    expect(getOrchestrationRun(oid)!.state).toBe("running");
+  });
+
+  it("timeline records pause and resume events", () => {
+    setRunState(oid, "running");
+    addTimelineEvent(oid, "plan_paused", { message: "User paused" });
+    addTimelineEvent(oid, "plan_resumed", { message: "User resumed" });
+    const tl = getTimeline(oid);
+    expect(tl.some(e => e.type === "plan_paused")).toBe(true);
+    expect(tl.some(e => e.type === "plan_resumed")).toBe(true);
+  });
+});

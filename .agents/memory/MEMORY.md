@@ -7,3 +7,4 @@
 - [Speech session layer](speech-session.md) — Global SpeechManager singleton (lib/speechManager.ts) with 7-state machine, priority queue, iOS resilience; React via useSpeechSession; Chat.tsx uses speech.toggle/queue/unlock
 - [Runtime orchestrator](runtime-orchestrator.md) — JarvisRuntime singleton in lib/runtime/index.ts; EventBus + RuntimeLogger + subsystem health; bridges speech/network/visibility; RuntimeInspector shown in debug mode; NotificationToast always active
 - [Phase 4 multi-agent](phase4-multi-agent.md) — lib/agents/ framework + 5 agents; tasks never run autonomously; all execution is POST /api/agents/tasks/:id/run (user-triggered); agents self-register on import in routes/index.ts
+- [Phase 4B execution engine](phase4b-execution.md) — runPlan/stepNext/pause/resume in orchestrator.ts; executionState/agentMessages/retryPolicy pure libs; 149/149 tests; TaskStatus extended with 6 new states

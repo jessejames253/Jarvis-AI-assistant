@@ -1,8 +1,7 @@
 /**
- * lib/agents/taskGraph.ts — Phase 4 dependency-aware task graph.
+ * lib/agents/taskGraph.ts — Phase 4 / 4B dependency-aware task graph.
  *
- * Tasks are the atomic unit of work routed to a specific agent.
- * Dependencies form a DAG — a task is "ready" only when all deps are "done".
+ * Phase 4B extends TaskStatus with supervised execution states.
  * State is persisted to /tmp so it survives server restarts.
  */
 
@@ -11,7 +10,20 @@ import { readFileSync, writeFileSync } from "fs";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type TaskStatus   = "pending" | "running" | "blocked" | "done" | "failed" | "cancelled";
+export type TaskStatus =
+  | "pending"           // created, waiting for dependencies
+  | "ready"             // all deps satisfied, awaiting execution trigger
+  | "running"           // Claude call in progress
+  | "waiting_approval"  // high-risk task — paused for human approval
+  | "validating"        // TesterAgent is running validation commands
+  | "passed"            // completed successfully (alias for "done")
+  | "done"              // completed successfully (backward compat alias)
+  | "failed"            // ran and failed (may be retried)
+  | "skipped"           // bypassed due to upstream failure + user continue
+  | "blocked"           // upstream dep failed and no continue was given
+  | "rolled_back"       // applied change was rolled back
+  | "cancelled";        // explicitly cancelled by user
+
 export type TaskPriority = "critical" | "high" | "medium" | "low";
 
 export interface Task {
@@ -20,7 +32,7 @@ export interface Task {
   description:     string;
   /** ID of the agent responsible for this task. */
   agentId:         string;
-  /** IDs of tasks that must be "done" before this one can run. */
+  /** IDs of tasks that must be "done"/"passed" before this one can run. */
   dependencies:    string[];
   status:          TaskStatus;
   priority:        TaskPriority;
@@ -38,6 +50,20 @@ export interface Task {
   completedAt?:    number;
   /** Groups all tasks created by a single orchestrate() call. */
   orchestrationId?: string;
+}
+
+// ─── Terminal statuses (no further transitions expected) ──────────────────────
+
+export const TERMINAL_STATUSES: TaskStatus[] = [
+  "passed", "done", "failed", "skipped", "blocked", "rolled_back", "cancelled",
+];
+
+export function isTerminal(status: TaskStatus): boolean {
+  return TERMINAL_STATUSES.includes(status);
+}
+
+export function isSuccess(status: TaskStatus): boolean {
+  return status === "done" || status === "passed";
 }
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
@@ -65,13 +91,13 @@ load();
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
 
 export function createTask(params: {
-  title:           string;
-  description:     string;
-  agentId:         string;
-  dependencies?:   string[];
-  priority?:       TaskPriority;
-  riskScore?:      number;
-  maxRetries?:     number;
+  title:            string;
+  description:      string;
+  agentId:          string;
+  dependencies?:    string[];
+  priority?:        TaskPriority;
+  riskScore?:       number;
+  maxRetries?:      number;
   orchestrationId?: string;
 }): Task {
   const task: Task = {
@@ -130,23 +156,36 @@ export function getTaskGraph(): Task[] {
 // ─── Dependency helpers ───────────────────────────────────────────────────────
 
 /**
- * Returns tasks whose dependencies are all "done" and whose status is "pending".
- * These are the tasks that can be run right now.
+ * A task is "ready" when all its dependencies are in a success state
+ * (done or passed) and its own status is pending or ready.
  */
-export function getReadyTasks(): Task[] {
-  return Array.from(tasks.values()).filter(t => {
-    if (t.status !== "pending") return false;
-    return t.dependencies.every(depId => tasks.get(depId)?.status === "done");
+export function isTaskReady(task: Task): boolean {
+  if (task.status !== "pending" && task.status !== "ready") return false;
+  return task.dependencies.every(depId => {
+    const dep = tasks.get(depId);
+    return dep != null && isSuccess(dep.status);
   });
 }
 
 /**
- * Returns tasks that are blocked because at least one dependency has failed.
+ * Returns tasks whose dependencies are all done/passed and whose
+ * status is pending or ready.
+ */
+export function getReadyTasks(): Task[] {
+  return Array.from(tasks.values()).filter(isTaskReady);
+}
+
+/**
+ * Returns tasks that are blocked because at least one dependency failed
+ * (and has no retry left).
  */
 export function getBlockedTasks(): Task[] {
   return Array.from(tasks.values()).filter(t => {
-    if (t.status !== "pending") return false;
-    return t.dependencies.some(depId => tasks.get(depId)?.status === "failed");
+    if (t.status !== "pending" && t.status !== "ready") return false;
+    return t.dependencies.some(depId => {
+      const dep = tasks.get(depId);
+      return dep?.status === "failed" || dep?.status === "blocked";
+    });
   });
 }
 
