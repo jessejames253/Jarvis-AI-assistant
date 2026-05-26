@@ -76,6 +76,37 @@ function savePatches(): void {
   } catch { /* non-fatal */ }
 }
 
+/**
+ * Register a patch from any source (REST endpoint, Jarvis chat tool, etc.).
+ * The patch is stored in the shared `pendingPatches` map and persisted to disk,
+ * so DEV → Patches tab picks it up on its next poll of GET /api/dev/patches.
+ */
+export function registerPatch(params: {
+  file: string;
+  description: string;
+  oldContent?: string;
+  newContent: string;
+  riskLevel?: "low" | "medium" | "high";
+}): PendingPatch {
+  const patchId = crypto.randomUUID();
+  const patch: PendingPatch = {
+    patchId,
+    file: params.file,
+    description: params.description,
+    oldContent: params.oldContent ?? "",
+    newContent: params.newContent,
+    createdAt: Date.now(),
+    riskLevel: params.riskLevel ?? "medium",
+    uiImpact: "unknown",
+    logicImpact: "unknown",
+    safeToTest: false,
+  };
+  pendingPatches.set(patchId, patch);
+  savePatches();
+  console.log("[pendingPatches] Registered:", patchId, "for", params.file, "— total:", pendingPatches.size);
+  return patch;
+}
+
 // ─── Tool implementations ─────────────────────────────────────────────────────
 
 export async function listProjectFiles(

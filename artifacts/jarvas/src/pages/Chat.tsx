@@ -42,6 +42,7 @@ import ToolStatusBubble, { type ToolCallInfo } from "@/components/ToolStatusBubb
 import DevAgentPanel from "@/components/DevAgentPanel";
 import { approvePatch, rejectPatch as logRejectPatch, fetchPendingPatches, type PendingPatchSummary } from "@/lib/patchApproval";
 import PatchNotificationBar from "@/components/PatchNotificationBar";
+import ChatPatchProposal from "@/components/ChatPatchProposal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,6 +70,13 @@ interface Source {
   description: string;
 }
 
+interface PatchProposalRef {
+  patchId:     string;
+  file:        string;
+  description: string;
+  riskLevel?:  "low" | "medium" | "high";
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -81,6 +89,8 @@ interface Message {
   toolCalls?: ToolCallInfo[];
   plan?: FrontendPlan;
   autoRouted?: boolean;
+  /** Set when Jarvis's propose_code_change tool queues a patch for approval */
+  patchProposal?: PatchProposalRef;
 }
 
 // ─── Session management ───────────────────────────────────────────────────────
@@ -346,6 +356,7 @@ function MessageBubble({
   onSpeak: () => void;
   onStopSpeak: () => void;
 }) {
+  // nothing extra — patchProposal lives on message and ChatPatchProposal owns its state
   const isUser = message.role === "user";
   const timeStr = message.timestamp.toLocaleTimeString([], {
     hour: "2-digit",
@@ -462,6 +473,11 @@ function MessageBubble({
             </button>
           )}
         </div>
+
+        {/* Patch proposal — real Approve/Reject buttons when Jarvis proposes a code change */}
+        {message.patchProposal && (
+          <ChatPatchProposal proposal={message.patchProposal} />
+        )}
 
         {/* Debug panel — shown only when debug mode is on */}
         {showDebug && message.debug && <DebugPanel debug={message.debug} />}
@@ -836,6 +852,41 @@ export default function Chat() {
             });
           }
           setAgentStatus("idle");
+
+          // ── Detect propose_code_change → attach patchProposal to message ───
+          if (toolEvent.tool === "propose_code_change" && toolEvent.result) {
+            try {
+              const parsed = toolEvent.result as {
+                patchId?: string; file?: string; description?: string; riskLevel?: "low" | "medium" | "high";
+              };
+              if (parsed.patchId) {
+                console.log("[Jarvis] pending patches loaded — patchId:", parsed.patchId, "file:", parsed.file);
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === currentMsgId
+                      ? {
+                          ...m,
+                          toolCalls: Array.from(pendingToolCalls.values()),
+                          patchProposal: {
+                            patchId:     parsed.patchId!,
+                            file:        parsed.file ?? "",
+                            description: parsed.description ?? "Code change",
+                            riskLevel:   parsed.riskLevel,
+                          },
+                        }
+                      : m
+                  )
+                );
+                // Immediately refresh the notification bar
+                fetchPendingPatches().then(patches => {
+                  console.log("[Jarvis] pending patches loaded — count:", patches.length);
+                  setPendingPatches(patches);
+                });
+                return;
+              }
+            } catch { /* ignore */ }
+          }
+
           setMessages((prev) =>
             prev.map((m) =>
               m.id === currentMsgId

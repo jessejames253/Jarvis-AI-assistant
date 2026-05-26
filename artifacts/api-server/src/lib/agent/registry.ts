@@ -13,6 +13,7 @@ import { searchWeb } from "./tools/search";
 import { createReminder, listReminders } from "./tools/reminders";
 import { lookupMemory } from "./tools/memory";
 import { runCode } from "./tools/code";
+import { proposeCodeChange } from "./tools/propose";
 
 // ─── Anthropic tool definitions ───────────────────────────────────────────────
 
@@ -130,18 +131,51 @@ export const TOOL_DEFINITIONS = [
       required: ["code"],
     },
   },
+  {
+    name: "propose_code_change",
+    description:
+      "Propose a code change to a project file. This queues the change for user review — the user will see real Approve/Reject buttons in the chat and in DEV → Patches. ALWAYS use this tool when modifying project source files instead of just describing the change in text. Never apply changes automatically — only propose them.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        file: {
+          type: "string",
+          description: "Relative file path from the project root, e.g. 'artifacts/jarvas/src/components/Foo.tsx'",
+        },
+        description: {
+          type: "string",
+          description: "Brief description of what this change does",
+        },
+        oldContent: {
+          type: "string",
+          description: "The original file content before the change (empty string if the file does not exist yet)",
+        },
+        newContent: {
+          type: "string",
+          description: "The full new file content after applying the change",
+        },
+        riskLevel: {
+          type: "string",
+          enum: ["low", "medium", "high"],
+          description: "Risk assessment: low=text/style only, medium=logic change, high=structural or API change",
+        },
+      },
+      required: ["file", "description", "newContent"],
+    },
+  },
 ] as const;
 
 // ─── Human-readable labels ────────────────────────────────────────────────────
 
 export const TOOL_LABELS: Record<string, { running: string; done: string; icon: string }> = {
-  get_weather:    { running: "Checking weather...", done: "Weather retrieved",  icon: "🌡️" },
-  search_web:     { running: "Searching web...",    done: "Search complete",    icon: "🔍" },
-  calculate:      { running: "Calculating...",      done: "Calculation done",   icon: "🧮" },
-  create_reminder:{ running: "Saving reminder...",  done: "Reminder saved",     icon: "📌" },
-  list_reminders: { running: "Loading tasks...",    done: "Tasks loaded",       icon: "📋" },
-  lookup_memory:  { running: "Checking memory...",  done: "Memory retrieved",   icon: "🧠" },
-  run_code:       { running: "Running code...",     done: "Code executed",      icon: "⚡" },
+  get_weather:          { running: "Checking weather...",     done: "Weather retrieved",    icon: "🌡️" },
+  search_web:           { running: "Searching web...",        done: "Search complete",      icon: "🔍" },
+  calculate:            { running: "Calculating...",          done: "Calculation done",     icon: "🧮" },
+  create_reminder:      { running: "Saving reminder...",      done: "Reminder saved",       icon: "📌" },
+  list_reminders:       { running: "Loading tasks...",        done: "Tasks loaded",         icon: "📋" },
+  lookup_memory:        { running: "Checking memory...",      done: "Memory retrieved",     icon: "🧠" },
+  run_code:             { running: "Running code...",         done: "Code executed",        icon: "⚡" },
+  propose_code_change:  { running: "Proposing code change…",  done: "Code change queued",   icon: "📝" },
 };
 
 // ─── Tool execution context ───────────────────────────────────────────────────
@@ -192,6 +226,9 @@ export async function executeToolCall(
 
     case "run_code":
       return runCode(String(input.code ?? ""), input.language ? String(input.language) : "javascript");
+
+    case "propose_code_change":
+      return proposeCodeChange(input);
 
     default:
       throw new Error(`Unknown tool: ${name}`);

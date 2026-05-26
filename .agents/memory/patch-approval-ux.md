@@ -4,7 +4,7 @@ description: How "Approve Patch" / "Reject Patch" buttons are wired across all t
 ---
 
 ## Rule
-All three approval surfaces (Jarvis main chat, DEV panel chat tab, DEV panel Patches tab) share one HTTP implementation in `lib/patchApproval.ts`. UI buttons are rendered by the `PatchActionButtons` shared component and `InlinePatchActions`.
+All approval surfaces share one backend store (`pendingPatches` Map in `lib/dev/tools.ts`). When Jarvis's AI uses the `propose_code_change` tool, the patch is registered in `pendingPatches` via `registerPatch()`. The DEV Patches tab and Jarvis chat notification bar both poll `GET /api/dev/patches` from the same store. Inline buttons inside chat messages are rendered by `ChatPatchProposal.tsx` using the patch data attached to the message when `tool_done` fires for `propose_code_change`.
 
 ## Surfaces
 1. **Jarvis chat** (`pages/Chat.tsx`) — `PatchNotificationBar` polls `GET /api/dev/patches` every 15 s; renders one row per patch with "Approve Patch" / "Reject Patch" buttons above the input footer. Uses `approvePatch()` from the shared lib.
@@ -23,6 +23,19 @@ All three approval surfaces (Jarvis main chat, DEV panel chat tab, DEV panel Pat
 ## Key utilities
 - `src/lib/approvalInput.ts` — `parseApprovalInput(input)` returns `"approve" | "reject" | null`; used by DevAgentPanel sendMessage for typed shortcut detection (case-insensitive, whitespace-trimmed).
 - `src/components/PatchNotificationBar.tsx` — standalone component (extracted from Chat.tsx) that accepts `patches`, `approvingId`, `errorMessage`, `onApprove`, `onReject` as props. No fetch/state inside — Chat.tsx owns that. Enables independent rendering in tests.
+- `src/components/ChatPatchProposal.tsx` — inline patch proposal card rendered inside MessageBubble when `message.patchProposal` is set. Owns its own `applying` state. Shows Approve/Reject buttons, then applied/rejected/failed state with exact backend error strings.
+- `artifacts/api-server/src/lib/dev/tools.ts` — `registerPatch()` (exported) adds to the shared `pendingPatches` Map and persists to disk. Call it from any source (REST or Jarvis tool).
+- `artifacts/api-server/src/lib/agent/tools/propose.ts` — Jarvis agent tool implementation for `propose_code_change`. Calls `registerPatch()` and returns `{patchId, file, description, riskLevel, status:"pending_approval"}`.
+- `artifacts/api-server/src/lib/agent/registry.ts` — `propose_code_change` tool added to TOOL_DEFINITIONS, TOOL_LABELS, and executeToolCall.
+- `artifacts/api-server/src/routes/dev.ts` — `POST /api/dev/patches` REST endpoint for external patch registration (same store as GET).
+
+## End-to-end flow (Phase 6B complete)
+1. User asks Jarvis to modify a file → Claude calls `propose_code_change` tool
+2. Backend: `registerPatch()` stores patch in `pendingPatches` Map + persists to `/tmp/jarvis_pending_patches.json`; returns `{patchId, file, description, riskLevel}`
+3. Frontend: SSE `tool_done` event for `propose_code_change` → Chat.tsx extracts `patchId` from result, sets `message.patchProposal`, and immediately refreshes `pendingPatches` for the notification bar
+4. MessageBubble renders `<ChatPatchProposal>` — real Approve/Reject buttons inside the chat message
+5. PatchNotificationBar (polled every 15s) also shows the patch above the input
+6. DEV Patches tab (fetches `GET /api/dev/patches`) shows the same patch with Approve/Reject/View Diff
 
 ## Typed APPROVE / no-pending-patch message
 DevAgentPanel sendMessage now uses `parseApprovalInput(goal)` and shows `"No pending patch to approve or reject."` if no patch_proposed message is found in the backlog.

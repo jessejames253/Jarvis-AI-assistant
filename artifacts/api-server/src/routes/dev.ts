@@ -258,6 +258,43 @@ router.post("/dev/rollback", async (req, res) => {
 
 // ─── GET /dev/patches ─────────────────────────────────────────────────────────
 
+// POST /api/dev/patches — register a patch from Jarvis chat or any external source
+router.post("/dev/patches", async (req, res): Promise<void> => {
+  const {
+    file,
+    description,
+    oldContent = "",
+    newContent,
+    riskLevel  = "medium",
+  } = req.body as {
+    file?: string; description?: string; oldContent?: string;
+    newContent?: string; riskLevel?: string;
+  };
+
+  if (!file?.trim() || !newContent?.trim()) {
+    res.status(400).json({ error: "file and newContent are required" });
+    return;
+  }
+
+  const { registerPatch } = await import("../lib/dev/tools");
+  const patch = registerPatch({
+    file:        file.trim(),
+    description: description?.trim() ?? "Code change proposed by Jarvis",
+    oldContent,
+    newContent,
+    riskLevel:   riskLevel as "low" | "medium" | "high",
+  });
+
+  console.log("[DEV] POST /api/dev/patches — registered:", patch.patchId, "for", file);
+  res.json({
+    ok:          true,
+    patchId:     patch.patchId,
+    file:        patch.file,
+    description: patch.description,
+    riskLevel:   patch.riskLevel,
+  });
+});
+
 router.get("/dev/patches", async (_req, res) => {
   const { pendingPatches } = await import("../lib/dev/tools");
   const patches = Array.from(pendingPatches.values());

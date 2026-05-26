@@ -1594,9 +1594,18 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
       {/* Title bar */}
       <div className="flex items-center justify-between px-3 py-2 border-b flex-shrink-0"
         style={{ borderColor: "hsl(210 15% 13%)" }}>
-        <span className="text-xs font-semibold" style={{ color: "hsl(38 100% 62%)" }}>
-          Pending Patches ({patches.length})
-        </span>
+        <div className="flex flex-col">
+          <span className="text-xs font-semibold" style={{ color: "hsl(38 100% 62%)" }}>
+            Pending Patches ({patches.length})
+          </span>
+          <span
+            data-testid="patch-count-debug"
+            className="text-xs"
+            style={{ color: patches.length > 0 ? "hsl(142 71% 50%)" : "hsl(196 30% 40%)" }}
+          >
+            {loading ? "Loading…" : `Pending patches: ${patches.length}`}
+          </span>
+        </div>
         <button type="button" onClick={load}
           className="p-1 rounded-lg opacity-60 hover:opacity-100 transition-opacity"
           style={{ color: "hsl(196 30% 55%)" }}>
