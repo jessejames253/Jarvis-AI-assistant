@@ -98,7 +98,7 @@ export default function InlinePatchActions({
               />
               Applying…
             </>
-          ) : "✓ Approve"}
+          ) : "Approve Patch"}
         </button>
 
         <button
@@ -113,7 +113,7 @@ export default function InlinePatchActions({
             color:      "hsl(355 80% 62%)",
           }}
         >
-          ✕ Reject
+          Reject Patch
         </button>
 
         <span className="text-[10px] truncate" style={{ color: "hsl(196 30% 40%)" }}>

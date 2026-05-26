@@ -216,12 +216,12 @@ export default function DiffViewer({ file, description, oldContent, newContent, 
           <button type="button" onClick={onApprove} disabled={applying}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 disabled:opacity-50"
             style={{ background: "hsl(142 60% 35% / 0.25)", border: "1px solid hsl(142 60% 40% / 0.5)", color: "hsl(142 71% 65%)" }}>
-            {applying ? "Applying…" : "✓ Apply patch"}
+            {applying ? "Applying…" : "Approve Patch"}
           </button>
           <button type="button" onClick={onReject} disabled={applying}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 disabled:opacity-50"
             style={{ background: "hsl(355 80% 40% / 0.15)", border: "1px solid hsl(355 80% 45% / 0.4)", color: "hsl(355 80% 62%)" }}>
-            ✕ Reject
+            Reject Patch
           </button>
           <span className="text-xs ml-auto" style={{ color: "hsl(210 15% 35%)" }}>Review carefully</span>
         </div>

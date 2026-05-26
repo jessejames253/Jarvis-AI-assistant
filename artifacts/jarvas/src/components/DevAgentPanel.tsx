@@ -2091,6 +2091,56 @@ function ContextPill({
   );
 }
 
+// ─── PatchActionBar ────────────────────────────────────────────────────────────
+// Sticky bar rendered just above the input field whenever a patch is pending.
+// Always contains real <button> elements named "Approve Patch" / "Reject Patch"
+// so that aria role queries and accessibility tools can find them reliably.
+
+function PatchActionBar({
+  patch,
+  onApprove,
+  onReject,
+  applying,
+}: {
+  patch:      PatchData;
+  onApprove:  () => void;
+  onReject:   () => void;
+  applying?:  boolean;
+}) {
+  const fileName = patch.file.split("/").pop() ?? patch.file;
+  return (
+    <div
+      data-testid="patch-action-bar"
+      className="flex-shrink-0 flex items-center gap-3 px-4 py-2.5 border-t"
+      style={{ background: "hsl(220 20% 5.5%)", borderColor: "hsl(142 60% 30% / 0.35)" }}
+    >
+      <span className="text-[11px] flex-1 min-w-0 truncate" style={{ color: "hsl(196 30% 40%)" }}>
+        Pending: <span className="font-mono" style={{ color: "hsl(194 100% 55%)" }}>{fileName}</span>
+      </span>
+      <button
+        type="button"
+        data-testid="patch-action-approve"
+        onClick={onApprove}
+        disabled={applying}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 disabled:opacity-50 flex-shrink-0"
+        style={{ background: "hsl(142 60% 35% / 0.25)", border: "1px solid hsl(142 60% 40% / 0.5)", color: "hsl(142 71% 65%)" }}
+      >
+        {applying ? "Applying…" : "Approve Patch"}
+      </button>
+      <button
+        type="button"
+        data-testid="patch-action-reject"
+        onClick={onReject}
+        disabled={applying}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 disabled:opacity-50 flex-shrink-0"
+        style={{ background: "hsl(355 80% 40% / 0.15)", border: "1px solid hsl(355 80% 45% / 0.4)", color: "hsl(355 80% 62%)" }}
+      >
+        Reject Patch
+      </button>
+    </div>
+  );
+}
+
 // ─── Main panel ───────────────────────────────────────────────────────────────
 
 interface DevAgentPanelProps { onClose: () => void; }
@@ -2232,6 +2282,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
    * an error message and a ManualPatchCard fallback.
    */
   const handleApprove = useCallback(async (patch: PatchData) => {
+    console.log("[Jarvis] Approving patchId:", patch.patchId, "| file:", patch.file);
     setMessages(prev => prev.map(m => m.patch?.patchId === patch.patchId ? { ...m, applying: true } : m));
     setSseDropped(false);
     const err = await tryApplyPatch(patch);
@@ -2243,6 +2294,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
   }, [addMsg, tryApplyPatch]);
 
   const handleReject = useCallback((patchId: string) => {
+    console.log("[Jarvis] Rejecting patchId:", patchId);
     setMessages(prev => prev.map(m =>
       m.patch?.patchId === patchId ? { ...m, type: "patch_rejected" as DevEventType } : m,
     ));
@@ -2841,6 +2893,22 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
 
               <div ref={bottomRef} />
             </div>
+
+            {/* PatchActionBar — always visible above input when a patch is pending */}
+            {(() => {
+              const pending = [...messages].reverse().find(
+                m => m.type === "patch_proposed" && m.patch && !m.applying,
+              );
+              if (!pending?.patch) return null;
+              return (
+                <PatchActionBar
+                  patch={pending.patch}
+                  onApprove={() => handleApprove(pending.patch!)}
+                  onReject={() => handleReject(pending.patch!.patchId)}
+                  applying={pending.applying}
+                />
+              );
+            })()}
 
             {/* Input */}
             <div className="flex-shrink-0 border-t px-4 py-3" style={{ borderColor: "hsl(210 15% 13%)" }}>

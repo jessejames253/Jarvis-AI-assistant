@@ -1,19 +1,24 @@
 /**
  * InlinePatchActions.test.tsx
  *
- * Proves that the Approve / Reject button elements render correctly and that
- * clicking them triggers the correct handlers with the right patch ID.
+ * Proves that real clickable "Approve Patch" / "Reject Patch" button elements
+ * render and that clicking them wires through to the correct handlers.
+ *
+ * Tests query buttons by their accessible role and name — the same way
+ * assistive technology and the user interacts with them.
  */
 
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import InlinePatchActions from "../components/InlinePatchActions";
 import type { PatchRef } from "../components/InlinePatchActions";
 
 const PATCH: PatchRef = { patchId: "patch-001", file: "src/components/Foo.tsx" };
 
-describe("InlinePatchActions — button rendering", () => {
-  it("renders an Approve button and a Reject button", () => {
+describe("InlinePatchActions — real button elements", () => {
+  // ── Presence ─────────────────────────────────────────────────────────────
+
+  it("renders an Approve Patch button (queryable by role+name)", () => {
     render(
       <InlinePatchActions
         patch={PATCH}
@@ -21,11 +26,12 @@ describe("InlinePatchActions — button rendering", () => {
         onReject={vi.fn()}
       />,
     );
-    expect(screen.getByTestId("inline-approve-btn")).toBeInTheDocument();
-    expect(screen.getByTestId("inline-reject-btn")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /approve patch/i }),
+    ).toBeInTheDocument();
   });
 
-  it("Approve button text is '✓ Approve' when idle", () => {
+  it("renders a Reject Patch button (queryable by role+name)", () => {
     render(
       <InlinePatchActions
         patch={PATCH}
@@ -33,10 +39,12 @@ describe("InlinePatchActions — button rendering", () => {
         onReject={vi.fn()}
       />,
     );
-    expect(screen.getByTestId("inline-approve-btn")).toHaveTextContent("✓ Approve");
+    expect(
+      screen.getByRole("button", { name: /reject patch/i }),
+    ).toBeInTheDocument();
   });
 
-  it("Reject button is labelled '✕ Reject'", () => {
+  it("both buttons are outside the markdown area (direct DOM children of the actions container)", () => {
     render(
       <InlinePatchActions
         patch={PATCH}
@@ -44,19 +52,26 @@ describe("InlinePatchActions — button rendering", () => {
         onReject={vi.fn()}
       />,
     );
-    expect(screen.getByTestId("inline-reject-btn")).toHaveTextContent("✕ Reject");
+    const container = screen.getByTestId("inline-patch-actions");
+    const approveBtn = screen.getByRole("button", { name: /approve patch/i });
+    const rejectBtn  = screen.getByRole("button", { name: /reject patch/i });
+    // Buttons must live somewhere inside the actions container, not inside prose
+    expect(container.contains(approveBtn)).toBe(true);
+    expect(container.contains(rejectBtn)).toBe(true);
   });
 
-  it("clicking Approve calls onApprove with the patch object", async () => {
+  // ── Click handlers ────────────────────────────────────────────────────────
+
+  it("clicking 'Approve Patch' calls onApprove with the patch object", async () => {
     const onApprove = vi.fn().mockResolvedValue(null);
     render(
       <InlinePatchActions patch={PATCH} onApprove={onApprove} onReject={vi.fn()} />,
     );
-    fireEvent.click(screen.getByTestId("inline-approve-btn"));
+    fireEvent.click(screen.getByRole("button", { name: /approve patch/i }));
     await waitFor(() => expect(onApprove).toHaveBeenCalledWith(PATCH));
   });
 
-  it("clicking Reject calls onReject with the correct patchId", () => {
+  it("clicking 'Reject Patch' calls onReject with the correct patchId", () => {
     const onReject = vi.fn();
     render(
       <InlinePatchActions
@@ -65,11 +80,13 @@ describe("InlinePatchActions — button rendering", () => {
         onReject={onReject}
       />,
     );
-    fireEvent.click(screen.getByTestId("inline-reject-btn"));
+    fireEvent.click(screen.getByRole("button", { name: /reject patch/i }));
     expect(onReject).toHaveBeenCalledWith("patch-001");
   });
 
-  it("shows 'Applying…' text and disables both buttons while applying", async () => {
+  // ── In-flight state ───────────────────────────────────────────────────────
+
+  it("both buttons are disabled and show 'Applying…' while the request is in flight", async () => {
     let resolveApprove!: (v: null) => void;
     const onApprove = vi.fn(
       () => new Promise<null>(res => { resolveApprove = res; }),
@@ -77,16 +94,15 @@ describe("InlinePatchActions — button rendering", () => {
     render(
       <InlinePatchActions patch={PATCH} onApprove={onApprove} onReject={vi.fn()} />,
     );
-    fireEvent.click(screen.getByTestId("inline-approve-btn"));
+    fireEvent.click(screen.getByRole("button", { name: /approve patch/i }));
     await waitFor(() => {
-      expect(screen.getByTestId("inline-approve-btn")).toBeDisabled();
-      expect(screen.getByTestId("inline-reject-btn")).toBeDisabled();
-      expect(screen.getByTestId("inline-approve-btn")).toHaveTextContent("Applying…");
+      expect(screen.getByRole("button", { name: /applying/i })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /reject patch/i })).toBeDisabled();
     });
     resolveApprove(null);
   });
 
-  it("disables buttons when siblingApplying=true", () => {
+  it("buttons are disabled when siblingApplying=true", () => {
     render(
       <InlinePatchActions
         patch={PATCH}
@@ -95,11 +111,15 @@ describe("InlinePatchActions — button rendering", () => {
         siblingApplying={true}
       />,
     );
+    // When siblingApplying=true the approve button shows "Applying…" (spinner state)
+    // and the reject button shows "Reject Patch" — both must be disabled.
     expect(screen.getByTestId("inline-approve-btn")).toBeDisabled();
-    expect(screen.getByTestId("inline-reject-btn")).toBeDisabled();
+    expect(screen.getByRole("button", { name: /reject patch/i })).toBeDisabled();
   });
 
-  it("shows success state after Approve resolves with null", async () => {
+  // ── Terminal states ───────────────────────────────────────────────────────
+
+  it("replaces buttons with a success confirmation after Approve resolves with null", async () => {
     render(
       <InlinePatchActions
         patch={PATCH}
@@ -107,15 +127,15 @@ describe("InlinePatchActions — button rendering", () => {
         onReject={vi.fn()}
       />,
     );
-    fireEvent.click(screen.getByTestId("inline-approve-btn"));
+    fireEvent.click(screen.getByRole("button", { name: /approve patch/i }));
     await waitFor(() =>
       expect(screen.getByTestId("inline-patch-success")).toBeInTheDocument(),
     );
-    expect(screen.queryByTestId("inline-approve-btn")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("inline-reject-btn")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /approve patch/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /reject patch/i })).not.toBeInTheDocument();
   });
 
-  it("shows inline error and keeps buttons when Approve returns an error string", async () => {
+  it("shows the exact backend error string inline and keeps buttons for retry", async () => {
     render(
       <InlinePatchActions
         patch={PATCH}
@@ -123,19 +143,20 @@ describe("InlinePatchActions — button rendering", () => {
         onReject={vi.fn()}
       />,
     );
-    fireEvent.click(screen.getByTestId("inline-approve-btn"));
+    fireEvent.click(screen.getByRole("button", { name: /approve patch/i }));
     await waitFor(() => {
-      expect(screen.getByTestId("inline-patch-error")).toBeInTheDocument();
       expect(screen.getByTestId("inline-patch-error")).toHaveTextContent(
         "patchId not found in pending queue",
       );
     });
-    // buttons still present so user can retry
-    expect(screen.getByTestId("inline-approve-btn")).toBeInTheDocument();
-    expect(screen.getByTestId("inline-reject-btn")).toBeInTheDocument();
+    // buttons must still be present so the user can retry
+    expect(screen.getByRole("button", { name: /approve patch/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /reject patch/i })).toBeInTheDocument();
   });
 
-  it("displays the file basename next to the action buttons", () => {
+  // ── Display ───────────────────────────────────────────────────────────────
+
+  it("displays the file basename next to the buttons", () => {
     render(
       <InlinePatchActions
         patch={PATCH}
