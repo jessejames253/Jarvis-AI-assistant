@@ -12,7 +12,8 @@
 import { Router } from "express";
 import { runDevAgent } from "../lib/dev/agent";
 import {
-  applyPatch, rollbackFile, listProjectFilesRest, readProjectFileRest, PROJECT_ROOT,
+  applyPatch, rollbackFile, listProjectFilesRest, readProjectFileRest,
+  PROJECT_ROOT, deletePatch, SERVER_STARTED_AT, RECOVERED_PATCH_COUNT,
 } from "../lib/dev/tools";
 import { createSnapshot } from "../lib/dev/snapshotStore";
 import { createTask, updateTask, addMessage, addPatchToTask, markPatchApplied } from "../lib/dev/taskStore";
@@ -299,6 +300,29 @@ router.get("/dev/patches", async (_req, res) => {
   const { pendingPatches } = await import("../lib/dev/tools");
   const patches = Array.from(pendingPatches.values());
   res.json({ ok: true, patches });
+});
+
+// ─── DELETE /dev/patches/:id ──────────────────────────────────────────────────
+// Persistently reject a patch — removes it from the queue and saves to disk.
+// Called by the frontend rejectPatch() lib so rejections survive page refreshes.
+
+router.delete("/dev/patches/:id", (req, res) => {
+  const { id } = req.params as { id: string };
+  if (!id) { res.status(400).json({ ok: false, error: "patch id required" }); return; }
+  const existed = deletePatch(id);
+  res.json({ ok: true, existed });
+});
+
+// ─── GET /dev/server-status ───────────────────────────────────────────────────
+// Returns when this server process started and how many patches were recovered
+// from disk. The frontend polls this to detect restarts and show banners.
+
+router.get("/dev/server-status", (_req, res) => {
+  res.json({
+    ok: true,
+    startedAt: SERVER_STARTED_AT,
+    recoveredPatchCount: RECOVERED_PATCH_COUNT,
+  });
 });
 
 // ─── GET /dev/health ──────────────────────────────────────────────────────────

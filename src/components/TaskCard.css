@@ -1,0 +1,13 @@
+.task-card {
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+.task-card:hover {
+  box-shadow: 0 0 0 1px rgba(99,179,237,0.35), 0 4px 16px rgba(99,179,237,0.18);
+  transform: translateY(-1px);
+}
+.task-card--running:hover {
+  box-shadow: 0 0 0 1px rgba(104,211,145,0.4), 0 4px 16px rgba(104,211,145,0.2);
+}
+.task-card--failed:hover {
+  box-shadow: 0 0 0 1px rgba(252,129,129,0.4), 0 4px 16px rgba(252,129,129,0.2);
+}

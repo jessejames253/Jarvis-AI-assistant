@@ -36,6 +36,10 @@ export async function proposeCodeChange(input: Record<string, unknown>): Promise
     file:        patch.file,
     description: patch.description,
     riskLevel:   patch.riskLevel,
+    // Include content so the frontend can resubmit if the backend loses the
+    // patch after a server restart before the user has approved it.
+    newContent:  patch.newContent,
+    oldContent:  patch.oldContent,
     status:      "pending_approval",
     message:     "Code change queued for your review. Approve or Reject buttons will appear in the chat and in DEV → Patches.",
   };

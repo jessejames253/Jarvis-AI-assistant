@@ -11,7 +11,7 @@
 
 import path from "path";
 import fs from "fs/promises";
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { exec } from "child_process";
 import { promisify } from "util";
 
@@ -58,22 +58,57 @@ export interface PendingPatch {
   safeToTest?: boolean;
   /** Allowlisted shell command to verify the patch (shown in UI, run on apply). */
   testCommand?: string;
+  /** True when this patch was loaded from disk on server startup (i.e. survived a restart). */
+  recoveredFromRestart?: boolean;
 }
 
-const PATCHES_FILE = "/tmp/jarvis_pending_patches.json";
+// Store patches in the project directory so they survive container sleeps.
+// /tmp is cleared when Replit hibernates; PROJECT_ROOT/.jarvis is not.
+const JARVIS_DIR = `${PROJECT_ROOT}/.jarvis`;
+const PATCHES_FILE = `${JARVIS_DIR}/pending_patches.json`;
 
 export const pendingPatches = new Map<string, PendingPatch>();
+
+/** Timestamp when this server process started. Used by the restart-status endpoint. */
+export const SERVER_STARTED_AT = Date.now();
+/** How many patches were loaded from disk on this startup (0 = fresh start). */
+export let RECOVERED_PATCH_COUNT = 0;
+
+// Ensure the .jarvis directory exists, then load any patches saved before last restart.
+try { mkdirSync(JARVIS_DIR, { recursive: true }); } catch { /* non-fatal */ }
 
 try {
   const raw = readFileSync(PATCHES_FILE, "utf8");
   const saved = JSON.parse(raw) as Array<[string, PendingPatch]>;
-  for (const [id, patch] of saved) pendingPatches.set(id, patch);
-} catch { /* no file yet */ }
+  for (const [id, patch] of saved) {
+    pendingPatches.set(id, { ...patch, recoveredFromRestart: true });
+  }
+  RECOVERED_PATCH_COUNT = pendingPatches.size;
+  if (RECOVERED_PATCH_COUNT > 0) {
+    console.log(`[pendingPatches] Recovered ${RECOVERED_PATCH_COUNT} patch(es) from disk after restart.`);
+  }
+} catch { /* no file yet — fresh start */ }
 
 function savePatches(): void {
   try {
+    mkdirSync(JARVIS_DIR, { recursive: true });
     writeFileSync(PATCHES_FILE, JSON.stringify(Array.from(pendingPatches.entries())), "utf8");
   } catch { /* non-fatal */ }
+}
+
+/**
+ * Remove a patch from the pending queue by ID.
+ * Called by the DELETE /api/dev/patches/:id endpoint (explicit rejection).
+ * Returns true if the patch existed, false if it was already gone.
+ */
+export function deletePatch(patchId: string): boolean {
+  const existed = pendingPatches.has(patchId);
+  if (existed) {
+    pendingPatches.delete(patchId);
+    savePatches();
+    console.log("[pendingPatches] Deleted (rejected):", patchId, "— remaining:", pendingPatches.size);
+  }
+  return existed;
 }
 
 /**

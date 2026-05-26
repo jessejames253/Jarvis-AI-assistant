@@ -40,7 +40,11 @@ import DebugPanel, { type DebugInfo } from "@/components/DebugPanel";
 import MarkdownContent from "@/components/MarkdownContent";
 import ToolStatusBubble, { type ToolCallInfo } from "@/components/ToolStatusBubble";
 import DevAgentPanel from "@/components/DevAgentPanel";
-import { approvePatch, rejectPatch as logRejectPatch, fetchPendingPatches, type PendingPatchSummary } from "@/lib/patchApproval";
+import {
+  approvePatch, rejectPatch as logRejectPatch, fetchPendingPatches,
+  fetchServerStatus,
+  type PendingPatchSummary, type ServerStatus,
+} from "@/lib/patchApproval";
 import PatchNotificationBar from "@/components/PatchNotificationBar";
 import ChatPatchProposal from "@/components/ChatPatchProposal";
 
@@ -521,15 +525,38 @@ export default function Chat() {
   const [devPanelOpen, setDevPanelOpen] = useState(() => getDevPanelOpen());
   const autoRoutedRef = useRef(false);
 
-  // ── Patch notification bar ────────────────────────────────────────────────
+  // ── Patch notification bar + server status ───────────────────────────────
   const [pendingPatches,    setPendingPatches]    = useState<PendingPatchSummary[]>([]);
   const [approvingPatchId,  setApprovingPatchId]  = useState<string | null>(null);
   const [patchBarError,     setPatchBarError]     = useState<string | null>(null);
   const [dismissedIds,      setDismissedIds]      = useState<Set<string>>(new Set());
+  const [serverStatus,      setServerStatus]      = useState<ServerStatus | null>(null);
+  // Track the last server startedAt we saw so we can detect a restart
+  const lastServerStartRef = useRef<number | null>(null);
 
   useEffect(() => {
     localStorage.setItem(DEV_PANEL_KEY, String(devPanelOpen));
   }, [devPanelOpen]);
+
+  // Poll server status every 30 s to detect restarts and recover patch records.
+  useEffect(() => {
+    const pollStatus = async () => {
+      const status = await fetchServerStatus();
+      if (!status) return;
+      setServerStatus(status);
+      // Detect a restart: if startedAt changed since last check, the server came back
+      if (lastServerStartRef.current !== null && lastServerStartRef.current !== status.startedAt) {
+        console.log("[Jarvis] Server restart detected — new startedAt:", status.startedAt);
+        // Refresh patches so the bar reflects the recovered queue
+        const patches = await fetchPendingPatches();
+        setPendingPatches(patches);
+      }
+      lastServerStartRef.current = status.startedAt;
+    };
+    pollStatus();
+    const id = setInterval(pollStatus, 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   // Poll for pending patches every 15 s so the bar stays in sync without
   // requiring the DEV panel to be open.
@@ -556,7 +583,8 @@ export default function Chat() {
   }, []);
 
   const handleRejectPatch = useCallback((patch: PendingPatchSummary) => {
-    logRejectPatch(patch.patchId, patch.file);
+    // Persistently delete from server queue (async, non-blocking)
+    void logRejectPatch(patch.patchId, patch.file);
     setDismissedIds(prev => new Set([...prev, patch.patchId]));
     setPendingPatches(prev => prev.filter(p => p.patchId !== patch.patchId));
   }, []);
@@ -857,7 +885,9 @@ export default function Chat() {
           if (toolEvent.tool === "propose_code_change" && toolEvent.result) {
             try {
               const parsed = toolEvent.result as {
-                patchId?: string; file?: string; description?: string; riskLevel?: "low" | "medium" | "high";
+                patchId?: string; file?: string; description?: string;
+                riskLevel?: "low" | "medium" | "high";
+                newContent?: string; oldContent?: string;
               };
               if (parsed.patchId) {
                 console.log("[Jarvis] pending patches loaded — patchId:", parsed.patchId, "file:", parsed.file);
@@ -872,6 +902,10 @@ export default function Chat() {
                             file:        parsed.file ?? "",
                             description: parsed.description ?? "Code change",
                             riskLevel:   parsed.riskLevel,
+                            // Store content so ChatPatchProposal can resubmit
+                            // if the server loses the patch after a restart
+                            newContent:  parsed.newContent,
+                            oldContent:  parsed.oldContent,
                           },
                         }
                       : m
@@ -1395,6 +1429,7 @@ export default function Chat() {
         patches={pendingPatches.filter(p => !dismissedIds.has(p.patchId))}
         approvingId={approvingPatchId}
         errorMessage={patchBarError}
+        serverStatus={serverStatus}
         onApprove={handleApprovePatch}
         onReject={handleRejectPatch}
       />

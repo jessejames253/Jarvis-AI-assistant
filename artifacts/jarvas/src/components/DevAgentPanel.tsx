@@ -1685,6 +1685,21 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
                   {p.riskLevel ?? "?"}
                 </span>
 
+                {/* Recovered badge — shown when the patch survived a server restart */}
+                {(p as { recoveredFromRestart?: boolean }).recoveredFromRestart && (
+                  <span
+                    data-testid={`dev-patch-recovered-${p.patchId}`}
+                    className="text-[9px] px-1.5 py-0.5 rounded font-mono flex-shrink-0"
+                    style={{
+                      background: "hsl(196 100% 45% / 0.15)",
+                      border:     "1px solid hsl(196 100% 55% / 0.35)",
+                      color:      "hsl(196 100% 70%)",
+                    }}
+                  >
+                    RECOVERED
+                  </span>
+                )}
+
                 <PatchActionButtons
                   patchId={p.patchId}
                   isApplying={isApplying}

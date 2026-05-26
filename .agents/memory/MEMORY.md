@@ -10,4 +10,5 @@
 - [Phase 4B execution engine](phase4b-execution.md) — runPlan/stepNext/pause/resume in orchestrator.ts; executionState/agentMessages/retryPolicy pure libs; 149/149 tests; TaskStatus extended with 6 new states
 - [Phase 5 intelligence layer](phase5-intelligence.md) — lib/memory/ (6 files), routes/intel.ts, IntelPanel.tsx, "intel" tab in DevAgentPanel; orchestrator injects memory into agent prompts; 210/210 tests; boolean/undefined filter predicate pitfall documented
 - [Phase 6 supervised autonomy](phase6-autonomy.md) — lib/autonomy/ (5 files), routes/autonomy.ts, AutonomyPanel.tsx, "autonomy" tab; 63 new tests; 273/273 total; manual-start only, budget hard stops, policy gates always block protected files
+- [Phase 6B restart recovery](phase6b-restart-recovery.md) — patches persist in .jarvis/ (not /tmp); restart detection via startedAt polling; Resubmit Patch button; RECOVERED badges; DELETE for rejection; 76/76 tests
 - [Patch approval UX](patch-approval-ux.md) — propose_code_change Jarvis tool + registerPatch() + ChatPatchProposal; real buttons in chat AND DEV Patches; 53/53 tests

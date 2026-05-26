@@ -4,27 +4,41 @@
  * Rendered by MessageBubble when message.patchProposal is set (i.e. Jarvis used
  * the propose_code_change tool and got back a patchId from the backend).
  *
- * Shows real <button> elements with aria-labels so tests can find them by role:
- *   getByRole("button", { name: /approve patch/i })
- *   getByRole("button", { name: /reject patch/i })
+ * Restart recovery:
+ *   If the server restarts before the user approves, approvePatch returns an
+ *   error containing "server may have restarted". When that happens this
+ *   component shows a "Resubmit Patch" button instead of a plain error.
+ *   Resubmit calls POST /api/dev/patches with the stored newContent to re-register
+ *   the patch, then immediately sends the new patchId back through approvePatch.
  *
- * On Approve: calls approvePatch() from the shared lib, shows inline result.
- * On Reject:  calls rejectPatch() from the shared lib, shows rejected state.
- * Prevents double-click by disabling both buttons while applying.
+ * States: pending → applying → applied / rejected / failed / missing_server
  */
 
 import { useState } from "react";
-import { CheckCircle, XCircle, FileCode, AlertTriangle } from "lucide-react";
-import { approvePatch, rejectPatch } from "@/lib/patchApproval";
+import { CheckCircle, XCircle, FileCode, AlertTriangle, RefreshCw } from "lucide-react";
+import { approvePatch, rejectPatch, resubmitPatch } from "@/lib/patchApproval";
 
 export interface PatchProposalRef {
   patchId:     string;
   file:        string;
   description: string;
   riskLevel?:  "low" | "medium" | "high";
+  /** Stored so we can re-register the patch if the server restarts. */
+  newContent?: string;
+  oldContent?: string;
 }
 
-type Status = "pending" | "applying" | "applied" | "rejected" | "failed";
+type Status = "pending" | "applying" | "applied" | "rejected" | "failed" | "missing_server";
+
+const RESTART_PATTERNS = [
+  /server may have restarted/i,
+  /patch not found/i,
+  /patchid not found/i,
+];
+
+function isRestartError(err: string): boolean {
+  return RESTART_PATTERNS.some(p => p.test(err));
+}
 
 const riskColor = (r?: string) =>
   r === "high"   ? "hsl(355 80% 62%)"
@@ -35,34 +49,72 @@ const riskLabel = (r?: string) =>
   r === "high" ? "HIGH" : r === "medium" ? "MEDIUM" : "LOW";
 
 export default function ChatPatchProposal({ proposal }: { proposal: PatchProposalRef }) {
-  const [status,    setStatus]    = useState<Status>("pending");
-  const [errorMsg,  setErrorMsg]  = useState<string | null>(null);
+  const [status,     setStatus]     = useState<Status>("pending");
+  const [errorMsg,   setErrorMsg]   = useState<string | null>(null);
   const [validation, setValidation] = useState<string | null>(null);
+  const [activePatchId, setActivePatchId] = useState(proposal.patchId);
 
   const isApplying = status === "applying";
 
   const handleApprove = async () => {
     if (isApplying) return;
-    console.log("[Jarvis chat] approve clicked — patchId:", proposal.patchId);
+    console.log("[Jarvis chat] approve clicked — patchId:", activePatchId);
     setStatus("applying");
     setErrorMsg(null);
 
-    const result = await approvePatch(proposal.patchId, proposal.file);
+    const result = await approvePatch(activePatchId, proposal.file);
     console.log("[Jarvis chat] backend response:", result);
 
     if (result.ok) {
       setStatus("applied");
       setValidation(result.validation?.summary ?? null);
     } else {
-      setStatus("failed");
-      setErrorMsg(result.error ?? "Apply failed");
+      const err = result.error ?? "Apply failed";
+      if (isRestartError(err) && proposal.newContent) {
+        setStatus("missing_server");
+      } else {
+        setStatus("failed");
+      }
+      setErrorMsg(err);
     }
   };
 
-  const handleReject = () => {
-    console.log("[Jarvis chat] reject clicked — patchId:", proposal.patchId);
-    rejectPatch(proposal.patchId, proposal.file);
+  const handleReject = async () => {
+    console.log("[Jarvis chat] reject clicked — patchId:", activePatchId);
+    await rejectPatch(activePatchId, proposal.file);
     setStatus("rejected");
+  };
+
+  const handleResubmit = async () => {
+    if (!proposal.newContent) return;
+    console.log("[Jarvis chat] resubmit clicked — file:", proposal.file);
+    setStatus("applying");
+    setErrorMsg(null);
+
+    const sub = await resubmitPatch({
+      file:        proposal.file,
+      description: proposal.description,
+      newContent:  proposal.newContent,
+      oldContent:  proposal.oldContent,
+      riskLevel:   proposal.riskLevel,
+    });
+
+    if (!sub.ok) {
+      setStatus("failed");
+      setErrorMsg(sub.error);
+      return;
+    }
+
+    // Now approve with the freshly-registered patchId
+    setActivePatchId(sub.patchId);
+    const result = await approvePatch(sub.patchId, proposal.file);
+    if (result.ok) {
+      setStatus("applied");
+      setValidation(result.validation?.summary ?? null);
+    } else {
+      setStatus("failed");
+      setErrorMsg(result.error ?? "Apply failed after resubmit");
+    }
   };
 
   const fileName = proposal.file.split("/").pop() ?? proposal.file;
@@ -106,7 +158,7 @@ export default function ChatPatchProposal({ proposal }: { proposal: PatchProposa
     );
   }
 
-  // ── Pending / applying / failed state ─────────────────────────────────────
+  // ── Pending / applying / failed / missing_server state ────────────────────
   return (
     <div
       data-testid="chat-patch-proposal"
@@ -139,8 +191,20 @@ export default function ChatPatchProposal({ proposal }: { proposal: PatchProposa
         </span>
       </div>
 
-      {/* Error message — exact backend error string */}
-      {errorMsg && (
+      {/* Missing-server banner */}
+      {status === "missing_server" && (
+        <div
+          data-testid="chat-patch-restart-warning"
+          className="flex items-start gap-2 rounded px-3 py-2 text-xs"
+          style={{ background: "hsl(38 100% 45% / 0.12)", border: "1px solid hsl(38 100% 55% / 0.3)", color: "hsl(38 100% 75%)" }}
+        >
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+          <span>Server restarted — patch record was lost. Click <strong>Resubmit Patch</strong> to re-register and apply.</span>
+        </div>
+      )}
+
+      {/* Generic error message */}
+      {errorMsg && status === "failed" && (
         <div
           data-testid="chat-patch-error"
           className="flex items-center gap-2 rounded px-3 py-2 text-xs"
@@ -152,45 +216,91 @@ export default function ChatPatchProposal({ proposal }: { proposal: PatchProposa
       )}
 
       {/* Action buttons */}
-      <div className="flex items-center gap-2 pt-0.5">
-        <button
-          type="button"
-          onClick={handleApprove}
-          disabled={isApplying}
-          aria-label="Approve Patch"
-          data-testid={`chat-approve-patch-${proposal.patchId}`}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
-                     active:scale-95 transition-all disabled:opacity-40"
-          style={{
-            background: "hsl(142 60% 35% / 0.22)",
-            border:     "1px solid hsl(142 60% 40% / 0.45)",
-            color:      "hsl(142 71% 65%)",
-          }}
-        >
-          <CheckCircle className="w-3.5 h-3.5" />
-          {isApplying ? "Applying…" : "Approve Patch"}
-        </button>
+      <div className="flex items-center gap-2 pt-0.5 flex-wrap">
 
-        <button
-          type="button"
-          onClick={handleReject}
-          disabled={isApplying}
-          aria-label="Reject Patch"
-          data-testid={`chat-reject-patch-${proposal.patchId}`}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
-                     active:scale-95 transition-all disabled:opacity-40"
-          style={{
-            background: "hsl(355 80% 40% / 0.12)",
-            border:     "1px solid hsl(355 80% 45% / 0.35)",
-            color:      "hsl(355 80% 62%)",
-          }}
-        >
-          <XCircle className="w-3.5 h-3.5" />
-          Reject Patch
-        </button>
+        {/* Resubmit — only shown in missing_server state AND when we have content */}
+        {status === "missing_server" && proposal.newContent && (
+          <button
+            type="button"
+            onClick={handleResubmit}
+            aria-label="Resubmit Patch"
+            data-testid={`chat-resubmit-patch-${proposal.patchId}`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                       active:scale-95 transition-all"
+            style={{
+              background: "hsl(38 100% 45% / 0.18)",
+              border:     "1px solid hsl(38 100% 55% / 0.45)",
+              color:      "hsl(38 100% 75%)",
+            }}
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Resubmit Patch
+          </button>
+        )}
+
+        {/* Standard approve/reject — shown in pending, applying, failed states */}
+        {status !== "missing_server" && (
+          <>
+            <button
+              type="button"
+              onClick={handleApprove}
+              disabled={isApplying}
+              aria-label="Approve Patch"
+              data-testid={`chat-approve-patch-${proposal.patchId}`}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                         active:scale-95 transition-all disabled:opacity-40"
+              style={{
+                background: "hsl(142 60% 35% / 0.22)",
+                border:     "1px solid hsl(142 60% 40% / 0.45)",
+                color:      "hsl(142 71% 65%)",
+              }}
+            >
+              <CheckCircle className="w-3.5 h-3.5" />
+              {isApplying ? "Applying…" : "Approve Patch"}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleReject}
+              disabled={isApplying}
+              aria-label="Reject Patch"
+              data-testid={`chat-reject-patch-${proposal.patchId}`}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                         active:scale-95 transition-all disabled:opacity-40"
+              style={{
+                background: "hsl(355 80% 40% / 0.12)",
+                border:     "1px solid hsl(355 80% 45% / 0.35)",
+                color:      "hsl(355 80% 62%)",
+              }}
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              Reject Patch
+            </button>
+          </>
+        )}
+
+        {/* Reject also shown in missing_server so user can discard */}
+        {status === "missing_server" && (
+          <button
+            type="button"
+            onClick={handleReject}
+            aria-label="Reject Patch"
+            data-testid={`chat-reject-patch-${proposal.patchId}`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                       active:scale-95 transition-all"
+            style={{
+              background: "hsl(355 80% 40% / 0.12)",
+              border:     "1px solid hsl(355 80% 45% / 0.35)",
+              color:      "hsl(355 80% 62%)",
+            }}
+          >
+            <XCircle className="w-3.5 h-3.5" />
+            Reject Patch
+          </button>
+        )}
 
         <span className="text-xs ml-auto" style={{ color: "hsl(196 30% 45%)" }}>
-          patchId: {proposal.patchId.slice(0, 8)}…
+          patchId: {activePatchId.slice(0, 8)}…
         </span>
       </div>
     </div>
