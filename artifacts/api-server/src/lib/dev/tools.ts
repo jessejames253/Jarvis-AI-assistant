@@ -2,9 +2,11 @@
  * lib/dev/tools.ts — File and build tools for the Dev Agent.
  *
  * Safety rules:
- *  - All file operations are bounded to PROJECT_ROOT
+ *  - All file operations bounded to PROJECT_ROOT
  *  - Terminal commands are allowlisted
- *  - Patches are proposed but NOT auto-applied — user must approve
+ *  - Patches proposed but NOT auto-applied — user must approve
+ *  - Backup created before every apply; rollback restores from backup
+ *  - Pending patches persisted to disk so server restarts don't lose them
  */
 
 import path from "path";
@@ -17,14 +19,12 @@ const execAsync = promisify(exec);
 
 export const PROJECT_ROOT = "/home/runner/workspace";
 
-// Files/dirs that can never be read or edited by the dev agent
 const BLOCKED_PATHS = [
   ".env", ".env.local", ".env.production", ".env.development",
   ".git/", "node_modules/", ".pnpm-store/",
   "secrets", ".replit", ".ssh",
 ];
 
-// Terminal commands that are explicitly allowed
 const ALLOWED_COMMANDS = [
   /^pnpm\s+(--filter\s+\S+\s+)?(run\s+)?(dev|build|typecheck|check|test|lint)\b/,
   /^npx\s+tsc\s+--noEmit/,
@@ -42,7 +42,7 @@ function isCommandAllowed(cmd: string): boolean {
   return ALLOWED_COMMANDS.some(r => r.test(cmd.trim()));
 }
 
-// ─── Pending patches (persisted to disk so server restarts don't lose them) ───
+// ─── Pending patches (persisted to disk so restarts don't lose them) ──────────
 
 export interface PendingPatch {
   patchId: string;
@@ -51,23 +51,27 @@ export interface PendingPatch {
   oldContent: string;
   newContent: string;
   createdAt: number;
+  // Review metadata
+  riskLevel?: "low" | "medium" | "high";
+  uiImpact?: string;
+  logicImpact?: string;
+  safeToTest?: boolean;
 }
 
 const PATCHES_FILE = "/tmp/jarvis_pending_patches.json";
 
 export const pendingPatches = new Map<string, PendingPatch>();
 
-// Load any patches that survived a previous server run
 try {
   const raw = readFileSync(PATCHES_FILE, "utf8");
   const saved = JSON.parse(raw) as Array<[string, PendingPatch]>;
   for (const [id, patch] of saved) pendingPatches.set(id, patch);
-} catch { /* no file yet — fine */ }
+} catch { /* no file yet */ }
 
 function savePatches(): void {
   try {
     writeFileSync(PATCHES_FILE, JSON.stringify(Array.from(pendingPatches.entries())), "utf8");
-  } catch { /* ignore — non-fatal */ }
+  } catch { /* non-fatal */ }
 }
 
 // ─── Tool implementations ─────────────────────────────────────────────────────
@@ -78,8 +82,7 @@ export async function listProjectFiles(
 ): Promise<string> {
   const dir = params.directory ?? "";
   const absDir = path.resolve(PROJECT_ROOT, dir);
-  if (!isPathSafe(dir)) throw new Error(`Path not allowed: ${dir}`);
-
+  if (dir && !isPathSafe(dir)) throw new Error(`Path not allowed: ${dir}`);
   const pattern = params.pattern?.toLowerCase();
   send({ type: "dev:file_op", op: "list", path: dir || "." });
 
@@ -91,11 +94,11 @@ export async function listProjectFiles(
       const rel = path.relative(PROJECT_ROOT, path.join(d, e.name));
       if (BLOCKED_PATHS.some(b => rel.startsWith(b) || e.name === b.replace("/", ""))) continue;
       if (e.name.startsWith(".") && e.name !== ".gitignore") continue;
+      if (e.name.endsWith(".devbak") || e.name.includes(".devbak.")) continue;
       if (pattern && !rel.toLowerCase().includes(pattern) && e.isFile()) continue;
       if (e.isDirectory()) {
         results.push(`${rel}/`);
-        const sub = await walk(path.join(d, e.name), depth + 1);
-        results.push(...sub);
+        results.push(...await walk(path.join(d, e.name), depth + 1));
       } else {
         results.push(rel);
       }
@@ -105,6 +108,52 @@ export async function listProjectFiles(
 
   const files = await walk(absDir);
   return files.slice(0, 200).join("\n") || "(empty directory)";
+}
+
+/** REST-friendly version for the file browser UI — no SSE send needed */
+export async function listProjectFilesRest(dir = "", maxDepth = 2): Promise<string[]> {
+  const absDir = path.resolve(PROJECT_ROOT, dir);
+  if (dir && !isPathSafe(dir)) throw new Error(`Path not allowed: ${dir}`);
+
+  async function walk(d: string, depth = 0): Promise<string[]> {
+    if (depth > maxDepth) return [];
+    let entries: import("fs").Dirent[];
+    try { entries = await fs.readdir(d, { withFileTypes: true }); } catch { return []; }
+    const results: string[] = [];
+    for (const e of entries) {
+      const rel = path.relative(PROJECT_ROOT, path.join(d, e.name));
+      if (BLOCKED_PATHS.some(b => rel.startsWith(b) || e.name === b.replace("/", ""))) continue;
+      if (e.name.startsWith(".")) continue;
+      if (e.name.endsWith(".devbak") || e.name.includes(".devbak.")) continue;
+      if (e.isDirectory()) {
+        results.push(rel + "/");
+        results.push(...await walk(path.join(d, e.name), depth + 1));
+      } else {
+        results.push(rel);
+      }
+    }
+    return results;
+  }
+
+  return walk(absDir);
+}
+
+/** REST-friendly file read for the file browser UI */
+export async function readProjectFileRest(
+  filePath: string,
+  maxLines = 300,
+): Promise<{ ok: boolean; content?: string; lines?: number; error?: string }> {
+  if (!isPathSafe(filePath)) return { ok: false, error: "Path not allowed" };
+  const abs = path.resolve(PROJECT_ROOT, filePath);
+  try {
+    const raw = await fs.readFile(abs, "utf8");
+    const lines = raw.split("\n");
+    const slice = lines.slice(0, maxLines);
+    const content = slice.map((l, i) => `${String(i + 1).padStart(4)}: ${l}`).join("\n");
+    return { ok: true, content, lines: lines.length };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
 }
 
 export async function readProjectFile(
@@ -145,18 +194,22 @@ export async function searchProjectFiles(
 }
 
 export async function proposeFilePatch(
-  params: { file: string; newContent: string; description: string },
+  params: {
+    file: string;
+    newContent: string;
+    description: string;
+    riskLevel?: "low" | "medium" | "high";
+    uiImpact?: string;
+    logicImpact?: string;
+    safeToTest?: boolean;
+  },
   send: (d: object) => void,
 ): Promise<string> {
   if (!isPathSafe(params.file)) throw new Error(`Path not allowed: ${params.file}`);
   const abs = path.resolve(PROJECT_ROOT, params.file);
 
   let oldContent = "";
-  try {
-    oldContent = await fs.readFile(abs, "utf8");
-  } catch {
-    oldContent = "";
-  }
+  try { oldContent = await fs.readFile(abs, "utf8"); } catch { /* new file */ }
 
   const patchId = crypto.randomUUID();
   const patch: PendingPatch = {
@@ -166,6 +219,10 @@ export async function proposeFilePatch(
     oldContent,
     newContent: params.newContent,
     createdAt: Date.now(),
+    riskLevel: params.riskLevel ?? "medium",
+    uiImpact: params.uiImpact ?? "unknown",
+    logicImpact: params.logicImpact ?? "unknown",
+    safeToTest: params.safeToTest ?? false,
   };
   pendingPatches.set(patchId, patch);
   savePatches();
@@ -178,9 +235,13 @@ export async function proposeFilePatch(
     oldContent,
     newContent: params.newContent,
     linesAdded: params.newContent.split("\n").length - oldContent.split("\n").length,
+    riskLevel: patch.riskLevel,
+    uiImpact: patch.uiImpact,
+    logicImpact: patch.logicImpact,
+    safeToTest: patch.safeToTest,
   });
 
-  return JSON.stringify({ patchId, status: "pending_approval", message: "Patch proposed and sent to user for approval. Do not apply until approved." });
+  return JSON.stringify({ patchId, status: "pending_approval", message: "Patch proposed. Do not apply until the user approves." });
 }
 
 export async function runTypecheck(
@@ -225,26 +286,49 @@ export async function runBuild(
   }
 }
 
-// ─── Apply patch (called only after explicit user approval) ───────────────────
+// ─── Apply patch ──────────────────────────────────────────────────────────────
 
-export async function applyPatch(patchId: string): Promise<{ ok: boolean; error?: string }> {
+export async function applyPatch(patchId: string): Promise<{ ok: boolean; error?: string; backupPath?: string }> {
   const patch = pendingPatches.get(patchId);
-  if (!patch) return { ok: false, error: "Patch not found or already applied" };
+  if (!patch) return { ok: false, error: "Patch not found — server may have restarted. Use Manual Patch to apply manually." };
   if (!isPathSafe(patch.file)) return { ok: false, error: "Path not allowed" };
 
   const abs = path.resolve(PROJECT_ROOT, patch.file);
   const backupPath = `${abs}.devbak.${Date.now()}`;
 
   try {
-    // Backup existing file
-    try { await fs.copyFile(abs, backupPath); } catch { /* new file — no backup needed */ }
-    // Ensure directory exists
+    try { await fs.copyFile(abs, backupPath); } catch { /* new file */ }
     await fs.mkdir(path.dirname(abs), { recursive: true });
-    // Write new content
     await fs.writeFile(abs, patch.newContent, "utf8");
     pendingPatches.delete(patchId);
     savePatches();
-    return { ok: true };
+    return { ok: true, backupPath: path.relative(PROJECT_ROOT, backupPath) };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+}
+
+// ─── Rollback ─────────────────────────────────────────────────────────────────
+
+export async function rollbackFile(filePath: string): Promise<{ ok: boolean; error?: string; restoredFrom?: string }> {
+  if (!isPathSafe(filePath)) return { ok: false, error: "Path not allowed" };
+  const abs = path.resolve(PROJECT_ROOT, filePath);
+  const dir = path.dirname(abs);
+  const base = path.basename(abs);
+
+  let entries: string[] = [];
+  try { entries = await fs.readdir(dir); } catch { return { ok: false, error: "Could not read directory" }; }
+
+  const backups = entries
+    .filter(e => e.startsWith(base + ".devbak."))
+    .sort(); // lexicographic = chronological (timestamp suffix)
+
+  if (backups.length === 0) return { ok: false, error: `No backup found for ${filePath}` };
+
+  const latest = path.join(dir, backups[backups.length - 1]);
+  try {
+    await fs.copyFile(latest, abs);
+    return { ok: true, restoredFrom: backups[backups.length - 1] };
   } catch (err) {
     return { ok: false, error: String(err) };
   }
@@ -255,18 +339,18 @@ export async function applyPatch(patchId: string): Promise<{ ok: boolean; error?
 export const DEV_TOOL_DEFINITIONS = [
   {
     name: "list_project_files",
-    description: "List files in the project directory. Use to explore the codebase structure.",
+    description: "List files in the project directory. Use to explore codebase structure before making changes.",
     input_schema: {
       type: "object" as const,
       properties: {
-        directory: { type: "string", description: "Subdirectory to list (relative to project root). Empty for root." },
-        pattern: { type: "string", description: "Optional filter — only return files matching this pattern." },
+        directory: { type: "string", description: "Subdirectory (relative to project root). Empty for root." },
+        pattern: { type: "string", description: "Filter — only return files containing this pattern." },
       },
     },
   },
   {
     name: "read_project_file",
-    description: "Read the contents of a project file. Use startLine/endLine to limit output.",
+    description: "Read a project file's contents. Always read the file before proposing changes to it.",
     input_schema: {
       type: "object" as const,
       required: ["file"],
@@ -292,24 +376,28 @@ export const DEV_TOOL_DEFINITIONS = [
   },
   {
     name: "propose_file_patch",
-    description: "Propose a file change. Shows the user a diff and waits for approval before anything is written. Use this for ALL edits — never edit files directly.",
+    description: "Propose a file change. Shows the user a labeled diff with risk/impact metadata. NEVER edits files directly. Always read the file first.",
     input_schema: {
       type: "object" as const,
-      required: ["file", "newContent", "description"],
+      required: ["file", "newContent", "description", "riskLevel", "uiImpact", "logicImpact", "safeToTest"],
       properties: {
         file: { type: "string", description: "File path relative to project root." },
         newContent: { type: "string", description: "Complete new content for the file." },
-        description: { type: "string", description: "Human-readable description of what changed and why." },
+        description: { type: "string", description: "What changed and why (1–2 sentences)." },
+        riskLevel: { type: "string", enum: ["low", "medium", "high"], description: "Risk of this change causing breakage." },
+        uiImpact: { type: "string", description: "What the user will see differently in the UI, or 'none'." },
+        logicImpact: { type: "string", description: "How backend/state/data flow changes, or 'none'." },
+        safeToTest: { type: "boolean", description: "True if the change can be safely previewed in dev without side effects." },
       },
     },
   },
   {
     name: "run_typecheck",
-    description: "Run TypeScript typecheck (tsc --noEmit) on a workspace package.",
+    description: "Run TypeScript typecheck on a workspace package.",
     input_schema: {
       type: "object" as const,
       properties: {
-        project: { type: "string", description: "Package name: 'jarvas' or 'api-server'. Default: jarvas." },
+        project: { type: "string", description: "Package: 'jarvas' or 'api-server'. Default: jarvas." },
       },
     },
   },
@@ -319,13 +407,15 @@ export const DEV_TOOL_DEFINITIONS = [
     input_schema: {
       type: "object" as const,
       properties: {
-        project: { type: "string", description: "Package name: 'jarvas' or 'api-server'. Default: jarvas." },
+        project: { type: "string", description: "Package: 'jarvas' or 'api-server'. Default: jarvas." },
       },
     },
   },
 ] as const;
 
-export type DevToolName = "list_project_files" | "read_project_file" | "search_project_files" | "propose_file_patch" | "run_typecheck" | "run_build";
+export type DevToolName =
+  | "list_project_files" | "read_project_file" | "search_project_files"
+  | "propose_file_patch" | "run_typecheck" | "run_build";
 
 export async function executeDevTool(
   name: string,
@@ -340,7 +430,10 @@ export async function executeDevTool(
     case "search_project_files":
       return searchProjectFiles(input as { pattern: string; directory?: string; fileGlob?: string }, send);
     case "propose_file_patch":
-      return proposeFilePatch(input as { file: string; newContent: string; description: string }, send);
+      return proposeFilePatch(input as {
+        file: string; newContent: string; description: string;
+        riskLevel?: "low" | "medium" | "high"; uiImpact?: string; logicImpact?: string; safeToTest?: boolean;
+      }, send);
     case "run_typecheck":
       return runTypecheck(input as { project?: string }, send);
     case "run_build":

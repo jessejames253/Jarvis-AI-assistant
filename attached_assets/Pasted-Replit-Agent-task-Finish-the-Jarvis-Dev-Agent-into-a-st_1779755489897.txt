@@ -1,0 +1,97 @@
+Replit Agent task:
+
+Finish the Jarvis Dev Agent into a stable usable builder system.
+
+Do this as ONE planned upgrade, but apply in safe batches.
+
+GOAL:
+Turn Dev Agent into a persistent, recoverable, approved-patch coding workspace.
+
+Build these systems:
+
+1. Persistent Dev Sessions
+- Save Dev Agent messages, current task, proposed diffs, pending patch IDs, and running status to disk/database
+- Restore everything after refresh, hot reload, or browser close
+- Add “Resume last task” behavior
+
+2. Persistent Patch Store
+- Store pending patches on disk, not only in memory
+- Patch survives API restart/hot reload
+- Applying a patch removes only that patch
+- Failed apply keeps the patch available
+
+3. Real Diff Review
+- Every proposed change must show:
+  - CHANGE SUMMARY
+  - PURPOSE
+  - FILE
+  - RISK LEVEL
+  - UI IMPACT
+  - LOGIC IMPACT
+  - SAFE TO TEST?
+  - REQUIRES APPROVAL?
+  - full grouped diff
+- Never apply without approval
+
+4. Safer Apply Pipeline
+- Dry-run patch before apply
+- Validate file exists
+- Reject malformed or unsafe paths
+- Apply patch
+- Run typecheck/build after apply
+- If build fails, show exact error and offer rollback
+
+5. Rollback System
+- Save backup before every approved patch
+- Add rollback button per patch
+- Rollback restores exact previous file content
+
+6. Manual Patch Mode
+If automatic apply fails:
+- keep conversation intact
+- show exact failed route/status/body
+- show exact file path
+- show exact code to paste
+- show exact location
+- provide copy button
+
+7. File Tree + Search
+- Add a simple file browser inside Dev Agent
+- Search files by name/content
+- Read files
+- Show likely files affected before proposing edits
+
+8. Better Agent Memory
+- Persist project architecture notes
+- Persist coding rules:
+  - label every change
+  - show diff first
+  - keep responses concise
+  - no vague wording
+  - approval required before apply
+- Reload these rules at the start of every Dev Agent task
+
+9. Recovery Mode
+If browser reloads, API restarts, or SSE disconnects:
+- reconnect safely
+- show “session restored”
+- preserve task, messages, diffs, and approval state
+- do not restart the same task blindly
+
+10. Route Reliability
+Audit and fix:
+- /api/dev/stream
+- /api/dev/apply
+- any patch/proposal route
+- all frontend BASE/API URL usage
+- all Vite proxy assumptions
+
+RULES:
+- Start by showing the full plan and files affected.
+- Then implement in batches.
+- After each batch, run typecheck/build.
+- Restart services only when needed.
+- Keep responses short.
+- Do not touch .env or secrets.
+- Do not break normal chat, planner, voice, memory, or runtime.
+- Final response must include what works, what changed, how to test, and rollback instructions.
