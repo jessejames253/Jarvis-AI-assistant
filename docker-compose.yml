@@ -1,0 +1,108 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Jarvis — Docker Compose (full stack)
+#
+# Services:
+#   postgres    — PostgreSQL 16 database
+#   api         — Express + Node.js API server (port 8080)
+#   web         — nginx serving the Vite SPA + proxying /api/* (port 80)
+#
+# Usage:
+#   cp .env.example .env && vi .env   # fill in real values
+#   docker compose build
+#   docker compose up -d
+#   docker compose exec api pnpm --filter @workspace/db run drizzle-kit migrate
+#
+# Named volumes:
+#   postgres_data    — PostgreSQL WAL + tables (survives restarts)
+#   jarvis_tmp       — /tmp inside the api container (PersistentStore JSON files)
+#   jarvis_workspace — /workspace project root (.jarvis/, .jarvas-data/, source)
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       jarvis
+      POSTGRES_USER:     jarvis
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test:     ["CMD-SHELL", "pg_isready -U jarvis -d jarvis"]
+      interval: 10s
+      timeout:  5s
+      retries:  5
+
+  # ── API Server ──────────────────────────────────────────────────────────────
+  api:
+    build:
+      context:    .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV:                              production
+      PORT:                                  "8080"
+      DATABASE_URL:                          "postgresql://jarvis:${POSTGRES_PASSWORD}@postgres:5432/jarvis"
+      AI_INTEGRATIONS_ANTHROPIC_API_KEY:    "${AI_INTEGRATIONS_ANTHROPIC_API_KEY}"
+      AI_INTEGRATIONS_ANTHROPIC_BASE_URL:   "${AI_INTEGRATIONS_ANTHROPIC_BASE_URL}"
+      SEARCH_API_KEY:                        "${SEARCH_API_KEY:-}"
+      LOG_LEVEL:                             "${LOG_LEVEL:-warn}"
+    volumes:
+      # Persist PersistentStore JSON files that write to /tmp/jarvis_*.json
+      # ⚠️  This mounts the entire /tmp directory — all PersistentStore data
+      #     survives container restarts. Required until JARVIS_TMP_DIR is implemented.
+      - jarvis_tmp:/tmp
+      # Persist .jarvis/ (pending patches) and .jarvas-data/ (session stores)
+      - jarvis_workspace:/workspace/.jarvis
+      - jarvis_jarvasdata:/workspace/.jarvas-data
+    networks:
+      - internal
+    healthcheck:
+      test:     ["CMD-SHELL", "wget -qO- http://localhost:8080/api/healthz || exit 1"]
+      interval: 30s
+      timeout:  5s
+      retries:  3
+      start_period: 20s
+
+  # ── Frontend (nginx) ────────────────────────────────────────────────────────
+  web:
+    build:
+      context:    .
+      dockerfile: Dockerfile.frontend
+      args:
+        BASE_PATH: "/"
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    networks:
+      - internal
+      - external
+
+# ── Networks ──────────────────────────────────────────────────────────────────
+networks:
+  internal:
+    driver: bridge
+  external:
+    driver: bridge
+
+# ── Volumes ───────────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local
+  jarvis_tmp:
+    driver: local
+  jarvis_workspace:
+    driver: local
+  jarvis_jarvasdata:
+    driver: local
