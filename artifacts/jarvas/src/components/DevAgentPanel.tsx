@@ -1,20 +1,24 @@
 /**
  * components/DevAgentPanel.tsx — Dev Agent overlay panel.
  *
- * Provides a chat-like interface for the dev agent, with:
- * - File read / search event cards
- * - DiffViewer with Approve / Reject for proposed patches
- * - Typecheck / build result chips
- * - Full streaming text from the agent
- * - localStorage persistence across refresh / reopen
+ * Reliability fixes:
+ * - Every failed fetch shows the exact URL + HTTP status + response body
+ * - When /api/dev/apply fails for any reason, Manual Patch Mode kicks in:
+ *   exact file path, full new content in a copyable block, no conversation lost
+ * - Messages and pending patch data persist in localStorage across reloads
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, Code2, FileSearch, FileEdit, CheckCircle, XCircle, AlertTriangle, Trash2, RotateCcw } from "lucide-react";
+import {
+  X, Code2, FileSearch, FileEdit, CheckCircle, XCircle,
+  AlertTriangle, Trash2, RotateCcw, ClipboardCopy, Check,
+} from "lucide-react";
 import DiffViewer from "./DiffViewer";
 import MarkdownContent from "./MarkdownContent";
 
 const BASE = import.meta.env.BASE_URL;
+const APPLY_URL  = `${BASE}api/dev/apply`;
+const STREAM_URL = `${BASE}api/dev/stream`;
 const DEV_MESSAGES_KEY = "jarvas_dev_messages";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -29,20 +33,10 @@ interface PatchData {
 }
 
 type DevEventType =
-  | "agent_text"
-  | "file_op"
-  | "tool_start"
-  | "tool_done"
-  | "tool_error"
-  | "patch_proposed"
-  | "patch_applied"
-  | "patch_rejected"
-  | "check_started"
-  | "check_passed"
-  | "check_failed"
-  | "restore_notice"
-  | "error"
-  | "done";
+  | "agent_text" | "file_op" | "tool_start" | "tool_done" | "tool_error"
+  | "patch_proposed" | "patch_applied" | "patch_rejected"
+  | "check_started" | "check_passed" | "check_failed"
+  | "manual_patch" | "restore_notice" | "error" | "done";
 
 interface DevMessage {
   id: string;
@@ -59,7 +53,7 @@ interface DevMessage {
   applying?: boolean;
 }
 
-// ─── Persistence helpers ──────────────────────────────────────────────────────
+// ─── localStorage helpers ─────────────────────────────────────────────────────
 
 function saveDevMessages(msgs: DevMessage[]): void {
   try {
@@ -67,11 +61,10 @@ function saveDevMessages(msgs: DevMessage[]): void {
       .filter(m => m.type !== "check_started")
       .map(m => ({ ...m, applying: false }));
     const json = JSON.stringify(toSave);
-    if (json.length > 400_000) {
-      localStorage.setItem(DEV_MESSAGES_KEY, JSON.stringify(toSave.slice(-60)));
-    } else {
-      localStorage.setItem(DEV_MESSAGES_KEY, json);
-    }
+    localStorage.setItem(
+      DEV_MESSAGES_KEY,
+      json.length > 400_000 ? JSON.stringify(toSave.slice(-60)) : json,
+    );
   } catch { /* quota exceeded */ }
 }
 
@@ -81,7 +74,6 @@ function loadDevMessages(): { messages: DevMessage[]; restored: boolean; taskSum
     if (!raw) return { messages: [], restored: false, taskSummary: "" };
     const msgs = JSON.parse(raw) as DevMessage[];
     if (!Array.isArray(msgs) || msgs.length === 0) return { messages: [], restored: false, taskSummary: "" };
-
     const userTurns = msgs.filter(m => m.type === "agent_text" && m.text?.startsWith("**You:**"));
     const lastTask = userTurns.length > 0
       ? (userTurns[userTurns.length - 1].text ?? "").replace("**You:** ", "").slice(0, 80)
@@ -89,7 +81,6 @@ function loadDevMessages(): { messages: DevMessage[]; restored: boolean; taskSum
     const summary = userTurns.length > 0
       ? `${userTurns.length} task${userTurns.length > 1 ? "s" : ""} · last: "${lastTask}${lastTask.length >= 80 ? "…" : ""}"`
       : `${msgs.length} messages`;
-
     return { messages: msgs, restored: true, taskSummary: summary };
   } catch {
     return { messages: [], restored: false, taskSummary: "" };
@@ -100,7 +91,7 @@ function clearDevMessages(): void {
   localStorage.removeItem(DEV_MESSAGES_KEY);
 }
 
-// ─── Event cards ─────────────────────────────────────────────────────────────
+// ─── Cards ────────────────────────────────────────────────────────────────────
 
 function FileOpCard({ msg }: { msg: DevMessage }) {
   const label = msg.op === "read" ? "Read" : msg.op === "search" ? `Search: ${msg.pattern}` : "List";
@@ -117,12 +108,15 @@ function CheckCard({ msg }: { msg: DevMessage }) {
   const isPassed = msg.type === "check_passed";
   const isRunning = msg.type === "check_started";
   const color = isPassed ? "hsl(142 71% 55%)" : isRunning ? "hsl(194 100% 60%)" : "hsl(355 80% 62%)";
-  const icon = isPassed ? <CheckCircle className="w-3.5 h-3.5" /> : isRunning ? null : <XCircle className="w-3.5 h-3.5" />;
   const label = isRunning ? `Running ${msg.check}…` : isPassed ? `${msg.check} passed` : `${msg.check} failed`;
   return (
     <div className="rounded-lg text-xs overflow-hidden" style={{ border: `1px solid ${color}30`, background: `${color}0a` }}>
       <div className="flex items-center gap-2 px-3 py-1.5">
-        <span style={{ color }}>{icon ?? <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin inline-block" />}</span>
+        <span style={{ color }}>
+          {isPassed ? <CheckCircle className="w-3.5 h-3.5" /> : isRunning
+            ? <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin inline-block" />
+            : <XCircle className="w-3.5 h-3.5" />}
+        </span>
         <span style={{ color }}>{label}</span>
         {msg.project && <span className="ml-auto font-mono opacity-60" style={{ color }}>@{msg.project}</span>}
       </div>
@@ -152,6 +146,59 @@ function RestoreNotice({ text }: { text: string }) {
   );
 }
 
+function ManualPatchCard({ msg }: { msg: DevMessage }) {
+  const [copied, setCopied] = useState(false);
+  const patch = msg.patch;
+  if (!patch) return null;
+
+  const copy = () => {
+    navigator.clipboard.writeText(patch.newContent).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <div className="rounded-lg overflow-hidden text-xs" style={{ background: "hsl(38 80% 30% / 0.1)", border: "1px solid hsl(38 80% 50% / 0.3)" }}>
+      <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: "hsl(38 80% 50% / 0.2)" }}>
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(38 100% 62%)" }} />
+          <span className="font-semibold" style={{ color: "hsl(38 100% 72%)" }}>Manual Patch Required</span>
+        </div>
+        <button
+          type="button"
+          onClick={copy}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all active:scale-95"
+          style={{ background: "hsl(38 80% 50% / 0.15)", border: "1px solid hsl(38 80% 50% / 0.35)", color: copied ? "hsl(142 71% 60%)" : "hsl(38 100% 72%)" }}
+        >
+          {copied ? <Check className="w-3 h-3" /> : <ClipboardCopy className="w-3 h-3" />}
+          {copied ? "Copied!" : "Copy file"}
+        </button>
+      </div>
+      <div className="px-3 py-2 flex flex-col gap-1.5">
+        <p style={{ color: "hsl(38 80% 60%)" }}>
+          <span className="opacity-60">File: </span>
+          <span className="font-mono">{patch.file}</span>
+        </p>
+        {patch.description && (
+          <p style={{ color: "hsl(38 60% 55%)" }}>{patch.description}</p>
+        )}
+        <p className="opacity-60" style={{ color: "hsl(38 80% 60%)" }}>
+          Replace the entire file with the copied content, or expand to view below:
+        </p>
+        <details>
+          <summary className="cursor-pointer select-none" style={{ color: "hsl(38 80% 55%)" }}>
+            View new content ({patch.newContent.split("\n").length} lines)
+          </summary>
+          <pre className="mt-2 p-2 rounded overflow-x-auto max-h-64 scrollbar-thin text-[11px] leading-relaxed whitespace-pre-wrap break-all" style={{ background: "hsl(220 20% 6%)", color: "hsl(196 40% 65%)" }}>
+            {patch.newContent}
+          </pre>
+        </details>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main panel ──────────────────────────────────────────────────────────────
 
 interface DevAgentPanelProps {
@@ -160,6 +207,7 @@ interface DevAgentPanelProps {
 
 export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
   const [input, setInput] = useState("");
+
   const initialLoad = useRef(loadDevMessages());
   const [messages, setMessages] = useState<DevMessage[]>(() => {
     const { messages: saved, restored, taskSummary } = initialLoad.current;
@@ -171,6 +219,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
     };
     return [notice, ...saved];
   });
+
   const [isRunning, setIsRunning] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -181,7 +230,6 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
   useEffect(() => { scrollToBottom(); }, [messages, streamingText]);
 
   useEffect(() => {
-    if (messages.length === 0) return;
     const toSave = messages.filter(m => m.type !== "restore_notice");
     if (toSave.length > 0) saveDevMessages(toSave);
   }, [messages]);
@@ -197,35 +245,50 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
     streamingTextRef.current = "";
   }, []);
 
+  // ── Apply patch ────────────────────────────────────────────────────────────
+
   const handleApprove = useCallback(async (patch: PatchData) => {
     setMessages(prev => prev.map(m =>
       m.patch?.patchId === patch.patchId ? { ...m, applying: true } : m,
     ));
 
+    const fallback = () => {
+      setMessages(prev => prev.map(m =>
+        m.patch?.patchId === patch.patchId ? { ...m, applying: false } : m,
+      ));
+      addMsg({ type: "manual_patch", patch, text: "Auto-apply failed — use manual patch below" });
+    };
+
+    let res: Response;
     try {
-      const res = await fetch(`${BASE}api/dev/apply`, {
+      res = await fetch(APPLY_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ patchId: patch.patchId, runCheck: true, project: "jarvas" }),
       });
-      const data = await res.json() as { ok: boolean; error?: string; checkResult?: string };
-
-      if (data.ok) {
-        setMessages(prev => prev.map(m =>
-          m.patch?.patchId === patch.patchId ? { ...m, type: "patch_applied" as DevEventType, applying: false } : m,
-        ));
-        addMsg({ type: "check_passed", check: "patch", output: data.checkResult ?? "Patch applied successfully." });
-      } else {
-        setMessages(prev => prev.map(m =>
-          m.patch?.patchId === patch.patchId ? { ...m, applying: false } : m,
-        ));
-        addMsg({ type: "error", error: data.error ?? "Failed to apply patch" });
-      }
     } catch (err) {
+      addMsg({ type: "error", error: `Network error on ${APPLY_URL} — ${String(err)}` });
+      fallback();
+      return;
+    }
+
+    if (!res.ok) {
+      let body = "";
+      try { body = await res.text(); } catch { /* ignore */ }
+      addMsg({ type: "error", error: `${APPLY_URL} → HTTP ${res.status}: ${body.slice(0, 300)}` });
+      fallback();
+      return;
+    }
+
+    const data = await res.json() as { ok: boolean; error?: string; checkResult?: string };
+    if (data.ok) {
       setMessages(prev => prev.map(m =>
-        m.patch?.patchId === patch.patchId ? { ...m, applying: false } : m,
+        m.patch?.patchId === patch.patchId ? { ...m, type: "patch_applied" as DevEventType, applying: false } : m,
       ));
-      addMsg({ type: "error", error: String(err) });
+      addMsg({ type: "check_passed", check: "patch", output: data.checkResult ?? "Patch applied successfully." });
+    } else {
+      addMsg({ type: "error", error: `${APPLY_URL}: ${data.error ?? "Unknown error"}` });
+      fallback();
     }
   }, [addMsg]);
 
@@ -234,6 +297,8 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
       m.patch?.patchId === patchId ? { ...m, type: "patch_rejected" as DevEventType } : m,
     ));
   }, []);
+
+  // ── Send message ───────────────────────────────────────────────────────────
 
   const sendMessage = useCallback(async () => {
     const goal = input.trim();
@@ -247,19 +312,21 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
 
     let res: Response;
     try {
-      res = await fetch(`${BASE}api/dev/stream`, {
+      res = await fetch(STREAM_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: goal }),
       });
-    } catch {
-      addMsg({ type: "error", error: "Network error connecting to Dev Agent" });
+    } catch (err) {
+      addMsg({ type: "error", error: `Network error on ${STREAM_URL} — ${String(err)}` });
       setIsRunning(false);
       return;
     }
 
     if (!res.ok || !res.body) {
-      addMsg({ type: "error", error: `HTTP ${res.status}` });
+      let body = "";
+      try { body = await res.text(); } catch { /* ignore */ }
+      addMsg({ type: "error", error: `${STREAM_URL} → HTTP ${res.status}: ${body.slice(0, 300)}` });
       setIsRunning(false);
       return;
     }
@@ -287,7 +354,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
             if (t === "dev:token") {
               streamingTextRef.current += (ev.text as string) ?? "";
               setStreamingText(streamingTextRef.current);
-            } else if (t === "dev:done") {
+            } else if (t === "dev:done" || t === "done") {
               if (streamingTextRef.current.trim()) {
                 addMsg({ type: "agent_text", text: streamingTextRef.current });
               }
@@ -320,12 +387,6 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
               addMsg({ type: "check_failed", check: ev.check as string, output: ev.output as string });
             } else if (t === "dev:error" || t === "error") {
               addMsg({ type: "error", error: (ev.error as string) ?? (ev.message as string) });
-            } else if (t === "done") {
-              if (streamingTextRef.current.trim()) {
-                addMsg({ type: "agent_text", text: streamingTextRef.current });
-              }
-              streamingTextRef.current = "";
-              setStreamingText("");
             }
           } catch { /* malformed SSE line */ }
         }
@@ -342,6 +403,8 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
   };
 
   const hasRealMessages = messages.filter(m => m.type !== "restore_notice").length > 0;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div
@@ -368,25 +431,25 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
             )}
           </div>
           <div className="flex items-center gap-3">
-            <span className="hidden sm:block text-xs" style={{ color: "hsl(210 15% 35%)" }}>Read-only until you approve a patch</span>
+            <span className="hidden sm:block text-xs" style={{ color: "hsl(210 15% 35%)" }}>Patches require your approval</span>
             {hasRealMessages && !isRunning && (
               <button
                 type="button"
                 onClick={handleClear}
                 title="Clear session"
-                className="p-1 rounded-lg transition-opacity hover:opacity-100 opacity-40 hover:opacity-60"
+                className="p-1 rounded-lg transition-opacity opacity-40 hover:opacity-70"
                 style={{ color: "hsl(355 70% 55%)" }}
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             )}
-            <button type="button" onClick={onClose} className="p-1 rounded-lg transition-opacity hover:opacity-100 opacity-50" style={{ color: "hsl(196 30% 55%)" }}>
+            <button type="button" onClick={onClose} className="p-1 rounded-lg opacity-50 hover:opacity-100 transition-opacity" style={{ color: "hsl(196 30% 55%)" }}>
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Warning banner — only when no messages exist at all */}
+        {/* Warning banner — only on fresh start */}
         {!hasRealMessages && (
           <div className="flex items-start gap-2.5 mx-4 mt-3 px-3 py-2 rounded-lg" style={{ background: "hsl(38 100% 50% / 0.08)", border: "1px solid hsl(38 100% 50% / 0.2)" }}>
             <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "hsl(38 100% 62%)" }} />
@@ -397,7 +460,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
           </div>
         )}
 
-        {/* Starters — only when no messages */}
+        {/* Quick starters */}
         {!hasRealMessages && (
           <div className="flex flex-wrap gap-2 px-4 pt-3">
             {[
@@ -410,7 +473,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
                 key={s}
                 type="button"
                 onClick={() => { setInput(s); setTimeout(() => inputRef.current?.focus(), 50); }}
-                className="text-xs px-3 py-1.5 rounded-lg transition-all hover:opacity-100 opacity-70"
+                className="text-xs px-3 py-1.5 rounded-lg opacity-70 hover:opacity-100 transition-all"
                 style={{ background: "hsl(210 15% 10%)", border: "1px solid hsl(210 15% 18%)", color: "hsl(196 40% 60%)" }}
               >
                 {s}
@@ -419,62 +482,62 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
           </div>
         )}
 
-        {/* Messages */}
+        {/* Message list */}
         <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-3 flex flex-col gap-3">
           {messages.map(msg => {
-            if (msg.type === "restore_notice") {
-              return <RestoreNotice key={msg.id} text={msg.text ?? ""} />;
+            switch (msg.type) {
+              case "restore_notice":
+                return <RestoreNotice key={msg.id} text={msg.text ?? ""} />;
+              case "agent_text":
+                return <AgentTextCard key={msg.id} text={msg.text ?? ""} />;
+              case "file_op":
+                return <FileOpCard key={msg.id} msg={msg} />;
+              case "check_started":
+              case "check_passed":
+              case "check_failed":
+                return <CheckCard key={msg.id} msg={msg} />;
+              case "patch_proposed":
+                return msg.patch ? (
+                  <DiffViewer
+                    key={msg.id}
+                    file={msg.patch.file}
+                    description={msg.patch.description}
+                    oldContent={msg.patch.oldContent}
+                    newContent={msg.patch.newContent}
+                    onApprove={() => handleApprove(msg.patch!)}
+                    onReject={() => handleReject(msg.patch!.patchId)}
+                    applying={msg.applying}
+                  />
+                ) : null;
+              case "patch_applied":
+                return (
+                  <div key={msg.id} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: "hsl(142 60% 30% / 0.15)", border: "1px solid hsl(142 60% 35% / 0.3)" }}>
+                    <FileEdit className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(142 71% 60%)" }} />
+                    <span style={{ color: "hsl(142 71% 60%)" }}>Patch applied — {msg.patch?.file}</span>
+                  </div>
+                );
+              case "patch_rejected":
+                return (
+                  <div key={msg.id} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: "hsl(210 15% 8%)", border: "1px solid hsl(210 15% 15%)" }}>
+                    <span style={{ color: "hsl(210 15% 40%)" }}>✕ Patch rejected — {msg.patch?.file}</span>
+                  </div>
+                );
+              case "manual_patch":
+                return <ManualPatchCard key={msg.id} msg={msg} />;
+              case "error":
+                return (
+                  <div key={msg.id} className="px-3 py-2 rounded-lg text-xs" style={{ background: "hsl(355 80% 40% / 0.1)", border: "1px solid hsl(355 80% 45% / 0.3)" }}>
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: "hsl(355 80% 62%)" }} />
+                      <span className="font-mono break-all" style={{ color: "hsl(355 80% 62%)" }}>{msg.error}</span>
+                    </div>
+                  </div>
+                );
+              default:
+                return null;
             }
-            if (msg.type === "agent_text") {
-              return <AgentTextCard key={msg.id} text={msg.text ?? ""} />;
-            }
-            if (msg.type === "file_op") {
-              return <FileOpCard key={msg.id} msg={msg} />;
-            }
-            if (msg.type === "check_started" || msg.type === "check_passed" || msg.type === "check_failed") {
-              return <CheckCard key={msg.id} msg={msg} />;
-            }
-            if (msg.type === "patch_proposed" && msg.patch) {
-              return (
-                <DiffViewer
-                  key={msg.id}
-                  file={msg.patch.file}
-                  description={msg.patch.description}
-                  oldContent={msg.patch.oldContent}
-                  newContent={msg.patch.newContent}
-                  onApprove={() => handleApprove(msg.patch!)}
-                  onReject={() => handleReject(msg.patch!.patchId)}
-                  applying={msg.applying}
-                />
-              );
-            }
-            if (msg.type === "patch_applied") {
-              return (
-                <div key={msg.id} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: "hsl(142 60% 30% / 0.15)", border: "1px solid hsl(142 60% 35% / 0.3)" }}>
-                  <FileEdit className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(142 71% 60%)" }} />
-                  <span style={{ color: "hsl(142 71% 60%)" }}>Patch applied — {msg.patch?.file}</span>
-                </div>
-              );
-            }
-            if (msg.type === "patch_rejected") {
-              return (
-                <div key={msg.id} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: "hsl(210 15% 8%)", border: "1px solid hsl(210 15% 15%)" }}>
-                  <span style={{ color: "hsl(210 15% 40%)" }}>✕ Patch rejected — {msg.patch?.file}</span>
-                </div>
-              );
-            }
-            if (msg.type === "error") {
-              return (
-                <div key={msg.id} className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs" style={{ background: "hsl(355 80% 40% / 0.1)", border: "1px solid hsl(355 80% 45% / 0.3)" }}>
-                  <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(355 80% 62%)" }} />
-                  <span style={{ color: "hsl(355 80% 62%)" }}>{msg.error}</span>
-                </div>
-              );
-            }
-            return null;
           })}
 
-          {/* Live streaming text */}
           {streamingText && (
             <div className="text-sm" style={{ color: "hsl(196 40% 70%)" }}>
               <MarkdownContent content={streamingText} />

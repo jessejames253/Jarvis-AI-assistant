@@ -9,6 +9,7 @@
 
 import path from "path";
 import fs from "fs/promises";
+import { readFileSync, writeFileSync } from "fs";
 import { exec } from "child_process";
 import { promisify } from "util";
 
@@ -41,7 +42,7 @@ function isCommandAllowed(cmd: string): boolean {
   return ALLOWED_COMMANDS.some(r => r.test(cmd.trim()));
 }
 
-// ─── Pending patches (in-memory, keyed by patchId) ───────────────────────────
+// ─── Pending patches (persisted to disk so server restarts don't lose them) ───
 
 export interface PendingPatch {
   patchId: string;
@@ -52,7 +53,22 @@ export interface PendingPatch {
   createdAt: number;
 }
 
+const PATCHES_FILE = "/tmp/jarvis_pending_patches.json";
+
 export const pendingPatches = new Map<string, PendingPatch>();
+
+// Load any patches that survived a previous server run
+try {
+  const raw = readFileSync(PATCHES_FILE, "utf8");
+  const saved = JSON.parse(raw) as Array<[string, PendingPatch]>;
+  for (const [id, patch] of saved) pendingPatches.set(id, patch);
+} catch { /* no file yet — fine */ }
+
+function savePatches(): void {
+  try {
+    writeFileSync(PATCHES_FILE, JSON.stringify(Array.from(pendingPatches.entries())), "utf8");
+  } catch { /* ignore — non-fatal */ }
+}
 
 // ─── Tool implementations ─────────────────────────────────────────────────────
 
@@ -152,6 +168,7 @@ export async function proposeFilePatch(
     createdAt: Date.now(),
   };
   pendingPatches.set(patchId, patch);
+  savePatches();
 
   send({
     type: "dev:patch_proposed",
@@ -226,6 +243,7 @@ export async function applyPatch(patchId: string): Promise<{ ok: boolean; error?
     // Write new content
     await fs.writeFile(abs, patch.newContent, "utf8");
     pendingPatches.delete(patchId);
+    savePatches();
     return { ok: true };
   } catch (err) {
     return { ok: false, error: String(err) };
