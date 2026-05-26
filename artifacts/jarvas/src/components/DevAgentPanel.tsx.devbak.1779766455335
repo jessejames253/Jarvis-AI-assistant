@@ -18,7 +18,7 @@ import {
   AlertTriangle, Trash2, RotateCcw, ClipboardCopy, Check,
   FolderOpen, Folder, FileText, ChevronRight, GitCommit,
   WifiOff, RefreshCw, BookOpen, Plus, Database,
-  Server, GitBranch, Layers, Archive, Play, HardDrive, Zap,
+  Server, GitBranch, Layers, Archive, Play, HardDrive,
 } from "lucide-react";
 import DiffViewer from "./DiffViewer";
 import MarkdownContent from "./MarkdownContent";
@@ -615,34 +615,24 @@ interface PendingPatchFull {
   createdAt: number;
 }
 
-// ─── PatchesTab ─────────────────────────────────────────────────────────────
-// Collapsed-card layout: each card shows file + risk + Apply / Reject / Expand
-// in a single row. Diff is hidden until the user taps ▼. Sticky bulk-action
-// bar sits above the list when patches are present.
 function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean) => void }) {
-  const [patches,  setPatches]  = useState<PendingPatchFull[]>([]);
-  const [loading,  setLoading]  = useState(true);
+  const [patches, setPatches]   = useState<PendingPatchFull[]>([]);
+  const [loading, setLoading]   = useState(true);
   const [applying, setApplying] = useState<Record<string, boolean>>({});
-  // expanded[patchId] = true → show diff; false / absent → collapsed
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  /* ── fetch ── */
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const r = await fetch(PATCHES_URL);
       const d = await r.json() as { ok: boolean; patches?: PendingPatchFull[] };
-      if (d.ok) {
-        setPatches(d.patches ?? []);
-        // keep expansion state for surviving patches; new ones default to false
-      }
+      if (d.ok) setPatches(d.patches ?? []);
     } catch { /* ignore */ }
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  /* ── per-card actions ── */
   const handleApprove = useCallback(async (p: PendingPatchFull) => {
     setApplying(prev => ({ ...prev, [p.patchId]: true }));
     try {
@@ -654,9 +644,7 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
       const d = await r.json() as { ok: boolean; error?: string; validation?: { passed: boolean; summary: string } };
       if (d.ok) {
         onMessage(`✓ Applied \`${p.file}\` — validation ${d.validation?.passed ? "passed" : "failed"}: ${d.validation?.summary ?? ""}`);
-        // remove only this patch; leave all other cards + expanded state intact
         setPatches(prev => prev.filter(x => x.patchId !== p.patchId));
-        setExpanded(prev => { const n = { ...prev }; delete n[p.patchId]; return n; });
       } else {
         onMessage(d.error ?? "Apply failed", true);
       }
@@ -668,38 +656,32 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
 
   const handleReject = useCallback((patchId: string) => {
     setPatches(prev => prev.filter(p => p.patchId !== patchId));
-    setExpanded(prev => { const n = { ...prev }; delete n[patchId]; return n; });
     onMessage("Patch rejected — removed from queue.");
   }, [onMessage]);
 
-  /* ── bulk actions ── */
-  const lowPatches = patches.filter(p => p.riskLevel === "low");
-
   const handleApplyAllLow = async () => {
-    for (const p of lowPatches) await handleApprove(p);
+    const low = patches.filter(p => p.riskLevel === "low");
+    for (const p of low) await handleApprove(p);
   };
 
   const handleRejectAll = () => {
+    const ids = patches.map(p => p.patchId);
     setPatches([]);
-    setExpanded({});
-    onMessage(`Rejected all ${patches.length} patch${patches.length === 1 ? "" : "es"}.`);
+    ids.forEach(() => onMessage("Patch rejected — removed from queue."));
   };
 
-  /* ── expand toggle ── */
   const toggleExpand = (id: string) =>
     setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
-  /* ── helpers ── */
   const riskColor = (r?: string) =>
-    r === "high"   ? "hsl(355 80% 62%)"
-    : r === "medium" ? "hsl(38 100% 62%)"
-    : "hsl(142 71% 55%)";
+    r === "high" ? "hsl(355 80% 62%)" : r === "medium" ? "hsl(38 100% 62%)" : "hsl(142 71% 55%)";
 
-  /* ── render ── */
+  const lowCount = patches.filter(p => p.riskLevel === "low").length;
+
   return (
     <div className="flex flex-col h-full">
 
-      {/* Title bar */}
+      {/* ── Title bar ── */}
       <div className="flex items-center justify-between px-3 py-2 border-b flex-shrink-0"
         style={{ borderColor: "hsl(210 15% 13%)" }}>
         <span className="text-xs font-semibold" style={{ color: "hsl(38 100% 62%)" }}>
@@ -712,26 +694,23 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
         </button>
       </div>
 
-      {/* Sticky bulk-action bar — only when patches exist */}
+      {/* ── Sticky bulk action bar ── */}
       {!loading && patches.length > 0 && (
         <div className="flex items-center gap-2 px-3 py-2 border-b flex-shrink-0 flex-wrap"
           style={{ borderColor: "hsl(210 15% 13%)", background: "hsl(220 20% 5%)" }}>
-
           <button type="button" onClick={handleApplyAllLow}
-            disabled={lowPatches.length === 0}
+            disabled={lowCount === 0}
             className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-30 active:scale-95 transition-all"
             style={{ background: "hsl(142 60% 35% / 0.2)", border: "1px solid hsl(142 60% 40% / 0.45)", color: "hsl(142 71% 65%)" }}>
             <CheckCircle className="w-3 h-3" />
-            Apply all LOW{lowPatches.length > 0 ? ` (${lowPatches.length})` : ""}
+            Apply all LOW{lowCount > 0 ? ` (${lowCount})` : ""}
           </button>
-
           <button type="button" onClick={handleRejectAll}
             className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold active:scale-95 transition-all"
             style={{ background: "hsl(355 80% 40% / 0.12)", border: "1px solid hsl(355 80% 45% / 0.35)", color: "hsl(355 80% 62%)" }}>
             <XCircle className="w-3 h-3" />
             Reject all
           </button>
-
           <button type="button" onClick={load}
             className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs active:scale-95 transition-all ml-auto"
             style={{ background: "transparent", border: "1px solid hsl(210 15% 20%)", color: "hsl(196 30% 50%)" }}>
@@ -741,21 +720,17 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
         </div>
       )}
 
-      {/* Patch list */}
+      {/* ── Patch list ── */}
       <div className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-2">
-
         {loading && (
           <div className="text-xs opacity-50 text-center py-6" style={{ color: "hsl(196 30% 55%)" }}>
             Loading patches…
           </div>
         )}
-
         {!loading && patches.length === 0 && (
           <div className="flex flex-col items-center gap-2 py-8 opacity-50">
             <CheckCircle className="w-6 h-6" style={{ color: "hsl(142 71% 55%)" }} />
-            <p className="text-xs" style={{ color: "hsl(196 30% 55%)" }}>
-              No pending patches — queue is empty.
-            </p>
+            <p className="text-xs" style={{ color: "hsl(196 30% 55%)" }}>No pending patches — queue is empty.</p>
           </div>
         )}
 
@@ -763,17 +738,15 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
           const isExpanded = expanded[p.patchId] ?? false;
           const isApplying = applying[p.patchId] ?? false;
           const rc = riskColor(p.riskLevel);
-
           return (
             <div key={p.patchId} className="rounded-lg overflow-hidden"
               style={{ border: "1px solid hsl(210 15% 17%)", background: "hsl(220 20% 6.5%)" }}>
 
-              {/* ── Collapsed row — ALWAYS visible ── */}
+              {/* ── Collapsed row — always visible ── */}
               <div className="flex items-center gap-2 px-3 py-2.5 min-w-0">
-
                 <FileEdit className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(194 100% 55%)" }} />
 
-                {/* File basename — truncates so buttons stay on-screen */}
+                {/* File path — truncates so buttons always stay in frame */}
                 <span className="font-mono text-xs truncate flex-1 min-w-0" style={{ color: "hsl(196 50% 65%)" }}>
                   {p.file.split("/").pop()}
                 </span>
@@ -784,37 +757,29 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
                   {p.riskLevel ?? "?"}
                 </span>
 
-                {/* ✓ Apply */}
-                <button type="button"
-                  onClick={() => handleApprove(p)}
-                  disabled={isApplying}
-                  title="Apply patch"
+                {/* Apply */}
+                <button type="button" onClick={() => handleApprove(p)} disabled={isApplying}
                   className="flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold active:scale-95 transition-all disabled:opacity-40"
                   style={{ background: "hsl(142 60% 35% / 0.22)", border: "1px solid hsl(142 60% 40% / 0.45)", color: "hsl(142 71% 65%)" }}>
                   {isApplying ? "…" : "✓"}
                 </button>
 
-                {/* ✕ Reject */}
-                <button type="button"
-                  onClick={() => handleReject(p.patchId)}
-                  disabled={isApplying}
-                  title="Reject patch"
+                {/* Reject */}
+                <button type="button" onClick={() => handleReject(p.patchId)} disabled={isApplying}
                   className="flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold active:scale-95 transition-all disabled:opacity-40"
                   style={{ background: "hsl(355 80% 40% / 0.12)", border: "1px solid hsl(355 80% 45% / 0.35)", color: "hsl(355 80% 62%)" }}>
                   ✕
                 </button>
 
-                {/* ▼ / ▲ Expand */}
-                <button type="button"
-                  onClick={() => toggleExpand(p.patchId)}
-                  title={isExpanded ? "Collapse diff" : "Expand diff"}
-                  className="flex-shrink-0 w-7 py-1.5 rounded-lg text-xs active:scale-95 transition-all text-center"
+                {/* Expand toggle */}
+                <button type="button" onClick={() => toggleExpand(p.patchId)}
+                  className="flex-shrink-0 px-2 py-1.5 rounded-lg text-xs active:scale-95 transition-all"
                   style={{ background: "transparent", border: "1px solid hsl(210 15% 22%)", color: "hsl(196 30% 50%)" }}>
                   {isExpanded ? "▲" : "▼"}
                 </button>
               </div>
 
-              {/* ── Expanded: description + scrollable diff ── */}
+              {/* ── Expanded: description + diff ── */}
               {isExpanded && (
                 <div className="border-t" style={{ borderColor: "hsl(210 15% 13%)" }}>
                   <p className="px-3 py-1.5 text-xs leading-snug" style={{ color: "hsl(196 40% 58%)" }}>
