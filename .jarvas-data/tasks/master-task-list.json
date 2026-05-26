@@ -1,0 +1,20 @@
+[
+  {
+    "id": "task-001",
+    "title": "Build Jarvis memory system",
+    "priority": "high",
+    "status": "pending"
+  },
+  {
+    "id": "task-002",
+    "title": "Create command center dashboard",
+    "priority": "high",
+    "status": "pending"
+  },
+  {
+    "id": "task-003",
+    "title": "Add self-healing build checker",
+    "priority": "medium",
+    "status": "pending"
+  }
+]
