@@ -1,0 +1,19 @@
+[
+  {
+    "id": "e2ccf73d-94f7-4f62-96a3-80aa3e7cb33f",
+    "timestamp": "2026-05-26T22:20:30.752Z",
+    "description": "Smoke-test checkpoint — before auth middleware",
+    "commitHash": "b3d512571127abbbb31444d2cc1c1cf600618400",
+    "branch": "main",
+    "changedFiles": [
+      "rtifacts/api-server/src/routes/index.ts",
+      "artifacts/jarvas/src/pages/Chat.tsx",
+      ".jarvas-data/checkpoints/",
+      "artifacts/api-server/src/lib/checkpointPreview.ts",
+      "artifacts/api-server/src/lib/checkpoints.ts",
+      "artifacts/api-server/src/routes/checkpoints.ts",
+      "artifacts/jarvas/src/components/CheckpointsPanel.tsx"
+    ],
+    "status": "active"
+  }
+]
