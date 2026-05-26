@@ -11,6 +11,7 @@
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { DEV_TOOL_DEFINITIONS, executeDevTool } from "./tools";
 import { formatMemoryForPrompt } from "./projectMemory";
+import { getDevContext, formatContextForPrompt } from "./context";
 
 const BASE_SYSTEM = `You are Jarvis Dev Agent — an expert software engineer that inspects and proposes changes to the Jarvis project codebase. You are the main builder tool for this project.
 
@@ -159,12 +160,18 @@ export async function runDevAgent(
     send({ type: "dev:status", stage: "direct_patch", detail: targetFile });
   }
 
-  // Load project memory and inject into system prompt
+  // Build system prompt: base + project memory + live context
   let systemPrompt = BASE_SYSTEM;
   try {
     const memoryBlock = formatMemoryForPrompt();
     if (memoryBlock) systemPrompt = `${BASE_SYSTEM}\n\n${memoryBlock}`;
-  } catch { /* non-fatal if memory store unavailable */ }
+  } catch { /* non-fatal */ }
+
+  // Inject live system context (health, patches, improvements, tasks, git)
+  try {
+    const ctx = await getDevContext(false);
+    systemPrompt += `\n\n${formatContextForPrompt(ctx)}`;
+  } catch { /* non-fatal — proceed without context if aggregation fails */ }
 
   if (targetFile) {
     systemPrompt += `\n\n## ACTIVE TASK — DIRECT PATCH MODE\nTarget file: ${targetFile}\nInstruction: Read this file ONCE, then immediately use propose_patch_hunk. Do NOT search. Stop after proposing.`;

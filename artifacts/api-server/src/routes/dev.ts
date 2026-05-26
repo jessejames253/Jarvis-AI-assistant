@@ -233,6 +233,24 @@ router.get("/dev/health", async (req, res): Promise<void> => {
   }
 });
 
+// ─── GET /dev/context ─────────────────────────────────────────────────────────
+// Aggregates health, patches, improvements, tasks, git, rollbacks, and errors
+// into a single snapshot for the frontend ContextPill and Dev Agent prompts.
+// Add ?refresh=1 to force a fresh health check (other reads are always fresh).
+// Read-only — never writes or executes.
+
+router.get("/dev/context", async (req, res): Promise<void> => {
+  const force = req.query.refresh === "1";
+  try {
+    const { getDevContext, suggestTasksFromContext } = await import("../lib/dev/context");
+    const ctx = await getDevContext(force);
+    const suggestions = suggestTasksFromContext(ctx);
+    res.json({ ok: true, context: ctx, suggestions });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
 // ─── POST /dev/autofix ────────────────────────────────────────────────────────
 // Scans both packages for low-risk TypeScript errors and adds them to the
 // improvement store. Returns newly created improvements (duplicates skipped).

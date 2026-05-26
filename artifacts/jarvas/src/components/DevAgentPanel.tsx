@@ -39,6 +39,7 @@ const DEV_HEALTH_URL   = `${BASE}api/dev/health`;
 const IMPROVEMENTS_URL = `${BASE}api/dev/improvements`;
 const AUTOFIX_URL      = `${BASE}api/dev/autofix`;
 const AUTOFIX_HIST_URL = `${BASE}api/dev/autofix/history`;
+const DEV_CONTEXT_URL  = `${BASE}api/dev/context`;
 
 const LS_MESSAGES   = "jarvas_dev_messages";
 const LS_TASK_ID    = "jarvas_dev_current_task";
@@ -97,6 +98,23 @@ interface MemoryEntry {
   title: string;
   content: string;
   createdAt: number;
+}
+
+interface TaskSuggestion {
+  label: string;
+  prompt: string;
+  priority: "high" | "medium" | "low";
+}
+
+interface DevContextData {
+  health:       { score: number; label: string; feErrors: number; beErrors: number };
+  patches:      { count: number; files: string[] };
+  improvements: { total: number; autoFixable: number; categories: string[] };
+  tasks:        { open: number; recent: Array<{ id: string; title: string; status: string }> };
+  git:          { branch: string; dirty: boolean; changes: number };
+  rollbacks:    Array<{ title: string; reason: string; at: number }>;
+  errors:       Array<{ taskTitle: string; error: string; at: number }>;
+  snapshotAt:   number;
 }
 
 // ─── localStorage helpers ─────────────────────────────────────────────────────
@@ -1425,6 +1443,166 @@ function WorkspaceTab({ onInsertPath }: { onInsertPath: (p: string) => void }) {
   );
 }
 
+// ─── ContextPill ─────────────────────────────────────────────────────────────
+// Compact context strip shown at the top of the chat tab.
+// Fetches GET /api/dev/context (read-only) every 30 s.
+// Shows: health score · improvements · open tasks · git status.
+// Also surfaces dynamic task suggestions the user can click to pre-fill input.
+
+function ContextPill({
+  onSuggest,
+  onSwitchTab,
+}: {
+  onSuggest: (prompt: string) => void;
+  onSwitchTab: (tab: PanelTab) => void;
+}) {
+  const [ctx,         setCtx]         = useState<DevContextData | null>(null);
+  const [suggestions, setSuggestions] = useState<TaskSuggestion[]>([]);
+  const [refreshing,  setRefreshing]  = useState(false);
+  const [showSugg,    setShowSugg]    = useState(false);
+
+  const load = useCallback(async (force = false) => {
+    if (force) setRefreshing(true);
+    try {
+      const url = force ? `${DEV_CONTEXT_URL}?refresh=1` : DEV_CONTEXT_URL;
+      const res  = await fetch(url);
+      if (!res.ok) return;
+      const data = await res.json() as { ok: boolean; context: DevContextData; suggestions: TaskSuggestion[] };
+      if (data.ok) {
+        setCtx(data.context);
+        setSuggestions(data.suggestions);
+      }
+    } catch { /* non-fatal */ } finally {
+      if (force) setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load(false);
+    const id = setInterval(() => void load(false), 30_000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  if (!ctx) return null;
+
+  // Health colour
+  const healthColor =
+    ctx.health.score >= 90 ? "hsl(142 70% 55%)" :
+    ctx.health.score >= 70 ? "hsl(38 100% 55%)"  :
+    "hsl(355 80% 62%)";
+
+  const totalTsErrors = ctx.health.feErrors + ctx.health.beErrors;
+
+  return (
+    <div className="mx-4 mt-2.5 mb-0 flex-shrink-0 rounded-lg overflow-hidden"
+      style={{ border: "1px solid hsl(210 15% 18%)", background: "hsl(210 15% 7%)" }}>
+
+      {/* Pills row */}
+      <div className="flex items-center gap-0 text-[10px] font-mono divide-x divide-white/10">
+
+        {/* Health */}
+        <button
+          type="button"
+          className="flex items-center gap-1 px-2.5 py-1.5 hover:bg-white/5 transition-colors flex-shrink-0"
+          title={`Health ${ctx.health.score}/100${totalTsErrors > 0 ? ` — ${totalTsErrors} TS errors` : ""}`}
+          onClick={() => void load(true)}
+        >
+          <Zap className="w-3 h-3" style={{ color: healthColor }} />
+          <span style={{ color: healthColor }}>{ctx.health.score}</span>
+          {totalTsErrors > 0 && (
+            <span className="ml-0.5 px-1 rounded" style={{ background: "hsl(355 80% 62% / 0.18)", color: "hsl(355 80% 70%)" }}>
+              {totalTsErrors} err
+            </span>
+          )}
+          {refreshing && <RefreshCw className="w-2.5 h-2.5 animate-spin ml-0.5 opacity-50" style={{ color: healthColor }} />}
+        </button>
+
+        {/* Improvements */}
+        <button
+          type="button"
+          className="flex items-center gap-1 px-2.5 py-1.5 hover:bg-white/5 transition-colors flex-shrink-0"
+          title={`${ctx.improvements.total} improvement${ctx.improvements.total !== 1 ? "s" : ""} (${ctx.improvements.autoFixable} auto-fixable)`}
+          onClick={() => onSwitchTab("patches")}
+        >
+          <Play className="w-3 h-3" style={{ color: ctx.improvements.autoFixable > 0 ? "hsl(142 70% 55%)" : "hsl(210 15% 40%)" }} />
+          <span style={{ color: ctx.improvements.total > 0 ? "hsl(142 70% 65%)" : "hsl(210 15% 40%)" }}>
+            {ctx.improvements.total} fix{ctx.improvements.total !== 1 ? "es" : ""}
+          </span>
+        </button>
+
+        {/* Tasks */}
+        <button
+          type="button"
+          className="flex items-center gap-1 px-2.5 py-1.5 hover:bg-white/5 transition-colors flex-shrink-0"
+          title={`${ctx.tasks.open} open task${ctx.tasks.open !== 1 ? "s" : ""}`}
+          onClick={() => onSwitchTab("workspace")}
+        >
+          <Layers className="w-3 h-3" style={{ color: ctx.tasks.open > 0 ? "hsl(264 80% 70%)" : "hsl(210 15% 40%)" }} />
+          <span style={{ color: ctx.tasks.open > 0 ? "hsl(264 80% 75%)" : "hsl(210 15% 40%)" }}>
+            {ctx.tasks.open} task{ctx.tasks.open !== 1 ? "s" : ""}
+          </span>
+        </button>
+
+        {/* Git */}
+        <div
+          className="flex items-center gap-1 px-2.5 py-1.5 flex-shrink-0 flex-1 min-w-0"
+          title={ctx.git.dirty ? `${ctx.git.changes} uncommitted changes on ${ctx.git.branch}` : `Clean on ${ctx.git.branch}`}
+        >
+          <GitBranch className="w-3 h-3 flex-shrink-0" style={{ color: ctx.git.dirty ? "hsl(38 100% 55%)" : "hsl(210 15% 40%)" }} />
+          <span className="truncate" style={{ color: ctx.git.dirty ? "hsl(38 100% 65%)" : "hsl(210 15% 40%)" }}>
+            {ctx.git.branch}{ctx.git.dirty ? ` · ${ctx.git.changes}↑` : ""}
+          </span>
+        </div>
+
+        {/* Suggestions toggle */}
+        {suggestions.length > 0 && (
+          <button
+            type="button"
+            className="flex items-center gap-1 px-2.5 py-1.5 hover:bg-white/5 transition-colors flex-shrink-0"
+            title="Context-aware task suggestions"
+            onClick={() => setShowSugg(v => !v)}
+          >
+            <AlertTriangle className="w-3 h-3" style={{ color: showSugg ? "hsl(196 100% 60%)" : "hsl(210 15% 40%)" }} />
+            <span style={{ color: showSugg ? "hsl(196 100% 65%)" : "hsl(210 15% 40%)" }}>suggest</span>
+            <ChevronRight className={`w-3 h-3 transition-transform ${showSugg ? "rotate-90" : ""}`} style={{ color: "hsl(210 15% 40%)" }} />
+          </button>
+        )}
+      </div>
+
+      {/* Suggestions drawer */}
+      {showSugg && suggestions.length > 0 && (
+        <div className="px-2.5 pb-2.5 pt-1.5 flex flex-col gap-1.5 border-t" style={{ borderColor: "hsl(210 15% 15%)" }}>
+          <p className="text-[9px] font-semibold uppercase tracking-wider opacity-40" style={{ color: "hsl(210 15% 70%)" }}>
+            Suggested tasks based on current context
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {suggestions.map(s => {
+              const pillColor =
+                s.priority === "high"   ? "hsl(355 80% 62%)" :
+                s.priority === "medium" ? "hsl(38 100% 55%)"  :
+                "hsl(142 70% 50%)";
+              return (
+                <button
+                  key={s.label}
+                  type="button"
+                  className="text-[10px] px-2.5 py-1 rounded-md transition-all hover:opacity-100 opacity-80"
+                  style={{ background: `${pillColor}18`, border: `1px solid ${pillColor}40`, color: pillColor }}
+                  onClick={() => { onSuggest(s.prompt); setShowSugg(false); }}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[9px] opacity-30 mt-0.5" style={{ color: "hsl(210 15% 60%)" }}>
+            Clicking fills the input. No code is changed until you send and approve a patch.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main panel ───────────────────────────────────────────────────────────────
 
 interface DevAgentPanelProps { onClose: () => void; }
@@ -1901,6 +2079,12 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
           <>
             {/* Always-visible status bar */}
             <StatusBar onSwitchTab={setTab} taskStatus={taskStatus} />
+
+            {/* Context pill — health · improvements · tasks · git + dynamic suggestions */}
+            <ContextPill
+              onSuggest={prompt => { setInput(prompt); setTimeout(() => inputRef.current?.focus(), 50); }}
+              onSwitchTab={setTab}
+            />
 
             {/* Resume / clear stuck task banner */}
             {taskId && !isRunning && taskStatus === "waiting_approval" && (
