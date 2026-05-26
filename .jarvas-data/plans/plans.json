@@ -1,0 +1,652 @@
+[
+  {
+    "id": "58920ad5-fa8f-4e71-932c-bfbdca9eaa28",
+    "title": "Jarvis v2 Mobile App",
+    "goal": "Build a voice-first mobile companion app using React Native + Expo that mirrors the Jarvis web UI, supports offline mode, and syncs agent tasks via the API.",
+    "createdAt": "2026-05-26T23:18:32.556Z",
+    "updatedAt": "2026-05-26T23:18:33.496Z",
+    "status": "converted",
+    "phases": [
+      {
+        "id": "d1cca69f-f22a-411b-bf73-c0900c7c9691",
+        "title": "Planning & Architecture",
+        "order": 1,
+        "tasks": [
+          {
+            "id": "a0322bf0-e3e2-40e0-b43e-34acf22f25c8",
+            "title": "Define feature parity matrix between Jarvis web UI and mobile app (screens, components, interactions)",
+            "phaseId": "d1cca69f-f22a-411b-bf73-c0900c7c9691",
+            "priority": "high",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "a4a4153e-6414-4fd2-be00-b9b3d9011c8a",
+            "title": "Design offline-first data architecture: identify which data sets must be cached locally (tasks, agent configs, conversation history)",
+            "phaseId": "d1cca69f-f22a-411b-bf73-c0900c7c9691",
+            "priority": "high",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "f7e2df01-c6f4-4669-bd92-f46a7b23142c",
+            "title": "Evaluate and select local persistence strategy (e.g. SQLite via expo-sqlite, MMKV, or WatermelonDB) for offline sync",
+            "phaseId": "d1cca69f-f22a-411b-bf73-c0900c7c9691",
+            "priority": "high",
+            "estimatedEffort": "small",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "7581896b-b432-48b6-ae63-26b887d0dcf9",
+            "title": "Define API sync contract: endpoints, delta-sync vs full-sync, conflict resolution strategy, and authentication flow",
+            "phaseId": "d1cca69f-f22a-411b-bf73-c0900c7c9691",
+            "priority": "high",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "cf862968-0359-4db4-983d-269b19e5185a",
+            "title": "Create low-fidelity wireframes for core screens: Home, Agent Task List, Voice Interaction, Settings, Sync Status",
+            "phaseId": "d1cca69f-f22a-411b-bf73-c0900c7c9691",
+            "priority": "medium",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "29f829f4-a053-4ecc-8c66-fa13827f88c1",
+            "title": "Choose and document voice engine strategy: native device STT (expo-speech / Voice API) vs third-party (Whisper, Deepgram)",
+            "phaseId": "d1cca69f-f22a-411b-bf73-c0900c7c9691",
+            "priority": "high",
+            "estimatedEffort": "small",
+            "dependsOn": [],
+            "status": "converted"
+          }
+        ]
+      },
+      {
+        "id": "d5f2cd3e-d748-45c3-89a7-2b4b4bebcfb7",
+        "title": "Foundation & Core Infrastructure",
+        "order": 2,
+        "tasks": [
+          {
+            "id": "f279b526-6bb7-4075-aeef-1bc95bb93353",
+            "title": "Scaffold Expo project with TypeScript, configure ESLint, Prettier, absolute imports, and folder structure",
+            "phaseId": "d5f2cd3e-d748-45c3-89a7-2b4b4bebcfb7",
+            "priority": "high",
+            "estimatedEffort": "small",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "9eef34c3-44a5-4107-9481-edd267b50fdb",
+            "title": "Set up navigation structure using Expo Router (tab + stack navigators) matching planned screen hierarchy",
+            "phaseId": "d5f2cd3e-d748-45c3-89a7-2b4b4bebcfb7",
+            "priority": "high",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "9be6b3a5-c650-4a14-82f0-e1c3288c8f47",
+            "title": "Implement authentication module: token storage with expo-secure-store, login/logout flow, token refresh logic",
+            "phaseId": "d5f2cd3e-d748-45c3-89a7-2b4b4bebcfb7",
+            "priority": "high",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "950992f9-908f-495f-b3de-fbcd62724af1",
+            "title": "Build API client layer with Axios/fetch wrappers, interceptors for auth headers, error normalization, and retry logic",
+            "phaseId": "d5f2cd3e-d748-45c3-89a7-2b4b4bebcfb7",
+            "priority": "high",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "5cfd955b-41f5-4923-8198-04b020737f79",
+            "title": "Set up local database schema and ORM layer for offline storage of tasks, agents, and conversation logs",
+            "phaseId": "d5f2cd3e-d748-45c3-89a7-2b4b4bebcfb7",
+            "priority": "high",
+            "estimatedEffort": "large",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "3654cfde-7808-4f7f-892a-5777dc0c3b51",
+            "title": "Implement background sync service: queue mutations when offline, replay on reconnect, handle conflict resolution",
+            "phaseId": "d5f2cd3e-d748-45c3-89a7-2b4b4bebcfb7",
+            "priority": "high",
+            "estimatedEffort": "large",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "1fa3b5e1-0658-4c8b-8451-75ca3c1cb02a",
+            "title": "Configure global state management (Zustand or Redux Toolkit) with slices for tasks, agents, voice, and network status",
+            "phaseId": "d5f2cd3e-d748-45c3-89a7-2b4b4bebcfb7",
+            "priority": "medium",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          }
+        ]
+      },
+      {
+        "id": "22b7e3f2-e963-414f-aa3d-16ad4a6e9f40",
+        "title": "Feature Implementation",
+        "order": 3,
+        "tasks": [
+          {
+            "id": "b036a6ff-08f8-4c4d-aa1f-bbc8d140593a",
+            "title": "Build Voice Interaction screen: microphone button, live transcript display, waveform animation, send-to-agent pipeline",
+            "phaseId": "22b7e3f2-e963-414f-aa3d-16ad4a6e9f40",
+            "priority": "high",
+            "estimatedEffort": "large",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "7325d1be-73a9-4dc2-a4f4-7e4f8eb62e51",
+            "title": "Implement STT integration (selected engine) with permission handling, silence detection, and error states",
+            "phaseId": "22b7e3f2-e963-414f-aa3d-16ad4a6e9f40",
+            "priority": "high",
+            "estimatedEffort": "large",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "62745aff-7bb3-47ee-b79a-51046a726821",
+            "title": "Build Agent Task List screen with real-time status indicators, pull-to-refresh, pagination, and offline badge",
+            "phaseId": "22b7e3f2-e963-414f-aa3d-16ad4a6e9f40",
+            "priority": "high",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "d1a8b735-0c1c-4e12-8dcb-f5e38363f732",
+            "title": "Implement Task Detail screen: view/edit task, see agent logs, trigger re-run, and manual sync button",
+            "phaseId": "22b7e3f2-e963-414f-aa3d-16ad4a6e9f40",
+            "priority": "medium",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "3d072572-388f-4828-938f-736508202926",
+            "title": "Build Home/Dashboard screen mirroring Jarvis web UI widgets: active agents, recent tasks, quick-voice shortcut",
+            "phaseId": "22b7e3f2-e963-414f-aa3d-16ad4a6e9f40",
+            "priority": "medium",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "35952ca0-af36-4d28-8597-c32d4a0e3d53",
+            "title": "Implement push notifications for agent task completions and errors using expo-notifications",
+            "phaseId": "22b7e3f2-e963-414f-aa3d-16ad4a6e9f40",
+            "priority": "medium",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "5a8e1111-a76c-4816-8967-295a81a5217c",
+            "title": "Build Settings screen: account info, voice engine preferences, sync interval, offline storage usage, theme toggle",
+            "phaseId": "22b7e3f2-e963-414f-aa3d-16ad4a6e9f40",
+            "priority": "low",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "de20c821-0a13-48e0-94b4-940476f0d2a3",
+            "title": "Implement TTS (text-to-speech) for agent responses using expo-speech with configurable voice and rate settings",
+            "phaseId": "22b7e3f2-e963-414f-aa3d-16ad4a6e9f40",
+            "priority": "medium",
+            "estimatedEffort": "small",
+            "dependsOn": [],
+            "status": "converted"
+          }
+        ]
+      },
+      {
+        "id": "3a731ac4-14b3-4438-b7e2-1d05df6152f3",
+        "title": "Testing & Quality Assurance",
+        "order": 4,
+        "tasks": [
+          {
+            "id": "d007e359-5fb4-4d4a-80c7-80a020cbbdb2",
+            "title": "Write unit tests for API client, sync service, and conflict resolution logic using Jest",
+            "phaseId": "3a731ac4-14b3-4438-b7e2-1d05df6152f3",
+            "priority": "high",
+            "estimatedEffort": "large",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "151076dc-f61d-4fe2-ace9-0d9048c3ab3a",
+            "title": "Write integration tests for offline→online sync flow using mocked network conditions",
+            "phaseId": "3a731ac4-14b3-4438-b7e2-1d05df6152f3",
+            "priority": "high",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "e63af177-e836-472e-b743-32f5ad2b7f08",
+            "title": "Conduct manual voice UX testing on physical iOS and Android devices across noisy and quiet environments",
+            "phaseId": "3a731ac4-14b3-4438-b7e2-1d05df6152f3",
+            "priority": "high",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "e19fcfa3-446a-43b5-bac2-e20dd6dd1c6d",
+            "title": "Perform accessibility audit: VoiceOver/TalkBack compatibility, tap target sizes, color contrast",
+            "phaseId": "3a731ac4-14b3-4438-b7e2-1d05df6152f3",
+            "priority": "medium",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "f5a535c8-cab0-48aa-98a6-09fa69f7aa4f",
+            "title": "Run performance profiling: JS bundle size, cold start time, memory usage during voice recording sessions",
+            "phaseId": "3a731ac4-14b3-4438-b7e2-1d05df6152f3",
+            "priority": "medium",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "6fb3b3af-581d-4536-8795-ce291fea26e3",
+            "title": "Execute end-to-end tests with Detox covering critical user flows: login → voice command → task sync → notification",
+            "phaseId": "3a731ac4-14b3-4438-b7e2-1d05df6152f3",
+            "priority": "high",
+            "estimatedEffort": "large",
+            "dependsOn": [],
+            "status": "converted"
+          }
+        ]
+      },
+      {
+        "id": "f5bdb66f-11d2-4479-a6df-f822d5351b14",
+        "title": "Deployment & Release",
+        "order": 5,
+        "tasks": [
+          {
+            "id": "6faed5df-9687-49c3-9568-1093ffc263d0",
+            "title": "Configure EAS Build for iOS and Android with separate development, staging, and production build profiles",
+            "phaseId": "f5bdb66f-11d2-4479-a6df-f822d5351b14",
+            "priority": "high",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "ec62e186-90cc-418c-93fe-813eeb387e12",
+            "title": "Set up EAS Update (OTA) channel strategy for hotfixes without full store resubmission",
+            "phaseId": "f5bdb66f-11d2-4479-a6df-f822d5351b14",
+            "priority": "medium",
+            "estimatedEffort": "small",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "8015a377-7386-47ec-9b2d-ff3607ce9213",
+            "title": "Prepare App Store and Google Play store listings: screenshots, descriptions, privacy policy, microphone permission justification",
+            "phaseId": "f5bdb66f-11d2-4479-a6df-f822d5351b14",
+            "priority": "high",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "53f8ed98-f0dc-47f4-9ff0-101ab69ffcd8",
+            "title": "Configure CI/CD pipeline (GitHub Actions) for automated build, test, and EAS submission on merge to main",
+            "phaseId": "f5bdb66f-11d2-4479-a6df-f822d5351b14",
+            "priority": "medium",
+            "estimatedEffort": "medium",
+            "dependsOn": [],
+            "status": "converted"
+          },
+          {
+            "id": "41d3e460-9cd7-4f22-a9da-bd1b8dea4149",
+            "title": "Instrument app with crash reporting (Sentry) and analytics (PostHog or Amplitude) for production monitoring",
+            "phaseId": "f5bdb66f-11d2-4479-a6df-f822d5351b14",
+            "priority": "medium",
+            "estimatedEffort": "small",
+            "dependsOn": [],
+            "status": "converted"
+          }
+        ]
+      }
+    ],
+    "tasks": [
+      {
+        "id": "a0322bf0-e3e2-40e0-b43e-34acf22f25c8",
+        "title": "Define feature parity matrix between Jarvis web UI and mobile app (screens, components, interactions)",
+        "phaseId": "d1cca69f-f22a-411b-bf73-c0900c7c9691",
+        "priority": "high",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "a4a4153e-6414-4fd2-be00-b9b3d9011c8a",
+        "title": "Design offline-first data architecture: identify which data sets must be cached locally (tasks, agent configs, conversation history)",
+        "phaseId": "d1cca69f-f22a-411b-bf73-c0900c7c9691",
+        "priority": "high",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "f7e2df01-c6f4-4669-bd92-f46a7b23142c",
+        "title": "Evaluate and select local persistence strategy (e.g. SQLite via expo-sqlite, MMKV, or WatermelonDB) for offline sync",
+        "phaseId": "d1cca69f-f22a-411b-bf73-c0900c7c9691",
+        "priority": "high",
+        "estimatedEffort": "small",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "7581896b-b432-48b6-ae63-26b887d0dcf9",
+        "title": "Define API sync contract: endpoints, delta-sync vs full-sync, conflict resolution strategy, and authentication flow",
+        "phaseId": "d1cca69f-f22a-411b-bf73-c0900c7c9691",
+        "priority": "high",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "cf862968-0359-4db4-983d-269b19e5185a",
+        "title": "Create low-fidelity wireframes for core screens: Home, Agent Task List, Voice Interaction, Settings, Sync Status",
+        "phaseId": "d1cca69f-f22a-411b-bf73-c0900c7c9691",
+        "priority": "medium",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "29f829f4-a053-4ecc-8c66-fa13827f88c1",
+        "title": "Choose and document voice engine strategy: native device STT (expo-speech / Voice API) vs third-party (Whisper, Deepgram)",
+        "phaseId": "d1cca69f-f22a-411b-bf73-c0900c7c9691",
+        "priority": "high",
+        "estimatedEffort": "small",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "f279b526-6bb7-4075-aeef-1bc95bb93353",
+        "title": "Scaffold Expo project with TypeScript, configure ESLint, Prettier, absolute imports, and folder structure",
+        "phaseId": "d5f2cd3e-d748-45c3-89a7-2b4b4bebcfb7",
+        "priority": "high",
+        "estimatedEffort": "small",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "9eef34c3-44a5-4107-9481-edd267b50fdb",
+        "title": "Set up navigation structure using Expo Router (tab + stack navigators) matching planned screen hierarchy",
+        "phaseId": "d5f2cd3e-d748-45c3-89a7-2b4b4bebcfb7",
+        "priority": "high",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "9be6b3a5-c650-4a14-82f0-e1c3288c8f47",
+        "title": "Implement authentication module: token storage with expo-secure-store, login/logout flow, token refresh logic",
+        "phaseId": "d5f2cd3e-d748-45c3-89a7-2b4b4bebcfb7",
+        "priority": "high",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "950992f9-908f-495f-b3de-fbcd62724af1",
+        "title": "Build API client layer with Axios/fetch wrappers, interceptors for auth headers, error normalization, and retry logic",
+        "phaseId": "d5f2cd3e-d748-45c3-89a7-2b4b4bebcfb7",
+        "priority": "high",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "5cfd955b-41f5-4923-8198-04b020737f79",
+        "title": "Set up local database schema and ORM layer for offline storage of tasks, agents, and conversation logs",
+        "phaseId": "d5f2cd3e-d748-45c3-89a7-2b4b4bebcfb7",
+        "priority": "high",
+        "estimatedEffort": "large",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "3654cfde-7808-4f7f-892a-5777dc0c3b51",
+        "title": "Implement background sync service: queue mutations when offline, replay on reconnect, handle conflict resolution",
+        "phaseId": "d5f2cd3e-d748-45c3-89a7-2b4b4bebcfb7",
+        "priority": "high",
+        "estimatedEffort": "large",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "1fa3b5e1-0658-4c8b-8451-75ca3c1cb02a",
+        "title": "Configure global state management (Zustand or Redux Toolkit) with slices for tasks, agents, voice, and network status",
+        "phaseId": "d5f2cd3e-d748-45c3-89a7-2b4b4bebcfb7",
+        "priority": "medium",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "b036a6ff-08f8-4c4d-aa1f-bbc8d140593a",
+        "title": "Build Voice Interaction screen: microphone button, live transcript display, waveform animation, send-to-agent pipeline",
+        "phaseId": "22b7e3f2-e963-414f-aa3d-16ad4a6e9f40",
+        "priority": "high",
+        "estimatedEffort": "large",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "7325d1be-73a9-4dc2-a4f4-7e4f8eb62e51",
+        "title": "Implement STT integration (selected engine) with permission handling, silence detection, and error states",
+        "phaseId": "22b7e3f2-e963-414f-aa3d-16ad4a6e9f40",
+        "priority": "high",
+        "estimatedEffort": "large",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "62745aff-7bb3-47ee-b79a-51046a726821",
+        "title": "Build Agent Task List screen with real-time status indicators, pull-to-refresh, pagination, and offline badge",
+        "phaseId": "22b7e3f2-e963-414f-aa3d-16ad4a6e9f40",
+        "priority": "high",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "d1a8b735-0c1c-4e12-8dcb-f5e38363f732",
+        "title": "Implement Task Detail screen: view/edit task, see agent logs, trigger re-run, and manual sync button",
+        "phaseId": "22b7e3f2-e963-414f-aa3d-16ad4a6e9f40",
+        "priority": "medium",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "3d072572-388f-4828-938f-736508202926",
+        "title": "Build Home/Dashboard screen mirroring Jarvis web UI widgets: active agents, recent tasks, quick-voice shortcut",
+        "phaseId": "22b7e3f2-e963-414f-aa3d-16ad4a6e9f40",
+        "priority": "medium",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "35952ca0-af36-4d28-8597-c32d4a0e3d53",
+        "title": "Implement push notifications for agent task completions and errors using expo-notifications",
+        "phaseId": "22b7e3f2-e963-414f-aa3d-16ad4a6e9f40",
+        "priority": "medium",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "5a8e1111-a76c-4816-8967-295a81a5217c",
+        "title": "Build Settings screen: account info, voice engine preferences, sync interval, offline storage usage, theme toggle",
+        "phaseId": "22b7e3f2-e963-414f-aa3d-16ad4a6e9f40",
+        "priority": "low",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "de20c821-0a13-48e0-94b4-940476f0d2a3",
+        "title": "Implement TTS (text-to-speech) for agent responses using expo-speech with configurable voice and rate settings",
+        "phaseId": "22b7e3f2-e963-414f-aa3d-16ad4a6e9f40",
+        "priority": "medium",
+        "estimatedEffort": "small",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "d007e359-5fb4-4d4a-80c7-80a020cbbdb2",
+        "title": "Write unit tests for API client, sync service, and conflict resolution logic using Jest",
+        "phaseId": "3a731ac4-14b3-4438-b7e2-1d05df6152f3",
+        "priority": "high",
+        "estimatedEffort": "large",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "151076dc-f61d-4fe2-ace9-0d9048c3ab3a",
+        "title": "Write integration tests for offline→online sync flow using mocked network conditions",
+        "phaseId": "3a731ac4-14b3-4438-b7e2-1d05df6152f3",
+        "priority": "high",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "e63af177-e836-472e-b743-32f5ad2b7f08",
+        "title": "Conduct manual voice UX testing on physical iOS and Android devices across noisy and quiet environments",
+        "phaseId": "3a731ac4-14b3-4438-b7e2-1d05df6152f3",
+        "priority": "high",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "e19fcfa3-446a-43b5-bac2-e20dd6dd1c6d",
+        "title": "Perform accessibility audit: VoiceOver/TalkBack compatibility, tap target sizes, color contrast",
+        "phaseId": "3a731ac4-14b3-4438-b7e2-1d05df6152f3",
+        "priority": "medium",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "f5a535c8-cab0-48aa-98a6-09fa69f7aa4f",
+        "title": "Run performance profiling: JS bundle size, cold start time, memory usage during voice recording sessions",
+        "phaseId": "3a731ac4-14b3-4438-b7e2-1d05df6152f3",
+        "priority": "medium",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "6fb3b3af-581d-4536-8795-ce291fea26e3",
+        "title": "Execute end-to-end tests with Detox covering critical user flows: login → voice command → task sync → notification",
+        "phaseId": "3a731ac4-14b3-4438-b7e2-1d05df6152f3",
+        "priority": "high",
+        "estimatedEffort": "large",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "6faed5df-9687-49c3-9568-1093ffc263d0",
+        "title": "Configure EAS Build for iOS and Android with separate development, staging, and production build profiles",
+        "phaseId": "f5bdb66f-11d2-4479-a6df-f822d5351b14",
+        "priority": "high",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "ec62e186-90cc-418c-93fe-813eeb387e12",
+        "title": "Set up EAS Update (OTA) channel strategy for hotfixes without full store resubmission",
+        "phaseId": "f5bdb66f-11d2-4479-a6df-f822d5351b14",
+        "priority": "medium",
+        "estimatedEffort": "small",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "8015a377-7386-47ec-9b2d-ff3607ce9213",
+        "title": "Prepare App Store and Google Play store listings: screenshots, descriptions, privacy policy, microphone permission justification",
+        "phaseId": "f5bdb66f-11d2-4479-a6df-f822d5351b14",
+        "priority": "high",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "53f8ed98-f0dc-47f4-9ff0-101ab69ffcd8",
+        "title": "Configure CI/CD pipeline (GitHub Actions) for automated build, test, and EAS submission on merge to main",
+        "phaseId": "f5bdb66f-11d2-4479-a6df-f822d5351b14",
+        "priority": "medium",
+        "estimatedEffort": "medium",
+        "dependsOn": [],
+        "status": "converted"
+      },
+      {
+        "id": "41d3e460-9cd7-4f22-a9da-bd1b8dea4149",
+        "title": "Instrument app with crash reporting (Sentry) and analytics (PostHog or Amplitude) for production monitoring",
+        "phaseId": "f5bdb66f-11d2-4479-a6df-f822d5351b14",
+        "priority": "medium",
+        "estimatedEffort": "small",
+        "dependsOn": [],
+        "status": "converted"
+      }
+    ],
+    "risks": [
+      {
+        "id": "73b26a59-e7ec-48a1-a21d-00a78eeb1efd",
+        "description": "Voice recognition accuracy degrades significantly in noisy environments or with non-native English speakers, leading to poor UX for the core feature",
+        "severity": "high",
+        "mitigation": "Prototype both native STT and Whisper API early in Phase 2; implement manual text input fallback on the voice screen; allow users to switch engines in settings"
+      },
+      {
+        "id": "85db4999-0046-4271-8d61-7656ef10f4d6",
+        "description": "Offline sync conflict resolution is complex and may corrupt task state if multiple devices edit the same agent task while offline",
+        "severity": "high",
+        "mitigation": "Define a clear last-write-wins or server-authoritative conflict strategy during Phase 1 architecture review; implement full audit log and a visible conflict resolution UI"
+      },
+      {
+        "id": "0c4e8b6a-593b-4940-933b-b460233a19a0",
+        "description": "Apple App Store review may reject or delay the app due to microphone permission usage justification or background processing entitlements",
+        "severity": "medium",
+        "mitigation": "Write explicit NSMicrophoneUsageDescription and background mode justifications early; review Apple Human Interface Guidelines for voice apps before submission"
+      },
+      {
+        "id": "fea7781a-abda-4ae4-a8d6-aeaa8a7a33b1",
+        "description": "React Native / Expo SDK version incompatibilities with chosen native modules (SQLite, Voice, Notifications) may cause build failures",
+        "severity": "medium",
+        "mitigation": "Lock all native dependencies to tested versions in Phase 2 setup; maintain a compatibility matrix; evaluate bare workflow vs managed workflow tradeoffs before coding begins"
+      }
+    ],
+    "recommendedNextAction": "Schedule a half-day architecture workshop to produce the feature parity matrix, finalize the offline sync strategy, and select the voice engine — these three decisions gate every subsequent phase and must be resolved before any code is written."
+  }
+]

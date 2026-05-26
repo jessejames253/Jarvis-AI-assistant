@@ -16,5 +16,261 @@
     "title": "Add self-healing build checker",
     "priority": "medium",
     "status": "pending"
+  },
+  {
+    "id": "a0322bf0-e3e2-40e0-b43e-34acf22f25c8",
+    "title": "Define feature parity matrix between Jarvis web UI and mobile app (screens, components, interactions)",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.188Z",
+    "updatedAt": "2026-05-26T23:18:33.188Z"
+  },
+  {
+    "id": "a4a4153e-6414-4fd2-be00-b9b3d9011c8a",
+    "title": "Design offline-first data architecture: identify which data sets must be cached locally (tasks, agent configs, conversation history)",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.189Z",
+    "updatedAt": "2026-05-26T23:18:33.189Z"
+  },
+  {
+    "id": "f7e2df01-c6f4-4669-bd92-f46a7b23142c",
+    "title": "Evaluate and select local persistence strategy (e.g. SQLite via expo-sqlite, MMKV, or WatermelonDB) for offline sync",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.189Z",
+    "updatedAt": "2026-05-26T23:18:33.189Z"
+  },
+  {
+    "id": "7581896b-b432-48b6-ae63-26b887d0dcf9",
+    "title": "Define API sync contract: endpoints, delta-sync vs full-sync, conflict resolution strategy, and authentication flow",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.189Z",
+    "updatedAt": "2026-05-26T23:18:33.189Z"
+  },
+  {
+    "id": "cf862968-0359-4db4-983d-269b19e5185a",
+    "title": "Create low-fidelity wireframes for core screens: Home, Agent Task List, Voice Interaction, Settings, Sync Status",
+    "priority": "medium",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.189Z",
+    "updatedAt": "2026-05-26T23:18:33.189Z"
+  },
+  {
+    "id": "29f829f4-a053-4ecc-8c66-fa13827f88c1",
+    "title": "Choose and document voice engine strategy: native device STT (expo-speech / Voice API) vs third-party (Whisper, Deepgram)",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.189Z",
+    "updatedAt": "2026-05-26T23:18:33.189Z"
+  },
+  {
+    "id": "f279b526-6bb7-4075-aeef-1bc95bb93353",
+    "title": "Scaffold Expo project with TypeScript, configure ESLint, Prettier, absolute imports, and folder structure",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.189Z",
+    "updatedAt": "2026-05-26T23:18:33.189Z"
+  },
+  {
+    "id": "9eef34c3-44a5-4107-9481-edd267b50fdb",
+    "title": "Set up navigation structure using Expo Router (tab + stack navigators) matching planned screen hierarchy",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.190Z",
+    "updatedAt": "2026-05-26T23:18:33.190Z"
+  },
+  {
+    "id": "9be6b3a5-c650-4a14-82f0-e1c3288c8f47",
+    "title": "Implement authentication module: token storage with expo-secure-store, login/logout flow, token refresh logic",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.191Z",
+    "updatedAt": "2026-05-26T23:18:33.191Z"
+  },
+  {
+    "id": "950992f9-908f-495f-b3de-fbcd62724af1",
+    "title": "Build API client layer with Axios/fetch wrappers, interceptors for auth headers, error normalization, and retry logic",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.191Z",
+    "updatedAt": "2026-05-26T23:18:33.191Z"
+  },
+  {
+    "id": "5cfd955b-41f5-4923-8198-04b020737f79",
+    "title": "Set up local database schema and ORM layer for offline storage of tasks, agents, and conversation logs",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.192Z",
+    "updatedAt": "2026-05-26T23:18:33.192Z"
+  },
+  {
+    "id": "3654cfde-7808-4f7f-892a-5777dc0c3b51",
+    "title": "Implement background sync service: queue mutations when offline, replay on reconnect, handle conflict resolution",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.192Z",
+    "updatedAt": "2026-05-26T23:18:33.192Z"
+  },
+  {
+    "id": "1fa3b5e1-0658-4c8b-8451-75ca3c1cb02a",
+    "title": "Configure global state management (Zustand or Redux Toolkit) with slices for tasks, agents, voice, and network status",
+    "priority": "medium",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.193Z",
+    "updatedAt": "2026-05-26T23:18:33.193Z"
+  },
+  {
+    "id": "b036a6ff-08f8-4c4d-aa1f-bbc8d140593a",
+    "title": "Build Voice Interaction screen: microphone button, live transcript display, waveform animation, send-to-agent pipeline",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.193Z",
+    "updatedAt": "2026-05-26T23:18:33.193Z"
+  },
+  {
+    "id": "7325d1be-73a9-4dc2-a4f4-7e4f8eb62e51",
+    "title": "Implement STT integration (selected engine) with permission handling, silence detection, and error states",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.194Z",
+    "updatedAt": "2026-05-26T23:18:33.194Z"
+  },
+  {
+    "id": "62745aff-7bb3-47ee-b79a-51046a726821",
+    "title": "Build Agent Task List screen with real-time status indicators, pull-to-refresh, pagination, and offline badge",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.195Z",
+    "updatedAt": "2026-05-26T23:18:33.195Z"
+  },
+  {
+    "id": "d1a8b735-0c1c-4e12-8dcb-f5e38363f732",
+    "title": "Implement Task Detail screen: view/edit task, see agent logs, trigger re-run, and manual sync button",
+    "priority": "medium",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.195Z",
+    "updatedAt": "2026-05-26T23:18:33.195Z"
+  },
+  {
+    "id": "3d072572-388f-4828-938f-736508202926",
+    "title": "Build Home/Dashboard screen mirroring Jarvis web UI widgets: active agents, recent tasks, quick-voice shortcut",
+    "priority": "medium",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.196Z",
+    "updatedAt": "2026-05-26T23:18:33.196Z"
+  },
+  {
+    "id": "35952ca0-af36-4d28-8597-c32d4a0e3d53",
+    "title": "Implement push notifications for agent task completions and errors using expo-notifications",
+    "priority": "medium",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.197Z",
+    "updatedAt": "2026-05-26T23:18:33.197Z"
+  },
+  {
+    "id": "5a8e1111-a76c-4816-8967-295a81a5217c",
+    "title": "Build Settings screen: account info, voice engine preferences, sync interval, offline storage usage, theme toggle",
+    "priority": "low",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.198Z",
+    "updatedAt": "2026-05-26T23:18:33.198Z"
+  },
+  {
+    "id": "de20c821-0a13-48e0-94b4-940476f0d2a3",
+    "title": "Implement TTS (text-to-speech) for agent responses using expo-speech with configurable voice and rate settings",
+    "priority": "medium",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.198Z",
+    "updatedAt": "2026-05-26T23:18:33.198Z"
+  },
+  {
+    "id": "d007e359-5fb4-4d4a-80c7-80a020cbbdb2",
+    "title": "Write unit tests for API client, sync service, and conflict resolution logic using Jest",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.199Z",
+    "updatedAt": "2026-05-26T23:18:33.199Z"
+  },
+  {
+    "id": "151076dc-f61d-4fe2-ace9-0d9048c3ab3a",
+    "title": "Write integration tests for offline→online sync flow using mocked network conditions",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.199Z",
+    "updatedAt": "2026-05-26T23:18:33.199Z"
+  },
+  {
+    "id": "e63af177-e836-472e-b743-32f5ad2b7f08",
+    "title": "Conduct manual voice UX testing on physical iOS and Android devices across noisy and quiet environments",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.200Z",
+    "updatedAt": "2026-05-26T23:18:33.200Z"
+  },
+  {
+    "id": "e19fcfa3-446a-43b5-bac2-e20dd6dd1c6d",
+    "title": "Perform accessibility audit: VoiceOver/TalkBack compatibility, tap target sizes, color contrast",
+    "priority": "medium",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.201Z",
+    "updatedAt": "2026-05-26T23:18:33.201Z"
+  },
+  {
+    "id": "f5a535c8-cab0-48aa-98a6-09fa69f7aa4f",
+    "title": "Run performance profiling: JS bundle size, cold start time, memory usage during voice recording sessions",
+    "priority": "medium",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.201Z",
+    "updatedAt": "2026-05-26T23:18:33.201Z"
+  },
+  {
+    "id": "6fb3b3af-581d-4536-8795-ce291fea26e3",
+    "title": "Execute end-to-end tests with Detox covering critical user flows: login → voice command → task sync → notification",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.202Z",
+    "updatedAt": "2026-05-26T23:18:33.202Z"
+  },
+  {
+    "id": "6faed5df-9687-49c3-9568-1093ffc263d0",
+    "title": "Configure EAS Build for iOS and Android with separate development, staging, and production build profiles",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.203Z",
+    "updatedAt": "2026-05-26T23:18:33.203Z"
+  },
+  {
+    "id": "ec62e186-90cc-418c-93fe-813eeb387e12",
+    "title": "Set up EAS Update (OTA) channel strategy for hotfixes without full store resubmission",
+    "priority": "medium",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.203Z",
+    "updatedAt": "2026-05-26T23:18:33.203Z"
+  },
+  {
+    "id": "8015a377-7386-47ec-9b2d-ff3607ce9213",
+    "title": "Prepare App Store and Google Play store listings: screenshots, descriptions, privacy policy, microphone permission justification",
+    "priority": "high",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.204Z",
+    "updatedAt": "2026-05-26T23:18:33.204Z"
+  },
+  {
+    "id": "53f8ed98-f0dc-47f4-9ff0-101ab69ffcd8",
+    "title": "Configure CI/CD pipeline (GitHub Actions) for automated build, test, and EAS submission on merge to main",
+    "priority": "medium",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.204Z",
+    "updatedAt": "2026-05-26T23:18:33.204Z"
+  },
+  {
+    "id": "41d3e460-9cd7-4f22-a9da-bd1b8dea4149",
+    "title": "Instrument app with crash reporting (Sentry) and analytics (PostHog or Amplitude) for production monitoring",
+    "priority": "medium",
+    "status": "pending",
+    "createdAt": "2026-05-26T23:18:33.205Z",
+    "updatedAt": "2026-05-26T23:18:33.205Z"
   }
 ]

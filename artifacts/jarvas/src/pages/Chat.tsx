@@ -32,6 +32,7 @@ import {
   History,
   Cpu,
   Bot,
+  Layers,
 } from "lucide-react";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
 import { useSpeechSession } from "@/hooks/useSpeechSession";
@@ -55,6 +56,7 @@ import AgentActionsPanel   from "@/components/AgentActionsPanel";
 import CheckpointsPanel    from "@/components/CheckpointsPanel";
 import ExecutionsPanel     from "@/components/ExecutionsPanel";
 import AutoLoopPanel       from "@/components/AutoLoopPanel";
+import PlansPanel          from "@/components/PlansPanel";
 import {
   approvePatch, rejectPatch as logRejectPatch, fetchPendingPatches,
   fetchServerStatus,
@@ -546,6 +548,7 @@ export default function Chat() {
   const [checkpointsPanelOpen,  setCheckpointsPanelOpen]  = useState(false);
   const [executionsPanelOpen,   setExecutionsPanelOpen]   = useState(false);
   const [autoLoopPanelOpen,     setAutoLoopPanelOpen]     = useState(false);
+  const [plansPanelOpen,        setPlansPanelOpen]        = useState(false);
   const autoRoutedRef = useRef(false);
 
   // ── Patch notification bar + server status ───────────────────────────────
@@ -1410,6 +1413,21 @@ export default function Chat() {
             <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: autoLoopPanelOpen ? "hsl(150 70% 72%)" : "hsl(196 60% 55%)" }}>AUTO</span>
           </button>
 
+          {/* Plans */}
+          <button
+            onClick={() => setPlansPanelOpen(v => !v)}
+            title="Planner Brain — generate and manage structured plans"
+            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
+            style={{
+              background:  plansPanelOpen ? "hsl(264 80% 65% / 0.12)" : "transparent",
+              borderColor: plansPanelOpen ? "hsl(264 80% 65% / 0.5)"  : "hsl(210 15% 30%)",
+            }}
+            aria-label="Open plans panel"
+          >
+            <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: plansPanelOpen ? "hsl(264 80% 75%)" : "hsl(196 60% 55%)" }} />
+            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: plansPanelOpen ? "hsl(264 80% 75%)" : "hsl(196 60% 55%)" }}>PLANS</span>
+          </button>
+
           {/* Dev Agent — visible on all screen sizes */}
           <button
             onClick={() => setDevPanelOpen(true)}
@@ -1766,6 +1784,13 @@ export default function Chat() {
       <AutoLoopPanel
         isOpen={autoLoopPanelOpen}
         onClose={() => setAutoLoopPanelOpen(false)}
+        apiBase={BASE}
+      />
+
+      {/* Plans panel */}
+      <PlansPanel
+        isOpen={plansPanelOpen}
+        onClose={() => setPlansPanelOpen(false)}
         apiBase={BASE}
       />
 
