@@ -1326,7 +1326,7 @@ export default function Chat() {
               data-testid="input-message"
               className="flex-1 bg-transparent resize-none outline-none text-sm leading-relaxed placeholder:text-muted-foreground min-h-[24px] max-h-[120px] scrollbar-thin"
               style={{ color: "hsl(196 80% 85%)" }}
-              placeholder="Message Jarvis… ask anything, search the web, build apps, or open DEV."
+              placeholder="Ask Jarvis anything…"
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}

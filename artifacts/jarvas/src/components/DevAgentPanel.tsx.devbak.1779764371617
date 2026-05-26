@@ -114,55 +114,6 @@ function loadMessages(): DevMessage[] {
   } catch { return []; }
 }
 
-/** Re-hydrate patch cards from the backend after a reload.
- *  Finds patch_proposed messages that are missing their `.patch` data
- *  and fills them in from the /api/dev/patches response. */
-async function rehydratePatches(
-  msgs: DevMessage[],
-  setMessages: React.Dispatch<React.SetStateAction<DevMessage[]>>,
-): Promise<void> {
-  const needsHydration = msgs.some(m => m.type === "patch_proposed" && !m.patch && m.patch === undefined);
-  if (!needsHydration) return;
-  try {
-    const res = await fetch(PATCHES_URL);
-    if (!res.ok) return;
-    const data = await res.json() as { ok: boolean; patches?: Array<{
-      patchId: string; file: string; description: string;
-      oldContent: string; newContent: string; createdAt: number;
-      riskLevel?: "low" | "medium" | "high"; uiImpact?: string;
-      logicImpact?: string; safeToTest?: boolean;
-    }> };
-    if (!data.ok || !data.patches?.length) return;
-    const byId = new Map(data.patches.map(p => [p.patchId, p]));
-    setMessages(prev => {
-      const updated = prev.map(m => {
-        if (m.type !== "patch_proposed" || m.patch) return m;
-        // Try to find by patchId stored on message, or match by position
-        const patchId = (m as DevMessage & { patchId?: string }).patchId;
-        const backend = patchId ? byId.get(patchId) : undefined;
-        if (!backend) return m;
-        return {
-          ...m,
-          patch: {
-            patchId: backend.patchId,
-            file: backend.file,
-            description: backend.description,
-            oldContent: backend.oldContent,
-            newContent: backend.newContent,
-            linesAdded: backend.newContent.split("\n").length - backend.oldContent.split("\n").length,
-            riskLevel: backend.riskLevel,
-            uiImpact: backend.uiImpact,
-            logicImpact: backend.logicImpact,
-            safeToTest: backend.safeToTest,
-          } satisfies PatchData,
-        };
-      });
-      saveMessages(updated);
-      return updated;
-    });
-  } catch { /* non-fatal */ }
-}
-
 function clearMessages(): void {
   localStorage.removeItem(LS_MESSAGES);
   localStorage.removeItem(LS_TASK_ID);
