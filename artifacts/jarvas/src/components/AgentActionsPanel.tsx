@@ -199,13 +199,15 @@ function ActionCard({
   onApprove,
   onReject,
   onDryRun,
+  onExecute,
   busy,
 }: {
-  action:    AgentAction;
-  onApprove: (id: string) => void;
-  onReject:  (id: string) => void;
-  onDryRun:  (id: string) => void;
-  busy:      boolean;
+  action:     AgentAction;
+  onApprove:  (id: string) => void;
+  onReject:   (id: string) => void;
+  onDryRun:   (id: string) => void;
+  onExecute:  (id: string) => void;
+  busy:       boolean;
 }) {
   const risk   = RISK[action.riskLevel]   ?? RISK.medium;
   const status = STATUS[action.status]    ?? STATUS.pending;
@@ -281,7 +283,8 @@ function ActionCard({
       )}
 
       {action.status === "approved" && (
-        <div className="px-3 pb-3">
+        <div className="px-3 pb-3 space-y-2">
+          {/* DRY RUN button — conceptual preview via agentActionExecutor */}
           <button type="button"
             onClick={() => onDryRun(action.id)}
             disabled={busy}
@@ -290,6 +293,18 @@ function ActionCard({
             <PlayCircle className="w-3.5 h-3.5" />
             {action.executionMode === "dry-run" ? "RE-RUN DRY RUN" : "DRY RUN"}
           </button>
+
+          {/* EXECUTE button — real safe execution (low-risk only) */}
+          {action.riskLevel === "low" && (
+            <button type="button"
+              onClick={() => onExecute(action.id)}
+              disabled={busy}
+              className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
+              style={{ background: "hsl(38 100% 55% / 0.12)", border: "1px solid hsl(38 100% 55% / 0.4)", color: "hsl(38 100% 68%)" }}>
+              <PlayCircle className="w-3.5 h-3.5" />
+              EXECUTE
+            </button>
+          )}
         </div>
       )}
 
@@ -471,6 +486,20 @@ export default function AgentActionsPanel({ isOpen, onClose, apiBase }: AgentAct
     }
   }, [apiBase]);
 
+  const execute = useCallback(async (id: string) => {
+    setBusy(true); setError(null);
+    try {
+      const res  = await fetch(`${apiBase}api/agent-actions/${encodeURIComponent(id)}/execute`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dryRun: false }) });
+      const data = await res.json() as { ok: boolean; execution?: { id: string; status: string; report: string }; error?: string };
+      if (!data.ok) throw new Error(data.error ?? "Execution failed");
+      // Show brief success note via error channel (reuse for info)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Execution failed");
+    } finally {
+      setBusy(false);
+    }
+  }, [apiBase]);
+
   const visible = filter === "all" ? actions : actions.filter(a => a.status === filter);
   const pendingCount = actions.filter(a => a.status === "pending").length;
 
@@ -591,6 +620,7 @@ export default function AgentActionsPanel({ isOpen, onClose, apiBase }: AgentAct
               onApprove={id => mutate(id, "approve")}
               onReject={id  => mutate(id, "reject")}
               onDryRun={id  => dryRun(id)}
+              onExecute={id => execute(id)}
               busy={busy}
             />
           ))}

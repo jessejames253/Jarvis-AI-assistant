@@ -135,5 +135,35 @@
     "status": "pending",
     "createdAt": "2026-05-26T22:13:29.089Z",
     "updatedAt": "2026-05-26T22:13:29.089Z"
+  },
+  {
+    "id": "b7f895df-63ea-44e3-9ed2-ca4b083b6a88",
+    "title": "Generate daily summary report",
+    "description": "Generate a structured markdown report of todays agent activity and task completions",
+    "riskLevel": "low",
+    "proposedBy": "planner-agent",
+    "status": "approved",
+    "createdAt": "2026-05-26T22:57:17.066Z",
+    "updatedAt": "2026-05-26T22:57:17.278Z"
+  },
+  {
+    "id": "ca38c745-a26e-46df-bd5b-afea5136c0e0",
+    "title": "Create build cache directory",
+    "description": "Create directory for build artifacts",
+    "riskLevel": "high",
+    "proposedBy": "builder-agent",
+    "status": "approved",
+    "createdAt": "2026-05-26T22:57:17.758Z",
+    "updatedAt": "2026-05-26T22:57:17.885Z"
+  },
+  {
+    "id": "ab35fc4b-d34d-4a5a-b380-048d06c72d84",
+    "title": "Delete old log files",
+    "description": "Remove all logs from the system",
+    "riskLevel": "low",
+    "proposedBy": "cleaner-agent",
+    "status": "approved",
+    "createdAt": "2026-05-26T22:57:18.115Z",
+    "updatedAt": "2026-05-26T22:57:18.249Z"
   }
 ]
