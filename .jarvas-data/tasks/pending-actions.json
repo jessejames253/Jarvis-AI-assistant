@@ -165,5 +165,15 @@
     "status": "approved",
     "createdAt": "2026-05-26T22:57:18.115Z",
     "updatedAt": "2026-05-26T22:57:18.249Z"
+  },
+  {
+    "id": "f617a2f8-136a-4789-9a3c-c0da1484ada4",
+    "title": "Generate weekly agent report",
+    "description": "Produce a structured weekly summary of agent activity",
+    "riskLevel": "low",
+    "proposedBy": "auto-test",
+    "status": "approved",
+    "createdAt": "2026-05-26T23:08:52.484Z",
+    "updatedAt": "2026-05-26T23:08:52.617Z"
   }
 ]

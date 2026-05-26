@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "lockedOut": false,
+  "consecutiveFails": 0,
+  "processing": false,
+  "retries": {
+    "f617a2f8-136a-4789-9a3c-c0da1484ada4": 0
+  },
+  "executionIds": [
+    "e5398d1a-4974-4e1a-ae67-2468a0224365"
+  ],
+  "updatedAt": "2026-05-26T23:08:53.816Z",
+  "lastProcessedAt": "2026-05-26T23:08:52.870Z"
+}

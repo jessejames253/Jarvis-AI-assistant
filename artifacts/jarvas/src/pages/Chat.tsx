@@ -31,6 +31,7 @@ import {
   ShieldCheck,
   History,
   Cpu,
+  Bot,
 } from "lucide-react";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
 import { useSpeechSession } from "@/hooks/useSpeechSession";
@@ -53,6 +54,7 @@ import ActivityLogPanel    from "@/components/ActivityLogPanel";
 import AgentActionsPanel   from "@/components/AgentActionsPanel";
 import CheckpointsPanel    from "@/components/CheckpointsPanel";
 import ExecutionsPanel     from "@/components/ExecutionsPanel";
+import AutoLoopPanel       from "@/components/AutoLoopPanel";
 import {
   approvePatch, rejectPatch as logRejectPatch, fetchPendingPatches,
   fetchServerStatus,
@@ -543,6 +545,7 @@ export default function Chat() {
   const [actionsPanelOpen,      setActionsPanelOpen]      = useState(false);
   const [checkpointsPanelOpen,  setCheckpointsPanelOpen]  = useState(false);
   const [executionsPanelOpen,   setExecutionsPanelOpen]   = useState(false);
+  const [autoLoopPanelOpen,     setAutoLoopPanelOpen]     = useState(false);
   const autoRoutedRef = useRef(false);
 
   // ── Patch notification bar + server status ───────────────────────────────
@@ -1392,6 +1395,21 @@ export default function Chat() {
             <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: executionsPanelOpen ? "hsl(38 100% 72%)" : "hsl(196 60% 55%)" }}>EXECUTIONS</span>
           </button>
 
+          {/* Autonomous Dev Loop */}
+          <button
+            onClick={() => setAutoLoopPanelOpen(v => !v)}
+            title="Autonomous Dev Loop — auto-execute approved low-risk actions"
+            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
+            style={{
+              background:  autoLoopPanelOpen ? "hsl(150 70% 50% / 0.12)" : "transparent",
+              borderColor: autoLoopPanelOpen ? "hsl(150 70% 50% / 0.5)"  : "hsl(210 15% 30%)",
+            }}
+            aria-label="Open auto loop panel"
+          >
+            <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: autoLoopPanelOpen ? "hsl(150 70% 72%)" : "hsl(196 60% 55%)" }} />
+            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: autoLoopPanelOpen ? "hsl(150 70% 72%)" : "hsl(196 60% 55%)" }}>AUTO</span>
+          </button>
+
           {/* Dev Agent — visible on all screen sizes */}
           <button
             onClick={() => setDevPanelOpen(true)}
@@ -1741,6 +1759,13 @@ export default function Chat() {
       <ExecutionsPanel
         isOpen={executionsPanelOpen}
         onClose={() => setExecutionsPanelOpen(false)}
+        apiBase={BASE}
+      />
+
+      {/* Auto Loop panel */}
+      <AutoLoopPanel
+        isOpen={autoLoopPanelOpen}
+        onClose={() => setAutoLoopPanelOpen(false)}
         apiBase={BASE}
       />
 

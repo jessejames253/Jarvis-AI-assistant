@@ -40,6 +40,7 @@ import systemRouter       from "./system";
 import agentActionsRouter  from "./agentActions";
 import checkpointsRouter   from "./checkpoints";
 import executionsRouter    from "./executions";
+import autoLoopRouter      from "./autoLoop";
 
 // Register agents (self-register on import)
 import "../agents/plannerAgent";
@@ -67,5 +68,6 @@ router.use(systemRouter);
 router.use(agentActionsRouter);
 router.use(checkpointsRouter);
 router.use(executionsRouter);
+router.use(autoLoopRouter);
 
 export default router;

@@ -1,0 +1,67 @@
+[
+  {
+    "id": "25de5cc3-6ba3-4572-aa4e-8a70ac70c575",
+    "timestamp": "2026-05-26T23:08:52.152Z",
+    "type": "info",
+    "message": "AUTO MODE enabled by user."
+  },
+  {
+    "id": "79d410cf-f22d-4652-91da-169aa59497d2",
+    "timestamp": "2026-05-26T23:08:52.321Z",
+    "type": "info",
+    "message": "No eligible actions in queue. Waiting for new approved low-risk actions."
+  },
+  {
+    "id": "764939f3-2e40-4781-ad58-a3e2fc078d56",
+    "timestamp": "2026-05-26T23:08:52.847Z",
+    "type": "info",
+    "message": "Processing 1 eligible action(s)."
+  },
+  {
+    "id": "f785ab77-b3de-4e5d-9ee7-0abf345e1a3a",
+    "timestamp": "2026-05-26T23:08:52.847Z",
+    "type": "info",
+    "message": "Starting: \"Generate weekly agent report\"",
+    "actionId": "f617a2f8-136a-4789-9a3c-c0da1484ada4"
+  },
+  {
+    "id": "9b41bf70-f551-408a-9f17-dbb349d2f952",
+    "timestamp": "2026-05-26T23:08:52.849Z",
+    "type": "info",
+    "message": "Dry-run passed (safe): \"Generate weekly agent report\"",
+    "actionId": "f617a2f8-136a-4789-9a3c-c0da1484ada4"
+  },
+  {
+    "id": "0c7d4db9-7d30-435c-93c2-b2236ef0a1da",
+    "timestamp": "2026-05-26T23:08:52.849Z",
+    "type": "info",
+    "message": "Execution plan: generate report → .jarvas-data/reports/2026-05-26T23-08-52-generate-weekly-agent-report.md",
+    "actionId": "f617a2f8-136a-4789-9a3c-c0da1484ada4"
+  },
+  {
+    "id": "17c1fa04-a6de-4d98-855c-23dacd75f5e7",
+    "timestamp": "2026-05-26T23:08:52.869Z",
+    "type": "success",
+    "message": "Completed: \"Generate weekly agent report\" · generate report · ckpt 3548e463",
+    "actionId": "f617a2f8-136a-4789-9a3c-c0da1484ada4",
+    "executionId": "e5398d1a-4974-4e1a-ae67-2468a0224365"
+  },
+  {
+    "id": "389a4018-310a-4a7f-be5f-f29e1724a2c3",
+    "timestamp": "2026-05-26T23:08:53.331Z",
+    "type": "info",
+    "message": "AUTO MODE disabled by user."
+  },
+  {
+    "id": "66a2d694-8bb7-4ed6-87f1-4d3966e06f96",
+    "timestamp": "2026-05-26T23:08:53.461Z",
+    "type": "info",
+    "message": "AUTO MODE enabled by user."
+  },
+  {
+    "id": "8a1428d3-180f-44fd-bf56-0624dbddeee0",
+    "timestamp": "2026-05-26T23:08:53.816Z",
+    "type": "warning",
+    "message": "Safety lockout cleared by user. Monitor closely."
+  }
+]
