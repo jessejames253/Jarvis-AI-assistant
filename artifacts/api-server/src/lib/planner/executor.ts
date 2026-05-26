@@ -88,7 +88,7 @@ async function executeStep(
       max_tokens: 700,
       system: systemPrompt,
       messages: messages as Parameters<typeof anthropic.messages.create>[0]["messages"],
-      tools: TOOL_DEFINITIONS as Parameters<typeof anthropic.messages.create>[0]["tools"],
+      tools: TOOL_DEFINITIONS as unknown as Parameters<typeof anthropic.messages.create>[0]["tools"],
       stream: true,
     });
 

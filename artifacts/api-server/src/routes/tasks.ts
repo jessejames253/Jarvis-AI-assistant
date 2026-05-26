@@ -53,11 +53,11 @@ router.get("/tasks/:sessionId", async (req, res) => {
   }
 });
 
-router.post("/tasks", async (req, res) => {
+router.post("/tasks", async (req, res): Promise<void> => {
   try {
     const { sessionId, title, ...rest } = req.body as Record<string, string>;
     if (!sessionId || !title) {
-      return res.status(400).json({ error: "sessionId and title are required" });
+      res.status(400).json({ error: "sessionId and title are required" }); return;
     }
     const task = await createTask({ sessionId, title, ...rest } as Parameters<typeof createTask>[0]);
     res.status(201).json(task);
@@ -67,12 +67,12 @@ router.post("/tasks", async (req, res) => {
   }
 });
 
-router.patch("/tasks/:taskId", async (req, res) => {
+router.patch("/tasks/:taskId", async (req, res): Promise<void> => {
   try {
     const { sessionId, ...updates } = req.body as Record<string, string>;
-    if (!sessionId) return res.status(400).json({ error: "sessionId is required" });
-    const task = await updateTask(sessionId, req.params.taskId, updates as Parameters<typeof updateTask>[2]);
-    if (!task) return res.status(404).json({ error: "Task not found" });
+    if (!sessionId) { res.status(400).json({ error: "sessionId is required" }); return; }
+    const task = await updateTask(sessionId, req.params.taskId, updates as unknown as Parameters<typeof updateTask>[2]);
+    if (!task) { res.status(404).json({ error: "Task not found" }); return; }
     res.json(task);
   } catch (err) {
     console.error("[tasks] update error:", err);
@@ -80,12 +80,12 @@ router.patch("/tasks/:taskId", async (req, res) => {
   }
 });
 
-router.delete("/tasks/:taskId", async (req, res) => {
+router.delete("/tasks/:taskId", async (req, res): Promise<void> => {
   try {
     const sessionId = req.query.sessionId as string;
-    if (!sessionId) return res.status(400).json({ error: "sessionId query param required" });
+    if (!sessionId) { res.status(400).json({ error: "sessionId query param required" }); return; }
     const ok = await deleteTask(sessionId, req.params.taskId);
-    if (!ok) return res.status(404).json({ error: "Task not found" });
+    if (!ok) { res.status(404).json({ error: "Task not found" }); return; }
     res.json({ success: true });
   } catch (err) {
     console.error("[tasks] delete error:", err);
@@ -105,11 +105,11 @@ router.get("/projects/:sessionId", async (req, res) => {
   }
 });
 
-router.post("/projects", async (req, res) => {
+router.post("/projects", async (req, res): Promise<void> => {
   try {
     const { sessionId, name, ...rest } = req.body as Record<string, string>;
     if (!sessionId || !name) {
-      return res.status(400).json({ error: "sessionId and name are required" });
+      res.status(400).json({ error: "sessionId and name are required" }); return;
     }
     const project = await createProject({ sessionId, name, ...rest } as Parameters<typeof createProject>[0]);
     res.status(201).json(project);
@@ -119,12 +119,12 @@ router.post("/projects", async (req, res) => {
   }
 });
 
-router.patch("/projects/:projectId", async (req, res) => {
+router.patch("/projects/:projectId", async (req, res): Promise<void> => {
   try {
     const { sessionId, ...updates } = req.body as Record<string, string>;
-    if (!sessionId) return res.status(400).json({ error: "sessionId is required" });
+    if (!sessionId) { res.status(400).json({ error: "sessionId is required" }); return; }
     const project = await updateProject(sessionId, req.params.projectId, updates);
-    if (!project) return res.status(404).json({ error: "Project not found" });
+    if (!project) { res.status(404).json({ error: "Project not found" }); return; }
     res.json(project);
   } catch (err) {
     console.error("[projects] update error:", err);
@@ -132,12 +132,12 @@ router.patch("/projects/:projectId", async (req, res) => {
   }
 });
 
-router.delete("/projects/:projectId", async (req, res) => {
+router.delete("/projects/:projectId", async (req, res): Promise<void> => {
   try {
     const sessionId = req.query.sessionId as string;
-    if (!sessionId) return res.status(400).json({ error: "sessionId query param required" });
+    if (!sessionId) { res.status(400).json({ error: "sessionId query param required" }); return; }
     const ok = await deleteProject(sessionId, req.params.projectId);
-    if (!ok) return res.status(404).json({ error: "Project not found" });
+    if (!ok) { res.status(404).json({ error: "Project not found" }); return; }
     res.json({ success: true });
   } catch (err) {
     console.error("[projects] delete error:", err);
@@ -158,11 +158,11 @@ router.get("/goals/:sessionId", async (req, res) => {
   }
 });
 
-router.post("/goals", async (req, res) => {
+router.post("/goals", async (req, res): Promise<void> => {
   try {
     const { sessionId, title, date } = req.body as Record<string, string>;
     if (!sessionId || !title || !date) {
-      return res.status(400).json({ error: "sessionId, title, and date are required" });
+      res.status(400).json({ error: "sessionId, title, and date are required" }); return;
     }
     const goal = await createGoal({ sessionId, title, date });
     res.status(201).json(goal);
@@ -172,12 +172,12 @@ router.post("/goals", async (req, res) => {
   }
 });
 
-router.patch("/goals/:goalId", async (req, res) => {
+router.patch("/goals/:goalId", async (req, res): Promise<void> => {
   try {
     const { sessionId, done } = req.body as { sessionId: string; done: boolean };
-    if (!sessionId) return res.status(400).json({ error: "sessionId is required" });
+    if (!sessionId) { res.status(400).json({ error: "sessionId is required" }); return; }
     const goal = await updateGoal(sessionId, req.params.goalId, done);
-    if (!goal) return res.status(404).json({ error: "Goal not found" });
+    if (!goal) { res.status(404).json({ error: "Goal not found" }); return; }
     res.json(goal);
   } catch (err) {
     console.error("[goals] update error:", err);
@@ -185,12 +185,12 @@ router.patch("/goals/:goalId", async (req, res) => {
   }
 });
 
-router.delete("/goals/:goalId", async (req, res) => {
+router.delete("/goals/:goalId", async (req, res): Promise<void> => {
   try {
     const sessionId = req.query.sessionId as string;
-    if (!sessionId) return res.status(400).json({ error: "sessionId query param required" });
+    if (!sessionId) { res.status(400).json({ error: "sessionId query param required" }); return; }
     const ok = await deleteGoal(sessionId, req.params.goalId);
-    if (!ok) return res.status(404).json({ error: "Goal not found" });
+    if (!ok) { res.status(404).json({ error: "Goal not found" }); return; }
     res.json({ success: true });
   } catch (err) {
     console.error("[goals] delete error:", err);

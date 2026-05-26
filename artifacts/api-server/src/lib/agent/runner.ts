@@ -102,7 +102,7 @@ export async function runAgent(
     ...toolInput.history.slice(-20).map((h) => ({
       role: h.role as "user" | "assistant",
       content: h.content,
-    })),
+    }) as MessageParam),
     { role: "user", content: userContent },
   ];
 
@@ -124,7 +124,7 @@ export async function runAgent(
       max_tokens: 8192,
       system: SYSTEM_PROMPT,
       messages: messages as Parameters<typeof anthropic.messages.create>[0]["messages"],
-      tools: TOOL_DEFINITIONS as Parameters<typeof anthropic.messages.create>[0]["tools"],
+      tools: TOOL_DEFINITIONS as unknown as Parameters<typeof anthropic.messages.create>[0]["tools"],
       stream: true,
     });
 

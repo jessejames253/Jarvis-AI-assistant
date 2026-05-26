@@ -528,13 +528,13 @@ function StatusBar({
       const [health, patches, git] = await Promise.all([
         fetch(HEALTH_URL).then(r => r.ok).catch(() => false),
         fetch(PATCHES_URL).then(r => r.json() as Promise<{ ok: boolean; patches?: unknown[] }>).catch(() => ({ ok: false, patches: [] })),
-        fetch(`${GIT_URL}/status`).then(r => r.json() as Promise<{ branch?: string; changes?: number }>).catch(() => ({} as { branch?: string; changes?: number })),
+        fetch(`${GIT_URL}/status`).then(r => r.json() as Promise<{ branch?: string; changes?: Array<{ status: string; file: string }> | number }>).catch(() => ({} as { branch?: string; changes?: Array<{ status: string; file: string }> | number })),
       ]);
       setStatus({
         apiOnline: health === true,
         patchCount: (patches.patches ?? []).length,
         gitBranch: git.branch ?? "main",
-        gitDirty: (git.changes ?? 0) > 0,
+        gitDirty: (Array.isArray(git.changes) ? git.changes.length : (git.changes ?? 0)) > 0,
         taskStatus,
         tmpWarning: true,
       });
@@ -847,7 +847,7 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
 // ─── Workspace Tab ─────────────────────────────────────────────────────────────
 
 function WorkspaceTab({ onInsertPath }: { onInsertPath: (p: string) => void }) {
-  const [gitInfo, setGitInfo] = useState<{ branch?: string; changes?: number; available?: boolean } | null>(null);
+  const [gitInfo, setGitInfo] = useState<{ branch?: string; changes?: Array<{ status: string; file: string }> | number; available?: boolean } | null>(null);
   const [apiOk, setApiOk]     = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -855,7 +855,7 @@ function WorkspaceTab({ onInsertPath }: { onInsertPath: (p: string) => void }) {
       fetch(`${GIT_URL}/status`).then(r => r.json()).catch(() => null),
       fetch(HEALTH_URL).then(r => r.ok).catch(() => false),
     ]).then(([git, health]) => {
-      setGitInfo(git as { branch?: string; changes?: number; available?: boolean });
+      setGitInfo(git as { branch?: string; changes?: Array<{ status: string; file: string }> | number; available?: boolean });
       setApiOk(health === true);
     });
   }, []);
@@ -871,10 +871,12 @@ function WorkspaceTab({ onInsertPath }: { onInsertPath: (p: string) => void }) {
           {apiOk === null ? "checking…" : apiOk ? "API online" : "API offline"}
         </span>
         {gitInfo?.available && (
-          <span className="flex items-center gap-1.5" style={{ color: (gitInfo.changes ?? 0) > 0 ? "hsl(38 80% 62%)" : "hsl(196 30% 50%)" }}>
+          <span className="flex items-center gap-1.5" style={{ color: (Array.isArray(gitInfo.changes) ? gitInfo.changes.length : (gitInfo.changes ?? 0)) > 0 ? "hsl(38 80% 62%)" : "hsl(196 30% 50%)" }}>
             <GitBranch className="w-2.5 h-2.5" />
             {gitInfo.branch ?? "main"}
-            {(gitInfo.changes ?? 0) > 0 ? ` · ${gitInfo.changes} changed` : " · clean"}
+            {(Array.isArray(gitInfo.changes) ? gitInfo.changes.length : (gitInfo.changes ?? 0)) > 0
+              ? ` · ${Array.isArray(gitInfo.changes) ? gitInfo.changes.length : gitInfo.changes} changed`
+              : " · clean"}
           </span>
         )}
         <span className="ml-auto flex items-center gap-1 opacity-40" style={{ color: "hsl(38 60% 55%)" }}>
