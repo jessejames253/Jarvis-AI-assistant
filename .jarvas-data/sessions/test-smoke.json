@@ -1,0 +1,30 @@
+{
+  "sessionId": "test-smoke",
+  "messages": [
+    {
+      "role": "user",
+      "content": "ping",
+      "timestamp": "2026-05-26T01:00:02.189Z"
+    },
+    {
+      "role": "assistant",
+      "content": "pong. Online and ready.",
+      "timestamp": "2026-05-26T01:00:04.071Z"
+    },
+    {
+      "role": "user",
+      "content": "ping",
+      "timestamp": "2026-05-26T01:00:21.906Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Still here. What do you need?",
+      "timestamp": "2026-05-26T01:00:22.884Z"
+    }
+  ],
+  "summary": null,
+  "preferences": {},
+  "messageCount": 4,
+  "createdAt": "2026-05-26T01:00:02.187Z",
+  "updatedAt": "2026-05-26T01:00:22.884Z"
+}
