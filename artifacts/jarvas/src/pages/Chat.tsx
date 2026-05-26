@@ -28,6 +28,7 @@ import {
   Activity,
   Gauge,
   ScrollText,
+  ShieldCheck,
 } from "lucide-react";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
 import { useSpeechSession } from "@/hooks/useSpeechSession";
@@ -47,6 +48,7 @@ import JarvisTasksPanel    from "@/components/JarvisTasksPanel";
 import DiagnosticsPanel    from "@/components/DiagnosticsPanel";
 import SystemStatusPanel   from "@/components/SystemStatusPanel";
 import ActivityLogPanel    from "@/components/ActivityLogPanel";
+import AgentActionsPanel   from "@/components/AgentActionsPanel";
 import {
   approvePatch, rejectPatch as logRejectPatch, fetchPendingPatches,
   fetchServerStatus,
@@ -534,6 +536,7 @@ export default function Chat() {
   const [diagPanelOpen,   setDiagPanelOpen]   = useState(false);
   const [statusPanelOpen, setStatusPanelOpen] = useState(false);
   const [logsPanelOpen,   setLogsPanelOpen]   = useState(false);
+  const [actionsPanelOpen, setActionsPanelOpen] = useState(false);
   const autoRoutedRef = useRef(false);
 
   // ── Patch notification bar + server status ───────────────────────────────
@@ -1338,6 +1341,21 @@ export default function Chat() {
             <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: logsPanelOpen ? "hsl(196 100% 65%)" : "hsl(196 60% 55%)" }}>LOGS</span>
           </button>
 
+          {/* Agent Actions */}
+          <button
+            onClick={() => setActionsPanelOpen(v => !v)}
+            title="Agent action approvals"
+            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
+            style={{
+              background:  actionsPanelOpen ? "hsl(320 80% 55% / 0.12)" : "transparent",
+              borderColor: actionsPanelOpen ? "hsl(320 80% 55% / 0.5)" : "hsl(210 15% 30%)",
+            }}
+            aria-label="Open agent actions"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: actionsPanelOpen ? "hsl(320 80% 72%)" : "hsl(196 60% 55%)" }} />
+            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: actionsPanelOpen ? "hsl(320 80% 72%)" : "hsl(196 60% 55%)" }}>ACTIONS</span>
+          </button>
+
           {/* Dev Agent — visible on all screen sizes */}
           <button
             onClick={() => setDevPanelOpen(true)}
@@ -1666,6 +1684,13 @@ export default function Chat() {
       <ActivityLogPanel
         isOpen={logsPanelOpen}
         onClose={() => setLogsPanelOpen(false)}
+        apiBase={BASE}
+      />
+
+      {/* Agent Actions panel */}
+      <AgentActionsPanel
+        isOpen={actionsPanelOpen}
+        onClose={() => setActionsPanelOpen(false)}
         apiBase={BASE}
       />
 

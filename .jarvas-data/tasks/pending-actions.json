@@ -1,0 +1,22 @@
+[
+  {
+    "id": "0c20043f-4ff5-4a04-9921-20fb42fd31e4",
+    "title": "Enable auto-scaling",
+    "description": "Automatically scale worker pool based on queue depth",
+    "riskLevel": "medium",
+    "proposedBy": "planner-agent",
+    "status": "pending",
+    "createdAt": "2026-05-26T22:01:58.120Z",
+    "updatedAt": "2026-05-26T22:01:58.120Z"
+  },
+  {
+    "id": "34f7ee30-e72b-4d11-b289-48cd9defe2d4",
+    "title": "Wipe cache directory",
+    "description": "Remove all cached build artifacts to force a clean rebuild",
+    "riskLevel": "high",
+    "proposedBy": "builder-agent",
+    "status": "approved",
+    "createdAt": "2026-05-26T22:01:58.266Z",
+    "updatedAt": "2026-05-26T22:01:58.408Z"
+  }
+]
