@@ -1,0 +1,183 @@
+Build the next full Jarvis Dev Platform upgrade in safe batches.
+
+GOAL:
+Move Jarvis from a browser-local Dev Agent into a more stable production-style development platform.
+
+Implement all items below, but do it in ordered batches with verification after each batch.
+
+BATCH 1 — Backend persistent task system
+Create a backend-persisted Dev Task engine.
+
+Requirements:
+- Store Dev Agent tasks on disk or SQLite, not only localStorage
+- Each task must have:
+  - id
+  - title
+  - prompt
+  - status: queued | running | waiting_approval | applied | failed | rolled_back | cancelled
+  - createdAt
+  - updatedAt
+  - messages
+  - proposedPatches
+  - appliedPatches
+  - rollbackBackups
+  - lastError
+- Add routes:
+  - GET /api/dev/tasks
+  - GET /api/dev/tasks/:id
+  - POST /api/dev/tasks
+  - POST /api/dev/tasks/:id/resume
+  - POST /api/dev/tasks/:id/cancel
+  - DELETE /api/dev/tasks/:id
+
+BATCH 2 — Backend conversations for Dev Agent
+Move Dev Agent conversation persistence from localStorage into backend storage.
+
+Requirements:
+- Preserve existing localStorage fallback
+- Load backend session first
+- Save every Dev Agent message to backend
+- Restore after refresh, browser close, or Replit reload
+- Show “Session restored” when backend history loads
+
+BATCH 3 — Workspace snapshots
+Add snapshot support before approved patches.
+
+Requirements:
+- Before every approved patch, save a workspace snapshot or file-level snapshot
+- Add routes:
+  - POST /api/dev/snapshots
+  - GET /api/dev/snapshots
+  - POST /api/dev/snapshots/:id/restore
+- Snapshot must include changed file paths and previous contents
+- UI must show snapshot/restore option after patch apply
+
+BATCH 4 — Git workflow support
+Add safe Git integration if git is available.
+
+Requirements:
+- Detect if repo has git
+- Add routes:
+  - GET /api/dev/git/status
+  - POST /api/dev/git/commit
+  - POST /api/dev/git/revert
+- After approved patch, allow “Commit patch”
+- Commit message should be generated from the patch summary
+- Do not commit automatically unless user approves
+
+BATCH 5 — Validation pipeline
+After patch apply, automatically run available checks.
+
+Requirements:
+- Detect available scripts from package.json
+- Run typecheck/build/lint/test if present
+- Show results in Dev Agent UI
+- If validation fails:
+  - mark patch as failed_validation
+  - keep rollback available
+  - show exact error output
+- If validation passes:
+  - mark patch as validated
+
+BATCH 6 — Semantic project memory
+Add project architecture memory.
+
+Requirements:
+- Store project notes/rules in backend storage
+- Add routes:
+  - GET /api/dev/project-memory
+  - POST /api/dev/project-memory
+  - DELETE /api/dev/project-memory/:id
+- Agent prompt must load project memory before every task
+- Store:
+  - architecture notes
+  - coding rules
+  - UI conventions
+  - known bugs
+  - file map
+  - deployment notes
+
+BATCH 7 — File/symbol index
+Add a lightweight project index.
+
+Requirements:
+- Index files under the workspace
+- Track:
+  - file path
+  - imports
+  - exports
+  - functions/components found
+  - last modified time
+- Add route:
+  - GET /api/dev/index
+  - POST /api/dev/index/rebuild
+- Dev Agent should use this before proposing large changes
+
+BATCH 8 — Structured event stream
+Replace vague progress text with structured Dev Agent events.
+
+Events:
+- dev:task_created
+- dev:task_started
+- dev:file_listed
+- dev:file_read
+- dev:search_done
+- dev:plan_created
+- dev:patch_proposed
+- dev:approval_required
+- dev:patch_applied
+- dev:validation_started
+- dev:validation_done
+- dev:rollback_available
+- dev:error
+
+UI:
+- Render these as labeled chips/cards
+- Keep text concise
+- Do not spam repeated narration
+
+BATCH 9 — Service separation safety
+Make sure hot reload/restart does not destroy active state.
+
+Requirements:
+- No critical state only in memory
+- Pending patches must survive restart
+- Tasks must survive restart
+- Dev messages must survive restart
+- Snapshots must survive restart
+- If SSE disconnects, UI should show reconnect/resume option
+
+BATCH 10 — Final test pass
+Run complete verification.
+
+Test:
+1. Start Dev Agent task
+2. Ask it to propose a small placeholder text change
+3. Confirm labeled diff appears
+4. Approve patch
+5. Confirm validation runs
+6. Confirm rollback appears
+7. Refresh browser
+8. Confirm session/task/diff history restored
+9. Restart API server
+10. Confirm pending patch/task storage survives
+11. Test file browser
+12. Test project memory load
+13. Test git status route if available
+
+RULES:
+- Do not touch .env or secrets
+- Do not break normal chat
+- Do not break planner
+- Do not break voice
+- Do not break memory
+- Do not apply risky code without labeled diff first
+- Use plain English labels
+- Keep responses short
+- If something is too large for one pass, complete the backend persistence foundation first, then continue with the next batch
+- Final response must include:
+  - What changed
+  - Files changed
+  - What is verified
+  - What still needs manual testing
+  - How to rollback
