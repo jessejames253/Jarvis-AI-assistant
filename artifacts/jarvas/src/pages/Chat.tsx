@@ -40,6 +40,7 @@ import DebugPanel, { type DebugInfo } from "@/components/DebugPanel";
 import MarkdownContent from "@/components/MarkdownContent";
 import ToolStatusBubble, { type ToolCallInfo } from "@/components/ToolStatusBubble";
 import DevAgentPanel from "@/components/DevAgentPanel";
+import JarvisTasksPanel from "@/components/JarvisTasksPanel";
 import {
   approvePatch, rejectPatch as logRejectPatch, fetchPendingPatches,
   fetchServerStatus,
@@ -523,6 +524,7 @@ export default function Chat() {
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
   const [autoPlannerEnabled, setAutoPlannerEnabled] = useState(() => getAutoPlannerEnabled());
   const [devPanelOpen, setDevPanelOpen] = useState(() => getDevPanelOpen());
+  const [tasksPanelOpen, setTasksPanelOpen] = useState(false);
   const autoRoutedRef = useRef(false);
 
   // ── Patch notification bar + server status ───────────────────────────────
@@ -1267,6 +1269,21 @@ export default function Chat() {
             <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: "hsl(194 100% 55%)" }} />
           </button>
 
+          {/* Tasks panel — visible on all screen sizes */}
+          <button
+            onClick={() => setTasksPanelOpen(v => !v)}
+            title="Jarvis task list"
+            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
+            style={{
+              background:  tasksPanelOpen ? "hsl(150 60% 45% / 0.12)" : "transparent",
+              borderColor: tasksPanelOpen ? "hsl(150 60% 45% / 0.5)" : "hsl(210 15% 30%)",
+            }}
+            aria-label="Open task list"
+          >
+            <ListChecks className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: tasksPanelOpen ? "hsl(150 70% 65%)" : "hsl(196 60% 55%)" }} />
+            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: tasksPanelOpen ? "hsl(150 70% 65%)" : "hsl(196 60% 55%)" }}>TASKS</span>
+          </button>
+
           {/* Dev Agent — visible on all screen sizes */}
           <button
             onClick={() => setDevPanelOpen(true)}
@@ -1569,6 +1586,13 @@ export default function Chat() {
           }}
         />
       )}
+
+      {/* Jarvis Tasks panel */}
+      <JarvisTasksPanel
+        isOpen={tasksPanelOpen}
+        onClose={() => setTasksPanelOpen(false)}
+        apiBase={BASE}
+      />
 
       {/* Dev Agent panel */}
       {devPanelOpen && (
