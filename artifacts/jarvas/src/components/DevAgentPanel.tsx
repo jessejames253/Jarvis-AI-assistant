@@ -244,18 +244,42 @@ function CheckCard({ msg }: { msg: DevMessage }) {
   );
 }
 
-function ManualPatchCard({ msg }: { msg: DevMessage }) {
-  const [copied, setCopied] = useState(false);
+interface ManualPatchCardProps {
+  msg: DevMessage;
+  /** When provided, renders inline Approve/Reject action buttons. */
+  onApprove?: (patch: PatchData) => Promise<string | null>;
+  onReject?:  (patchId: string) => void;
+}
+
+function ManualPatchCard({ msg, onApprove, onReject }: ManualPatchCardProps) {
+  const [copied,     setCopied]     = useState(false);
+  const [applying,   setApplying]   = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const [applied,    setApplied]    = useState(false);
+
   const patch = msg.patch;
   if (!patch) return null;
+
   const copy = () => {
     navigator.clipboard.writeText(patch.newContent).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
   };
+
+  const handleApproveClick = async () => {
+    if (!onApprove) return;
+    setApplying(true);
+    setApplyError(null);
+    const err = await onApprove(patch);
+    setApplying(false);
+    if (err) setApplyError(err);
+    else setApplied(true);
+  };
+
   return (
     <div className="rounded-lg overflow-hidden text-xs" style={{ background: "hsl(38 80% 30% / 0.1)", border: "1px solid hsl(38 80% 50% / 0.3)" }}>
+      {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: "hsl(38 80% 50% / 0.2)" }}>
         <div className="flex items-center gap-2">
           <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(38 100% 62%)" }} />
@@ -268,6 +292,8 @@ function ManualPatchCard({ msg }: { msg: DevMessage }) {
           {copied ? "Copied!" : "Copy file"}
         </button>
       </div>
+
+      {/* Body */}
       <div className="px-3 py-2 flex flex-col gap-1.5">
         <p style={{ color: "hsl(38 80% 60%)" }}>
           <span className="opacity-60">File: </span>
@@ -283,6 +309,54 @@ function ManualPatchCard({ msg }: { msg: DevMessage }) {
           </pre>
         </details>
       </div>
+
+      {/* Inline result / action buttons */}
+      {applied ? (
+        <div className="flex items-center gap-2 px-3 py-2 border-t" style={{ borderColor: "hsl(142 60% 35% / 0.3)", background: "hsl(142 60% 30% / 0.08)" }}>
+          <Check className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(142 71% 60%)" }} />
+          <span style={{ color: "hsl(142 71% 65%)" }}>Patch applied successfully</span>
+        </div>
+      ) : (onApprove || onReject) && (
+        <div className="flex flex-col gap-1.5 px-3 py-2 border-t" style={{ borderColor: "hsl(38 80% 50% / 0.15)" }}>
+          {applyError && (
+            <div className="flex items-start gap-2 px-2 py-1.5 rounded-md text-[11px]"
+              style={{ background: "hsl(355 80% 40% / 0.12)", border: "1px solid hsl(355 80% 45% / 0.35)", color: "hsl(355 80% 68%)" }}>
+              <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+              <span className="break-all">{applyError}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            {onApprove && (
+              <button
+                type="button"
+                onClick={handleApproveClick}
+                disabled={applying}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 disabled:opacity-50"
+                style={{ background: "hsl(142 60% 35% / 0.25)", border: "1px solid hsl(142 60% 40% / 0.5)", color: "hsl(142 71% 65%)" }}>
+                {applying ? (
+                  <>
+                    <span className="inline-block w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                    Applying…
+                  </>
+                ) : "✓ Apply patch"}
+              </button>
+            )}
+            {onReject && (
+              <button
+                type="button"
+                onClick={() => onReject(patch.patchId)}
+                disabled={applying}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 disabled:opacity-50"
+                style={{ background: "hsl(355 80% 40% / 0.15)", border: "1px solid hsl(355 80% 45% / 0.4)", color: "hsl(355 80% 62%)" }}>
+                ✕ Reject
+              </button>
+            )}
+            <span className="text-[10px] ml-auto" style={{ color: "hsl(38 60% 40%)" }}>
+              Retry — previously failed to auto-apply
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2046,6 +2120,9 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
   const bottomRef        = useRef<HTMLDivElement>(null);
   const inputRef         = useRef<HTMLTextAreaElement>(null);
   const streamingTextRef = useRef("");
+  /** Always-current snapshot of messages, safe to read from any useCallback. */
+  const messagesRef      = useRef<DevMessage[]>([]);
+  messagesRef.current    = messages;
 
   // Check git on mount
   useEffect(() => {
@@ -2093,17 +2170,17 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
     setCurrentStage(null);
   }, []);
 
-  // ── Apply ──────────────────────────────────────────────────────────────────
+  // ── Apply helpers ──────────────────────────────────────────────────────────
 
-  const handleApprove = useCallback(async (patch: PatchData) => {
-    setMessages(prev => prev.map(m => m.patch?.patchId === patch.patchId ? { ...m, applying: true } : m));
-    setSseDropped(false);
-
-    const showFallback = () => {
-      setMessages(prev => prev.map(m => m.patch?.patchId === patch.patchId ? { ...m, applying: false } : m));
-      addMsg({ type: "manual_patch", patch });
-    };
-
+  /**
+   * Core apply logic — shared by handleApprove (chat DiffViewer) and
+   * ManualPatchCard inline buttons.
+   *
+   * Returns null on success, or a human-readable error string on failure.
+   * On success, updates the message card to patch_applied and replays
+   * validation events into the chat stream.
+   */
+  const tryApplyPatch = useCallback(async (patch: PatchData): Promise<string | null> => {
     let res: Response;
     try {
       res = await fetch(APPLY_URL, {
@@ -2112,16 +2189,12 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
         body: JSON.stringify({ patchId: patch.patchId, taskId, project: "jarvas" }),
       });
     } catch (err) {
-      addMsg({ type: "error", error: `Network error: ${String(err)}` });
-      showFallback();
-      return;
+      return `Network error: ${String(err)}`;
     }
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      addMsg({ type: "error", error: `${APPLY_URL} → HTTP ${res.status}: ${body.slice(0, 300)}` });
-      showFallback();
-      return;
+      return `Apply failed — HTTP ${res.status}: ${body.slice(0, 300)}`;
     }
 
     const data = await res.json() as {
@@ -2131,20 +2204,14 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
       validationEvents?: Array<Record<string, unknown>>;
     };
 
-    if (!data.ok) {
-      addMsg({ type: "error", error: data.error ?? "Apply failed" });
-      showFallback();
-      return;
-    }
+    if (!data.ok) return data.error ?? "Apply failed";
 
-    // Update patch card to applied + store snapshotId
     setMessages(prev => prev.map(m =>
       m.patch?.patchId === patch.patchId
         ? { ...m, type: "patch_applied" as DevEventType, applying: false, patch: { ...m.patch!, snapshotId: data.snapshotId } }
         : m,
     ));
 
-    // Replay validation events
     if (data.validationEvents) {
       for (const ev of data.validationEvents) {
         const t = ev.type as string;
@@ -2154,7 +2221,25 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
         else if (t === "dev:validation_done") addMsg({ type: "validation_done", validationPassed: ev.passed as boolean, validationSummary: ev.summary as string });
       }
     }
+
+    return null; // success
   }, [addMsg, taskId]);
+
+  /**
+   * Called by DiffViewer buttons in patch_proposed chat cards.
+   * Marks the card as applying, calls tryApplyPatch, and on failure shows
+   * an error message and a ManualPatchCard fallback.
+   */
+  const handleApprove = useCallback(async (patch: PatchData) => {
+    setMessages(prev => prev.map(m => m.patch?.patchId === patch.patchId ? { ...m, applying: true } : m));
+    setSseDropped(false);
+    const err = await tryApplyPatch(patch);
+    if (err) {
+      setMessages(prev => prev.map(m => m.patch?.patchId === patch.patchId ? { ...m, applying: false } : m));
+      addMsg({ type: "error", error: err });
+      addMsg({ type: "manual_patch", patch });
+    }
+  }, [addMsg, tryApplyPatch]);
 
   const handleReject = useCallback((patchId: string) => {
     setMessages(prev => prev.map(m =>
@@ -2220,6 +2305,20 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
     const goal = (overrideMsg ?? input).trim();
     if (!goal || isRunning) return;
     if (!overrideMsg) setInput("");
+
+    // ── Typed approval shortcuts (keep as fallback alongside inline buttons) ──
+    const upperGoal = goal.toUpperCase();
+    if (upperGoal === "APPROVE" || upperGoal === "REJECT") {
+      const pending = [...messagesRef.current]
+        .reverse()
+        .find(m => m.type === "patch_proposed" && m.patch && !m.applying);
+      if (pending?.patch) {
+        if (upperGoal === "APPROVE") await handleApprove(pending.patch);
+        else handleReject(pending.patch.patchId);
+        return;
+      }
+    }
+
     setIsRunning(true);
     setSseDropped(false);
     setLastMsg(goal);
@@ -2351,7 +2450,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
     streamingTextRef.current = "";
     setStreamingText("");
     if (!cleanClose) setSseDropped(true);
-  }, [input, isRunning, addMsg, taskId]);
+  }, [input, isRunning, addMsg, taskId, handleApprove, handleReject]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
@@ -2666,7 +2765,14 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
                       </div>
                     );
                   case "manual_patch":
-                    return <ManualPatchCard key={msg.id} msg={msg} />;
+                    return (
+                      <ManualPatchCard
+                        key={msg.id}
+                        msg={msg}
+                        onApprove={msg.patch ? (patch) => tryApplyPatch(patch) : undefined}
+                        onReject={handleReject}
+                      />
+                    );
                   case "error":
                     return (
                       <div key={msg.id} className="px-3 py-2 rounded-lg text-xs" style={{ background: "hsl(355 80% 40% / 0.1)", border: "1px solid hsl(355 80% 45% / 0.3)" }}>
