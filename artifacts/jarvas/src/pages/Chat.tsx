@@ -25,6 +25,9 @@ import {
   VolumeX,
   ListChecks,
   Code2,
+  Activity,
+  Gauge,
+  ScrollText,
 } from "lucide-react";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
 import { useSpeechSession } from "@/hooks/useSpeechSession";
@@ -40,7 +43,10 @@ import DebugPanel, { type DebugInfo } from "@/components/DebugPanel";
 import MarkdownContent from "@/components/MarkdownContent";
 import ToolStatusBubble, { type ToolCallInfo } from "@/components/ToolStatusBubble";
 import DevAgentPanel from "@/components/DevAgentPanel";
-import JarvisTasksPanel from "@/components/JarvisTasksPanel";
+import JarvisTasksPanel    from "@/components/JarvisTasksPanel";
+import DiagnosticsPanel    from "@/components/DiagnosticsPanel";
+import SystemStatusPanel   from "@/components/SystemStatusPanel";
+import ActivityLogPanel    from "@/components/ActivityLogPanel";
 import {
   approvePatch, rejectPatch as logRejectPatch, fetchPendingPatches,
   fetchServerStatus,
@@ -524,7 +530,10 @@ export default function Chat() {
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
   const [autoPlannerEnabled, setAutoPlannerEnabled] = useState(() => getAutoPlannerEnabled());
   const [devPanelOpen, setDevPanelOpen] = useState(() => getDevPanelOpen());
-  const [tasksPanelOpen, setTasksPanelOpen] = useState(false);
+  const [tasksPanelOpen,  setTasksPanelOpen]  = useState(false);
+  const [diagPanelOpen,   setDiagPanelOpen]   = useState(false);
+  const [statusPanelOpen, setStatusPanelOpen] = useState(false);
+  const [logsPanelOpen,   setLogsPanelOpen]   = useState(false);
   const autoRoutedRef = useRef(false);
 
   // ── Patch notification bar + server status ───────────────────────────────
@@ -1284,6 +1293,51 @@ export default function Chat() {
             <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: tasksPanelOpen ? "hsl(150 70% 65%)" : "hsl(196 60% 55%)" }}>TASKS</span>
           </button>
 
+          {/* Diagnostics */}
+          <button
+            onClick={() => setDiagPanelOpen(v => !v)}
+            title="Build & system diagnostics"
+            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
+            style={{
+              background:  diagPanelOpen ? "hsl(264 80% 55% / 0.12)" : "transparent",
+              borderColor: diagPanelOpen ? "hsl(264 80% 55% / 0.5)" : "hsl(210 15% 30%)",
+            }}
+            aria-label="Open diagnostics"
+          >
+            <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: diagPanelOpen ? "hsl(264 80% 72%)" : "hsl(196 60% 55%)" }} />
+            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: diagPanelOpen ? "hsl(264 80% 72%)" : "hsl(196 60% 55%)" }}>DIAG</span>
+          </button>
+
+          {/* System Status */}
+          <button
+            onClick={() => setStatusPanelOpen(v => !v)}
+            title="System status overview"
+            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
+            style={{
+              background:  statusPanelOpen ? "hsl(38 100% 55% / 0.12)" : "transparent",
+              borderColor: statusPanelOpen ? "hsl(38 100% 55% / 0.5)" : "hsl(210 15% 30%)",
+            }}
+            aria-label="Open system status"
+          >
+            <Gauge className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: statusPanelOpen ? "hsl(38 100% 70%)" : "hsl(196 60% 55%)" }} />
+            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: statusPanelOpen ? "hsl(38 100% 70%)" : "hsl(196 60% 55%)" }}>STATUS</span>
+          </button>
+
+          {/* Activity Logs */}
+          <button
+            onClick={() => setLogsPanelOpen(v => !v)}
+            title="Activity logs"
+            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
+            style={{
+              background:  logsPanelOpen ? "hsl(196 100% 45% / 0.12)" : "transparent",
+              borderColor: logsPanelOpen ? "hsl(196 100% 55% / 0.5)" : "hsl(210 15% 30%)",
+            }}
+            aria-label="Open activity logs"
+          >
+            <ScrollText className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: logsPanelOpen ? "hsl(196 100% 65%)" : "hsl(196 60% 55%)" }} />
+            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: logsPanelOpen ? "hsl(196 100% 65%)" : "hsl(196 60% 55%)" }}>LOGS</span>
+          </button>
+
           {/* Dev Agent — visible on all screen sizes */}
           <button
             onClick={() => setDevPanelOpen(true)}
@@ -1591,6 +1645,27 @@ export default function Chat() {
       <JarvisTasksPanel
         isOpen={tasksPanelOpen}
         onClose={() => setTasksPanelOpen(false)}
+        apiBase={BASE}
+      />
+
+      {/* Diagnostics panel */}
+      <DiagnosticsPanel
+        isOpen={diagPanelOpen}
+        onClose={() => setDiagPanelOpen(false)}
+        apiBase={BASE}
+      />
+
+      {/* System Status panel */}
+      <SystemStatusPanel
+        isOpen={statusPanelOpen}
+        onClose={() => setStatusPanelOpen(false)}
+        apiBase={BASE}
+      />
+
+      {/* Activity Log panel */}
+      <ActivityLogPanel
+        isOpen={logsPanelOpen}
+        onClose={() => setLogsPanelOpen(false)}
         apiBase={BASE}
       />
 
