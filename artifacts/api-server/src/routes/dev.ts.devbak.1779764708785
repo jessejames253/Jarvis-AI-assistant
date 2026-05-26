@@ -23,11 +23,7 @@ const router = Router();
 // ─── POST /dev/stream ─────────────────────────────────────────────────────────
 
 router.post("/dev/stream", async (req, res) => {
-  const {
-    message,
-    taskId: providedTaskId,
-    autoApprove = false,
-  } = req.body as { message?: string; taskId?: string; autoApprove?: boolean };
+  const { message, taskId: providedTaskId } = req.body as { message?: string; taskId?: string };
   if (!message?.trim()) { res.status(400).json({ error: "message is required" }); return; }
 
   res.setHeader("Content-Type", "text/event-stream");
@@ -57,10 +53,8 @@ router.post("/dev/stream", async (req, res) => {
   // Save user message
   addMessage(taskId, { role: "user", type: "user_message", text: message.trim() });
 
-  // Wrap send to also save agent messages to task.
-  // When autoApprove=true, patches flagged safeToTest are applied immediately
-  // without requiring a user round-trip — the result is streamed back inline.
-  const taskSend = async (data: Record<string, unknown>) => {
+  // Wrap send to also save agent messages to task
+  const taskSend = (data: Record<string, unknown>) => {
     send(data);
     const t = data.type as string;
     if (t === "dev:token") return; // don't save individual tokens
@@ -76,45 +70,6 @@ router.post("/dev/stream", async (req, res) => {
         riskLevel: data.riskLevel as "low" | "medium" | "high" | undefined,
         status: "proposed",
       });
-
-      // ── Auto-apply safe patches when autoApprove mode is active ──────────
-      if (autoApprove && data.safeToTest === true) {
-        const patchId = data.patchId as string;
-        send({ type: "dev:auto_applying", patchId, file: data.file, reason: "safeToTest=true + autoApprove mode" });
-
-        const { pendingPatches } = await import("../lib/dev/tools");
-        const patchEntry = pendingPatches.get(patchId);
-
-        // Create snapshot before apply
-        let snapshotId: string | undefined;
-        if (patchEntry) {
-          const snap = await createSnapshot({ patchId, file: patchEntry.file, taskId: taskId! });
-          snapshotId = snap.id;
-        }
-
-        const applyResult = await applyPatch(patchId);
-        if (!applyResult.ok) {
-          send({ type: "dev:auto_apply_failed", patchId, error: applyResult.error });
-        } else {
-          markPatchApplied(taskId!, patchId, snapshotId);
-
-          // Run validation and stream results
-          const validationSend = (d: Record<string, unknown>) => send(d);
-          const validation = await runValidation("jarvas", validationSend);
-          updateTask(taskId!, {
-            status: validation.passed ? "applied" : "failed",
-            validationResult: validation.passed ? "passed" : "failed",
-          });
-          send({
-            type: "dev:auto_applied",
-            patchId,
-            file: data.file,
-            snapshotId,
-            validationPassed: validation.passed,
-            validationSummary: validation.summary,
-          });
-        }
-      }
     } else if (t === "dev:error") {
       addMessage(taskId!, { role: "system", type: "error", error: data.error as string });
       updateTask(taskId!, { status: "failed", lastError: data.error as string });
@@ -122,8 +77,8 @@ router.post("/dev/stream", async (req, res) => {
   };
 
   try {
-    await runDevAgent(message.trim(), (d) => { void taskSend(d as Record<string, unknown>); }, () => cancelled);
-    // If we proposed patches (and didn't auto-apply), leave status as waiting_approval
+    await runDevAgent(message.trim(), taskSend, () => cancelled);
+    // If we proposed patches, leave status as waiting_approval
     const task = (await import("../lib/dev/taskStore")).getTask(taskId);
     if (task && task.status === "running") {
       updateTask(taskId, { status: "completed" });
