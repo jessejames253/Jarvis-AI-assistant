@@ -18,9 +18,10 @@ import {
   AlertTriangle, Trash2, RotateCcw, ClipboardCopy, Check,
   FolderOpen, Folder, FileText, ChevronRight, GitCommit,
   WifiOff, RefreshCw, BookOpen, Plus, Database,
-  Server, GitBranch, Layers, Archive, Play, HardDrive, Zap,
+  Server, GitBranch, Layers, Archive, Play, HardDrive, Zap, Network,
 } from "lucide-react";
 import DiffViewer from "./DiffViewer";
+import MultiAgentPanel from "./MultiAgentPanel";
 import MarkdownContent from "./MarkdownContent";
 
 const BASE          = import.meta.env.BASE_URL;
@@ -2016,7 +2017,7 @@ function ContextPill({
 // ─── Main panel ───────────────────────────────────────────────────────────────
 
 interface DevAgentPanelProps { onClose: () => void; }
-type PanelTab = "chat" | "workspace" | "patches" | "memory";
+type PanelTab = "chat" | "workspace" | "patches" | "memory" | "agents";
 
 export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
   const [tab, setTab]         = useState<PanelTab>("chat");
@@ -2390,7 +2391,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
             </div>
             {/* Tabs */}
             <div className="flex items-center gap-0.5 ml-2">
-              {(["chat", "workspace", "patches", "memory"] as PanelTab[]).map(t => (
+              {(["chat", "workspace", "patches", "memory", "agents"] as PanelTab[]).map(t => (
                 <button key={t} type="button" onClick={() => setTab(t)}
                   className="text-xs px-2.5 py-1 rounded-lg transition-all font-medium"
                   style={{
@@ -2401,6 +2402,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
                   {t === "chat"      ? "Chat"
                    : t === "workspace" ? <span className="flex items-center gap-1"><FolderOpen className="w-3 h-3" />Workspace</span>
                    : t === "patches"   ? <span className="flex items-center gap-1"><Layers className="w-3 h-3" />Patches</span>
+                   : t === "agents"    ? <span className="flex items-center gap-1"><Network className="w-3 h-3" />Agents</span>
                    : <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" />Memory</span>}
                 </button>
               ))}
@@ -2483,6 +2485,9 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
 
         {/* Memory tab */}
         {tab === "memory" && <div className="flex-1 overflow-hidden"><MemoryTab /></div>}
+
+        {/* Agents tab */}
+        {tab === "agents" && <div className="flex-1 overflow-hidden"><MultiAgentPanel /></div>}
 
         {/* Chat tab */}
         {tab === "chat" && (

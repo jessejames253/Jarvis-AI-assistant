@@ -1,0 +1,129 @@
+Begin Phase 4: Multi-Agent Architecture.
+
+Goal:
+Refactor Jarvis into a coordinated multi-agent system with specialized roles, shared context, bounded permissions, and task orchestration.
+
+Requirements:
+
+1. Create agent framework
+Add:
+- lib/agents/baseAgent.ts
+- lib/agents/registry.ts
+- lib/agents/taskGraph.ts
+- lib/agents/permissions.ts
+
+Each agent must define:
+- id
+- role
+- capabilities
+- allowed actions
+- risk limits
+- execution mode
+- system prompt builder
+
+2. Implement initial agents
+
+PlannerAgent
+- read-only
+- breaks goals into tasks
+- prioritizes work
+- cannot modify files
+
+BuilderAgent
+- can create patch proposals
+- cannot auto-apply risky changes
+- no direct git actions
+
+TesterAgent
+- runs validation/test commands
+- analyzes failures
+- can trigger AutoFix analysis
+- no file writing except safe auto-fix path
+
+ResearchAgent
+- analyzes architecture/codebase
+- suggests improvements
+- read-only
+
+GitAgent
+- manages checkpoints, diffs, commits, rollback metadata
+- no direct code generation
+
+3. Permission sandboxing
+Create strict permission boundaries.
+
+Examples:
+- PlannerAgent: READ only
+- BuilderAgent: PATCH_PROPOSAL only
+- TesterAgent: TEST_RUNNER only
+- GitAgent: CHECKPOINT + ROLLBACK only
+
+No agent gets unrestricted access.
+
+4. Shared context bus
+Create:
+- lib/agents/contextBus.ts
+
+Provides:
+- current tasks
+- project health
+- active patches
+- validation results
+- git state
+- auto-fix results
+- recent conversations
+- agent outputs
+
+5. Task graph system
+Create dependency-aware task orchestration.
+
+Features:
+- task ids
+- dependencies
+- status
+- assigned agent
+- retry count
+- risk score
+- validation state
+
+6. Agent orchestration
+Create orchestrator flow:
+User request
+→ PlannerAgent creates task graph
+→ BuilderAgent proposes changes
+→ TesterAgent validates
+→ AutoFix handles safe failures
+→ GitAgent checkpoints/applies/rolls back
+
+7. UI
+Add Multi-Agent panel showing:
+- active agents
+- current tasks
+- task ownership
+- validation state
+- risk levels
+- queued patches
+- recent agent actions
+
+8. Safety rules
+- No unrestricted autonomy
+- All risky changes require approval
+- All writes checkpointed
+- Rollback preserved
+- Agent permissions enforced server-side
+- Agents cannot escalate their own permissions
+
+9. Tests
+Add tests for:
+- permission enforcement
+- blocked action attempts
+- task graph execution
+- orchestration flow
+- rollback integrity
+- cross-agent communication
+- safe auto-fix integration
+
+10. Stability
+Keep app buildable throughout.
+Maintain all existing Phase 3 safety systems.
+No autonomous multi-agent execution yet.
