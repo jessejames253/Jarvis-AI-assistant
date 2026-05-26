@@ -146,9 +146,11 @@ export interface DiffViewerProps {
   onReject: () => void;
   applying?: boolean;
   metadata?: PatchMetadata;
+  showActions?: boolean;
+  showHeader?: boolean;
 }
 
-export default function DiffViewer({ file, description, oldContent, newContent, onApprove, onReject, applying, metadata }: DiffViewerProps) {
+export default function DiffViewer({ file, description, oldContent, newContent, onApprove, onReject, applying, metadata, showActions = true, showHeader = true }: DiffViewerProps) {
   const [expanded, setExpanded] = useState(false);
 
   const allLines  = computeDiff(oldContent, newContent);
@@ -162,20 +164,22 @@ export default function DiffViewer({ file, description, oldContent, newContent, 
   return (
     <div className="rounded-xl border overflow-hidden my-2" style={{ background: "hsl(220 20% 5%)", borderColor: "hsl(210 15% 18%)" }}>
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 px-3 py-2 border-b" style={{ borderColor: "hsl(210 15% 13%)" }}>
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono" style={{ color: "hsl(196 40% 40%)" }}>PROPOSED PATCH</span>
-            {isNewFile && <span className="text-xs font-mono px-1.5 py-0.5 rounded" style={{ background: "hsl(142 60% 35% / 0.2)", color: "hsl(142 71% 60%)" }}>NEW FILE</span>}
+      {showHeader && (
+        <div className="flex items-start justify-between gap-3 px-3 py-2 border-b" style={{ borderColor: "hsl(210 15% 13%)" }}>
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono" style={{ color: "hsl(196 40% 40%)" }}>PROPOSED PATCH</span>
+              {isNewFile && <span className="text-xs font-mono px-1.5 py-0.5 rounded" style={{ background: "hsl(142 60% 35% / 0.2)", color: "hsl(142 71% 60%)" }}>NEW FILE</span>}
+            </div>
+            <span className="text-xs font-mono truncate" style={{ color: "hsl(194 100% 65%)" }}>{file}</span>
+            <p className="text-xs mt-0.5 leading-snug" style={{ color: "hsl(196 25% 48%)" }}>{description}</p>
           </div>
-          <span className="text-xs font-mono truncate" style={{ color: "hsl(194 100% 65%)" }}>{file}</span>
-          <p className="text-xs mt-0.5 leading-snug" style={{ color: "hsl(196 25% 48%)" }}>{description}</p>
+          <div className="flex items-center gap-1.5 flex-shrink-0 text-xs font-mono">
+            {added   > 0 && <span style={{ color: "hsl(142 71% 55%)" }}>+{added}</span>}
+            {removed > 0 && <span style={{ color: "hsl(355 80% 62%)" }}>-{removed}</span>}
+          </div>
         </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0 text-xs font-mono">
-          {added   > 0 && <span style={{ color: "hsl(142 71% 55%)" }}>+{added}</span>}
-          {removed > 0 && <span style={{ color: "hsl(355 80% 62%)" }}>-{removed}</span>}
-        </div>
-      </div>
+      )}
 
       {/* Metadata */}
       {metadata && (metadata.riskLevel || metadata.uiImpact || metadata.logicImpact) && (
@@ -207,19 +211,21 @@ export default function DiffViewer({ file, description, oldContent, newContent, 
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-2 px-3 py-2 border-t" style={{ borderColor: "hsl(210 15% 13%)" }}>
-        <button type="button" onClick={onApprove} disabled={applying}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 disabled:opacity-50"
-          style={{ background: "hsl(142 60% 35% / 0.25)", border: "1px solid hsl(142 60% 40% / 0.5)", color: "hsl(142 71% 65%)" }}>
-          {applying ? "Applying…" : "✓ Apply patch"}
-        </button>
-        <button type="button" onClick={onReject} disabled={applying}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 disabled:opacity-50"
-          style={{ background: "hsl(355 80% 40% / 0.15)", border: "1px solid hsl(355 80% 45% / 0.4)", color: "hsl(355 80% 62%)" }}>
-          ✕ Reject
-        </button>
-        <span className="text-xs ml-auto" style={{ color: "hsl(210 15% 35%)" }}>Review carefully</span>
-      </div>
+      {showActions && (
+        <div className="flex items-center gap-2 px-3 py-2 border-t" style={{ borderColor: "hsl(210 15% 13%)" }}>
+          <button type="button" onClick={onApprove} disabled={applying}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 disabled:opacity-50"
+            style={{ background: "hsl(142 60% 35% / 0.25)", border: "1px solid hsl(142 60% 40% / 0.5)", color: "hsl(142 71% 65%)" }}>
+            {applying ? "Applying…" : "✓ Apply patch"}
+          </button>
+          <button type="button" onClick={onReject} disabled={applying}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 disabled:opacity-50"
+            style={{ background: "hsl(355 80% 40% / 0.15)", border: "1px solid hsl(355 80% 45% / 0.4)", color: "hsl(355 80% 62%)" }}>
+            ✕ Reject
+          </button>
+          <span className="text-xs ml-auto" style={{ color: "hsl(210 15% 35%)" }}>Review carefully</span>
+        </div>
+      )}
     </div>
   );
 }

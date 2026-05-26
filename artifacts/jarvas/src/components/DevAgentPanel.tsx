@@ -640,11 +640,11 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
         )}
 
         {patches.map(p => (
-          <div key={p.patchId} className="rounded-lg overflow-hidden"
+          <div key={p.patchId} className="rounded-lg overflow-hidden flex flex-col"
             style={{ border: "1px solid hsl(210 15% 18%)", background: "hsl(220 20% 6.5%)" }}>
 
-            {/* Header */}
-            <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b"
+            {/* Header — always visible */}
+            <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b flex-shrink-0"
               style={{ borderColor: "hsl(210 15% 14%)" }}>
               <FileEdit className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(194 100% 55%)" }} />
               <span className="font-mono text-xs truncate flex-1" style={{ color: "hsl(196 50% 65%)" }}>
@@ -656,10 +656,10 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
               </span>
             </div>
 
-            {/* Meta */}
-            <div className="px-3 py-2 flex flex-col gap-1 border-b" style={{ borderColor: "hsl(210 15% 13%)" }}>
-              <p className="text-xs" style={{ color: "hsl(196 40% 60%)" }}>{p.description}</p>
-              <div className="flex flex-wrap gap-3 text-[10px] opacity-70">
+            {/* Meta — always visible */}
+            <div className="px-3 py-1.5 flex flex-col gap-0.5 border-b flex-shrink-0" style={{ borderColor: "hsl(210 15% 13%)" }}>
+              <p className="text-xs leading-snug" style={{ color: "hsl(196 40% 60%)" }}>{p.description}</p>
+              <div className="flex flex-wrap gap-3 text-[10px] opacity-60">
                 {p.uiImpact && p.uiImpact !== "none" && (
                   <span style={{ color: "hsl(194 100% 60%)" }}>UI: {p.uiImpact}</span>
                 )}
@@ -672,8 +672,8 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
               </div>
             </div>
 
-            {/* Diff */}
-            <div className="px-3 py-2">
+            {/* Diff preview — height-capped and scrollable */}
+            <div className="overflow-y-auto overflow-x-auto" style={{ maxHeight: "min(220px, 40vh)" }}>
               <DiffViewer
                 file={p.file}
                 description={p.description}
@@ -683,7 +683,25 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
                 onReject={() => handleReject(p.patchId)}
                 applying={applying[p.patchId]}
                 metadata={{ riskLevel: p.riskLevel, uiImpact: p.uiImpact, logicImpact: p.logicImpact, safeToTest: p.safeToTest }}
+                showHeader={false}
+                showActions={false}
               />
+            </div>
+
+            {/* Action footer — always visible at card bottom */}
+            <div className="flex items-center gap-2 px-3 py-2.5 border-t flex-shrink-0"
+              style={{ borderColor: "hsl(210 15% 14%)", background: "hsl(220 20% 7.5%)" }}>
+              <button type="button" onClick={() => handleApprove(p)} disabled={applying[p.patchId]}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 disabled:opacity-50 flex-1 justify-center sm:flex-none sm:justify-start"
+                style={{ background: "hsl(142 60% 35% / 0.25)", border: "1px solid hsl(142 60% 40% / 0.5)", color: "hsl(142 71% 65%)" }}>
+                {applying[p.patchId] ? "Applying…" : "✓ Apply patch"}
+              </button>
+              <button type="button" onClick={() => handleReject(p.patchId)} disabled={applying[p.patchId]}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 disabled:opacity-50 flex-1 justify-center sm:flex-none sm:justify-start"
+                style={{ background: "hsl(355 80% 40% / 0.15)", border: "1px solid hsl(355 80% 45% / 0.4)", color: "hsl(355 80% 62%)" }}>
+                ✕ Reject
+              </button>
+              <span className="text-[10px] ml-auto hidden sm:block" style={{ color: "hsl(210 15% 35%)" }}>Review carefully</span>
             </div>
           </div>
         ))}
