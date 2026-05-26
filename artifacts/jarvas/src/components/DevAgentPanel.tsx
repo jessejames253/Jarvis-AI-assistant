@@ -24,7 +24,8 @@ import DiffViewer from "./DiffViewer";
 import MultiAgentPanel from "./MultiAgentPanel";
 import IntelPanel      from "./IntelPanel";
 import AutonomyPanel   from "./AutonomyPanel";
-import MarkdownContent from "./MarkdownContent";
+import MarkdownContent       from "./MarkdownContent";
+import InlinePatchActions     from "./InlinePatchActions";
 
 const BASE          = import.meta.env.BASE_URL;
 const STREAM_URL    = `${BASE}api/dev/stream`;
@@ -2678,7 +2679,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-3 flex flex-col gap-3">
-              {messages.map(msg => {
+              {messages.map((msg, idx) => {
                 switch (msg.type) {
                   case "restore_notice":
                     return (
@@ -2687,12 +2688,32 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
                         <span style={{ color: "hsl(194 100% 65%)" }}>{msg.text}</span>
                       </div>
                     );
-                  case "agent_text":
+                  case "agent_text": {
+                    // Look ahead up to 4 positions for a patch_proposed that is
+                    // still pending — renders inline Approve / Reject buttons directly
+                    // below this message card so the user never needs to type text.
+                    const nearbyPatchMsg = messages
+                      .slice(idx + 1, idx + 5)
+                      .find(m => m.type === "patch_proposed" && m.patch);
+                    const isPending = nearbyPatchMsg?.patch &&
+                      !messages.some(m =>
+                        m.patch?.patchId === nearbyPatchMsg.patch?.patchId &&
+                        (m.type === "patch_applied" || m.type === "patch_rejected"),
+                      );
                     return (
                       <div key={msg.id} className="px-0 py-1 text-sm" style={{ color: "hsl(196 40% 70%)" }}>
                         <MarkdownContent content={msg.text ?? ""} />
+                        {isPending && nearbyPatchMsg?.patch && (
+                          <InlinePatchActions
+                            patch={nearbyPatchMsg.patch}
+                            onApprove={() => tryApplyPatch(nearbyPatchMsg.patch!)}
+                            onReject={handleReject}
+                            siblingApplying={nearbyPatchMsg.applying}
+                          />
+                        )}
                       </div>
                     );
+                  }
                   case "file_op":
                     return <FileOpCard key={msg.id} msg={msg} />;
                   case "check_started":
@@ -2712,6 +2733,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
                         onApprove={() => handleApprove(msg.patch!)}
                         onReject={() => handleReject(msg.patch!.patchId)}
                         applying={msg.applying}
+                        showActions={true}
                         metadata={{
                           riskLevel:   msg.patch.riskLevel,
                           uiImpact:    msg.patch.uiImpact,
