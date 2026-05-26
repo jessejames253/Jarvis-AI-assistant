@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import DiffViewer from "./DiffViewer";
 import MultiAgentPanel from "./MultiAgentPanel";
+import IntelPanel      from "./IntelPanel";
 import MarkdownContent from "./MarkdownContent";
 
 const BASE          = import.meta.env.BASE_URL;
@@ -2017,7 +2018,7 @@ function ContextPill({
 // ─── Main panel ───────────────────────────────────────────────────────────────
 
 interface DevAgentPanelProps { onClose: () => void; }
-type PanelTab = "chat" | "workspace" | "patches" | "memory" | "agents";
+type PanelTab = "chat" | "workspace" | "patches" | "memory" | "agents" | "intel";
 
 export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
   const [tab, setTab]         = useState<PanelTab>("chat");
@@ -2391,7 +2392,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
             </div>
             {/* Tabs */}
             <div className="flex items-center gap-0.5 ml-2">
-              {(["chat", "workspace", "patches", "memory", "agents"] as PanelTab[]).map(t => (
+              {(["chat", "workspace", "patches", "memory", "agents", "intel"] as PanelTab[]).map(t => (
                 <button key={t} type="button" onClick={() => setTab(t)}
                   className="text-xs px-2.5 py-1 rounded-lg transition-all font-medium"
                   style={{
@@ -2488,6 +2489,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
 
         {/* Agents tab */}
         {tab === "agents" && <div className="flex-1 overflow-hidden"><MultiAgentPanel /></div>}
+        {tab === "intel"  && <div className="flex-1 overflow-hidden"><IntelPanel /></div>}
 
         {/* Chat tab */}
         {tab === "chat" && (

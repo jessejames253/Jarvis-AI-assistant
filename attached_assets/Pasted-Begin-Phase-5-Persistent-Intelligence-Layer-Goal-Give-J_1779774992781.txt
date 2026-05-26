@@ -1,0 +1,128 @@
+Begin Phase 5: Persistent Intelligence Layer.
+
+Goal:
+Give Jarvis long-term memory, architecture understanding, historical learning, and persistent project intelligence across sessions.
+
+Requirements:
+
+1. Create memory system
+Add:
+- lib/memory/memoryStore.ts
+- lib/memory/architectureGraph.ts
+- lib/memory/projectHistory.ts
+- lib/memory/patternLearning.ts
+- lib/memory/decisionLog.ts
+- lib/memory/contextCompression.ts
+
+2. Persistent architecture graph
+Jarvis should maintain a live graph of:
+- modules
+- APIs/routes
+- agent relationships
+- dependencies
+- UI components
+- validation systems
+- AutoFix systems
+- orchestration flow
+
+Track:
+- imports
+- exports
+- ownership
+- coupling strength
+- risk hotspots
+
+3. Historical memory
+Store:
+- successful fixes
+- failed fixes
+- rollback history
+- recurring TS errors
+- recurring runtime issues
+- validation outcomes
+- prior architecture decisions
+- common workflows
+- user-approved patterns
+
+4. Decision logging
+Track:
+- why a patch was approved
+- why a rollback occurred
+- why a task failed
+- why a retry happened
+- agent reasoning summaries
+- risk rationale
+
+5. Pattern learning
+Jarvis should identify:
+- repeated fixes
+- repeated failures
+- unstable files
+- high-risk modules
+- common dependency chains
+- successful patch patterns
+
+Generate:
+- confidence boosts
+- risk adjustments
+- architectural recommendations
+
+6. Memory compression
+Implement summarization/compression so memory remains scalable.
+
+Rules:
+- preserve critical architecture decisions
+- preserve rollback history
+- preserve security/risk events
+- compress repetitive validation logs
+- compress duplicate failures
+
+7. Context retrieval
+Agents should retrieve relevant memory automatically based on:
+- affected files
+- issue type
+- task category
+- related architecture area
+- historical similarity
+
+8. Persistent recommendations
+Add suggestions such as:
+- "This module frequently fails validation"
+- "This fix pattern previously succeeded"
+- "This dependency chain caused rollbacks before"
+- "Risk elevated due to historical instability"
+
+9. UI
+Add Memory tab with:
+- architecture graph viewer
+- recent decisions
+- recurring issues
+- risk hotspots
+- learned patterns
+- rollback history
+- project evolution timeline
+- memory search
+
+10. Safety
+- Memory cannot auto-grant permissions
+- Historical confidence cannot bypass approvals
+- Memory retrieval is read-only
+- Risk history must always remain visible
+- Rollback history cannot be deleted automatically
+
+11. Tests
+Add tests for:
+- memory persistence
+- architecture graph integrity
+- decision logging
+- retrieval relevance
+- compression behavior
+- pattern detection
+- risk history preservation
+- rollback history persistence
+- existing 149 tests still pass
+
+12. Stability
+Keep the app buildable.
+Preserve all Phase 3 and Phase 4 safety systems.
+No autonomous self-directed coding yet.

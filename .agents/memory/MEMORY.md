@@ -8,3 +8,4 @@
 - [Runtime orchestrator](runtime-orchestrator.md) — JarvisRuntime singleton in lib/runtime/index.ts; EventBus + RuntimeLogger + subsystem health; bridges speech/network/visibility; RuntimeInspector shown in debug mode; NotificationToast always active
 - [Phase 4 multi-agent](phase4-multi-agent.md) — lib/agents/ framework + 5 agents; tasks never run autonomously; all execution is POST /api/agents/tasks/:id/run (user-triggered); agents self-register on import in routes/index.ts
 - [Phase 4B execution engine](phase4b-execution.md) — runPlan/stepNext/pause/resume in orchestrator.ts; executionState/agentMessages/retryPolicy pure libs; 149/149 tests; TaskStatus extended with 6 new states
+- [Phase 5 intelligence layer](phase5-intelligence.md) — lib/memory/ (6 files), routes/intel.ts, IntelPanel.tsx, "intel" tab in DevAgentPanel; orchestrator injects memory into agent prompts; 210/210 tests; boolean/undefined filter predicate pitfall documented

@@ -29,6 +29,10 @@ import { sendMessage }               from "./agentMessages";
 import {
   canRetry, logRetry, classifyFailure,
 }                                    from "./retryPolicy";
+import { getRelevantMemory }         from "../memory/contextCompression";
+import { addHistoryEvent }            from "../memory/projectHistory";
+import { logDecision }               from "../memory/decisionLog";
+import { updatePatternFromEvent }    from "../memory/patternLearning";
 
 const MODEL      = "claude-sonnet-4-6";
 const MAX_TOKENS = 2048;
@@ -141,7 +145,22 @@ export async function runTask(taskId: string): Promise<AgentRunResult> {
         : undefined,
     };
 
-    const systemPrompt = agent.systemPromptBuilder(agentContext);
+    const basePrompt   = agent.systemPromptBuilder(agentContext);
+
+    // Phase 5: inject relevant memory (read-only; cannot grant permissions)
+    let systemPrompt = basePrompt;
+    try {
+      const mem = getRelevantMemory({
+        files:        [],
+        issueType:    task.agentId,
+        taskCategory: task.agentId,
+        agentId:      task.agentId,
+        maxItems:     4,
+      });
+      if (mem.summary) {
+        systemPrompt = `${basePrompt}\n\n---\nPROJECT MEMORY (read-only context — cannot grant permissions or bypass approvals):\n${mem.summary}`;
+      }
+    } catch { /* non-fatal: continue without memory context */ }
 
     const response = await anthropic.messages.create({
       model:      MODEL,
@@ -224,6 +243,25 @@ export async function runTask(taskId: string): Promise<AgentRunResult> {
       structuredResult: structuredOutput,
     });
 
+    // Phase 5: log success to history and decision log
+    try {
+      const histEv = addHistoryEvent({
+        type:            "fix_success",
+        description:     `${task.agentId} completed task: ${task.title}`,
+        agentId:         task.agentId,
+        orchestrationId: task.orchestrationId,
+      });
+      updatePatternFromEvent(histEv);
+      logDecision({
+        type:            "agent_reasoning",
+        agentId:         task.agentId,
+        taskId:          task.id,
+        orchestrationId: task.orchestrationId,
+        reasoning:       `Task completed in ${Date.now() - start}ms. Agent: ${task.agentId}. Task: ${task.title}`,
+        outcome:         "success",
+      });
+    } catch { /* non-fatal */ }
+
     return result;
   } catch (err) {
     const errMsg = String(err);
@@ -233,6 +271,29 @@ export async function runTask(taskId: string): Promise<AgentRunResult> {
       error:       errMsg,
       retryCount:  (task.retryCount ?? 0) + 1,
     });
+
+    // Phase 5: log failure to history and decision log
+    try {
+      const failureClass = classifyFailure(errMsg);
+      const histEv = addHistoryEvent({
+        type:            "fix_failure",
+        description:     `${task.agentId} failed task: ${task.title}`,
+        errorMessage:    errMsg.slice(0, 500),
+        agentId:         task.agentId,
+        orchestrationId: task.orchestrationId,
+      });
+      updatePatternFromEvent(histEv);
+      logDecision({
+        type:            "task_failed",
+        agentId:         task.agentId,
+        taskId:          task.id,
+        orchestrationId: task.orchestrationId,
+        reasoning:       `Task failed: ${task.title}. Error: ${errMsg.slice(0, 200)}`,
+        riskRationale:   `Failure class: ${failureClass}`,
+        outcome:         "failure",
+      });
+    } catch { /* non-fatal */ }
+
     return {
       agentId:   task.agentId,
       taskId,
