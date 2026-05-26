@@ -1,0 +1,189 @@
+{
+  "goal": "Add a real-time notification system so Jarvis can push alerts to the user when long-running agent tasks complete",
+  "changeType": "feature",
+  "riskTolerance": "medium",
+  "reasonedAt": "2026-05-26T23:50:06.441Z",
+  "confidence": 78,
+  "summary": "Implement a Server-Sent Events (SSE) endpoint on the API server to push real-time notifications to the frontend when long-running agent tasks complete. The backend will emit events from the existing agent/task execution pipeline via a shared event bus, and the frontend will consume them using a dedicated React hook, surfacing alerts through the existing NotificationToast component.",
+  "recommendedFiles": [
+    {
+      "path": "artifacts/api-server/src/routes/notifications.ts",
+      "role": "create",
+      "reason": "New SSE route (GET /api/notifications/stream) that clients subscribe to for real-time push events. Manages SSE connection lifecycle and writes events from the notification event bus.",
+      "priority": "high"
+    },
+    {
+      "path": "artifacts/api-server/src/lib/notificationBus.ts",
+      "role": "create",
+      "reason": "Shared in-process EventEmitter-based bus that decouples producers (agent task completion, autoLoop, autonomy cycles) from SSE consumers. Provides typed emit/subscribe API.",
+      "priority": "high"
+    },
+    {
+      "path": "artifacts/api-server/src/routes/index.ts",
+      "role": "modify",
+      "reason": "Register the new notifications router so /api/notifications/stream is mounted and reachable.",
+      "priority": "high"
+    },
+    {
+      "path": "artifacts/api-server/src/lib/executionEngine.ts",
+      "role": "modify",
+      "reason": "Emit a 'task:complete' or 'task:failed' event to notificationBus when agent task executions finish, providing task id, status, and summary payload.",
+      "priority": "high"
+    },
+    {
+      "path": "artifacts/jarvas/src/hooks/useNotificationStream.ts",
+      "role": "create",
+      "reason": "React hook that opens an EventSource connection to /api/notifications/stream, parses incoming events, and exposes a notifications array plus a dismiss callback.",
+      "priority": "high"
+    },
+    {
+      "path": "artifacts/jarvas/src/components/NotificationToast.tsx",
+      "role": "modify",
+      "reason": "Already exists as a component; wire it to consume notifications from useNotificationStream and render real-time agent alerts.",
+      "priority": "medium"
+    },
+    {
+      "path": "artifacts/jarvas/src/pages/Dashboard.tsx",
+      "role": "modify",
+      "reason": "Mount the useNotificationStream hook at the top-level Dashboard so notifications are available globally across all panels.",
+      "priority": "medium"
+    }
+  ],
+  "affectedSystems": [
+    {
+      "name": "Agent Task Execution Pipeline",
+      "impact": "high",
+      "reason": "executionEngine and agentActionExecutor must emit events on task completion/failure, coupling them to the new notificationBus."
+    },
+    {
+      "name": "API Server Routing",
+      "impact": "medium",
+      "reason": "A persistent SSE connection changes server resource usage patterns; the Express server must handle long-lived HTTP connections without timeout interference."
+    },
+    {
+      "name": "Frontend Notification UX",
+      "impact": "medium",
+      "reason": "NotificationToast and Dashboard are updated to surface real-time alerts, affecting the primary user-facing interaction surface."
+    },
+    {
+      "name": "AutoLoop / Autonomy Systems",
+      "impact": "low",
+      "reason": "autoLoop and autonomy cycle completions are good candidates for secondary notification events, requiring minor emit calls in autoLoop.ts and autonomyController."
+    }
+  ],
+  "implementationPlan": [
+    {
+      "order": 1,
+      "title": "Create the notificationBus module",
+      "description": "Implement a typed EventEmitter singleton in artifacts/api-server/src/lib/notificationBus.ts. Define a NotificationEvent interface with fields: id (uuid), type ('task:complete' | 'task:failed' | 'autonomy:cycle-done' | 'info'), title, message, timestamp, and optional metadata. Export emit() and subscribe() helpers.",
+      "files": [
+        "artifacts/api-server/src/lib/notificationBus.ts"
+      ]
+    },
+    {
+      "order": 2,
+      "title": "Add SSE notifications route",
+      "description": "Create artifacts/api-server/src/routes/notifications.ts with GET /api/notifications/stream. Set headers (Content-Type: text/event-stream, Cache-Control: no-cache, Connection: keep-alive). Subscribe to notificationBus and write 'data: <json>\\n\\n' for each event. Clean up subscription on client disconnect (req.on('close')). Send a heartbeat comment every 30 seconds to prevent proxy timeouts.",
+      "files": [
+        "artifacts/api-server/src/routes/notifications.ts"
+      ]
+    },
+    {
+      "order": 3,
+      "title": "Register the notifications route in the router index",
+      "description": "Import and mount the notifications router in artifacts/api-server/src/routes/index.ts under the path /api/notifications.",
+      "files": [
+        "artifacts/api-server/src/routes/index.ts"
+      ]
+    },
+    {
+      "order": 4,
+      "title": "Emit events from the execution engine",
+      "description": "In artifacts/api-server/src/lib/executionEngine.ts, import notificationBus and call emit() with a 'task:complete' or 'task:failed' event after an agent task finishes. Include the task id, name/title, and final status. Optionally add a similar emit in autoLoop.ts on loop-tick completion for 'info' events.",
+      "files": [
+        "artifacts/api-server/src/lib/executionEngine.ts",
+        "artifacts/api-server/src/lib/autoLoop.ts"
+      ]
+    },
+    {
+      "order": 5,
+      "title": "Create the useNotificationStream React hook",
+      "description": "Implement artifacts/jarvas/src/hooks/useNotificationStream.ts using the browser EventSource API pointed at /api/notifications/stream. Parse JSON event data, accumulate notifications in useState, and expose { notifications, dismiss(id) }. Handle reconnect on error with exponential backoff. Return a cleanup function that closes the EventSource.",
+      "files": [
+        "artifacts/jarvas/src/hooks/useNotificationStream.ts"
+      ]
+    },
+    {
+      "order": 6,
+      "title": "Wire NotificationToast to the stream and mount at Dashboard",
+      "description": "In Dashboard.tsx, call useNotificationStream() and pass the notifications list to NotificationToast. Modify NotificationToast.tsx to accept a notifications prop (or read from a context) and render a stacked toast list with auto-dismiss after 6 seconds and a manual close button.",
+      "files": [
+        "artifacts/jarvas/src/pages/Dashboard.tsx",
+        "artifacts/jarvas/src/components/NotificationToast.tsx"
+      ]
+    },
+    {
+      "order": 7,
+      "title": "Extend to autonomy and plan completions",
+      "description": "Add notificationBus.emit() calls in autonomyController when a cycle completes or stops, and in planner/executor when a plan finishes. Use the 'autonomy:cycle-done' type so the frontend can optionally render distinct styling.",
+      "files": [
+        "artifacts/api-server/src/lib/autonomyController.ts",
+        "artifacts/api-server/src/lib/planner/executor.ts"
+      ]
+    }
+  ],
+  "risks": [
+    {
+      "description": "SSE connections are persistent; many simultaneous browser tabs or clients could exhaust server file descriptors or memory if the subscriber list is not bounded.",
+      "severity": "medium",
+      "mitigation": "Cap max concurrent SSE clients (e.g. 50) in the route handler and reject new connections with 503 when the limit is reached. Log active connection count."
+    },
+    {
+      "description": "The in-process EventEmitter notificationBus only works in a single-process deployment. If the API server is ever clustered or multi-process, events won't propagate across workers.",
+      "severity": "medium",
+      "mitigation": "Document the single-process constraint clearly. For future scaling, design the bus interface so it can be swapped for a Redis pub/sub adapter without changing consumers."
+    },
+    {
+      "description": "Reverse proxies (nginx, Replit's routing layer) may buffer SSE responses or enforce request timeouts that disconnect the stream prematurely.",
+      "severity": "medium",
+      "mitigation": "Send a comment-only heartbeat (':\\n\\n') every 25-30 seconds. Set X-Accel-Buffering: no header. Implement client-side automatic reconnect in useNotificationStream."
+    },
+    {
+      "description": "Modifying executionEngine to emit events could introduce side effects or errors that inadvertently suppress task completion logic if the emit call throws.",
+      "severity": "low",
+      "mitigation": "Wrap all notificationBus.emit() calls in try/catch so notification failures never affect the primary execution flow."
+    }
+  ],
+  "validationPlan": [
+    {
+      "type": "typecheck",
+      "description": "Ensure NotificationEvent types are consistent across notificationBus, the SSE route, and the frontend hook with no implicit any.",
+      "command": "pnpm --filter @workspace/api-server tsc --noEmit && pnpm --filter @workspace/jarvas tsc --noEmit"
+    },
+    {
+      "type": "test",
+      "description": "Unit test notificationBus: verify emit() triggers subscribers with correct payload and cleanup unsubscribes properly.",
+      "command": "pnpm --filter @workspace/api-server test -- --testPathPattern=notificationBus"
+    },
+    {
+      "type": "manual",
+      "description": "Open the Jarvas Dashboard in a browser, trigger a long-running agent task via AgentActionsPanel or DevAgentPanel, and verify a toast notification appears within 2 seconds of task completion.",
+      "command": null
+    },
+    {
+      "type": "manual",
+      "description": "Open two browser tabs simultaneously and confirm both receive the same notification events. Close one tab and verify the server cleanly removes its SSE subscriber.",
+      "command": null
+    },
+    {
+      "type": "e2e",
+      "description": "Use curl to subscribe to /api/notifications/stream, then POST to /api/agent-actions/:id/execute and verify a 'task:complete' SSE event is received within the expected timeframe.",
+      "command": "curl -N http://localhost:5000/api/notifications/stream"
+    },
+    {
+      "type": "lint",
+      "description": "Run linter across new and modified files to ensure code style consistency.",
+      "command": "pnpm --filter @workspace/api-server lint && pnpm --filter @workspace/jarvas lint"
+    }
+  ]
+}

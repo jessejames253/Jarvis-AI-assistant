@@ -61,6 +61,7 @@ import AutoLoopPanel       from "@/components/AutoLoopPanel";
 import PlansPanel          from "@/components/PlansPanel";
 import PriorityPanel       from "@/components/PriorityPanel";
 import WorkspacePanel      from "@/components/WorkspacePanel";
+import ReasonPanel         from "@/components/ReasonPanel";
 import {
   approvePatch, rejectPatch as logRejectPatch, fetchPendingPatches,
   fetchServerStatus,
@@ -555,6 +556,7 @@ export default function Chat() {
   const [plansPanelOpen,        setPlansPanelOpen]        = useState(false);
   const [priorityPanelOpen,     setPriorityPanelOpen]     = useState(false);
   const [workspacePanelOpen,    setWorkspacePanelOpen]    = useState(false);
+  const [reasonPanelOpen,       setReasonPanelOpen]       = useState(false);
   const autoRoutedRef = useRef(false);
 
   // ── Patch notification bar + server status ───────────────────────────────
@@ -1464,6 +1466,21 @@ export default function Chat() {
             <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: workspacePanelOpen ? "hsl(28 100% 72%)" : "hsl(196 60% 55%)" }}>WORKSPACE</span>
           </button>
 
+          {/* Repo Reasoner */}
+          <button
+            onClick={() => setReasonPanelOpen(v => !v)}
+            title="Repo Reasoning — AI analysis of where and how to make changes"
+            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
+            style={{
+              background:  reasonPanelOpen ? "hsl(264 80% 68% / 0.12)" : "transparent",
+              borderColor: reasonPanelOpen ? "hsl(264 80% 68% / 0.5)"  : "hsl(210 15% 30%)",
+            }}
+            aria-label="Open repo reasoning panel"
+          >
+            <Brain className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: reasonPanelOpen ? "hsl(264 80% 80%)" : "hsl(196 60% 55%)" }} />
+            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: reasonPanelOpen ? "hsl(264 80% 80%)" : "hsl(196 60% 55%)" }}>REASON</span>
+          </button>
+
           {/* Dev Agent — visible on all screen sizes */}
           <button
             onClick={() => setDevPanelOpen(true)}
@@ -1841,6 +1858,13 @@ export default function Chat() {
       <WorkspacePanel
         isOpen={workspacePanelOpen}
         onClose={() => setWorkspacePanelOpen(false)}
+        apiBase={BASE}
+      />
+
+      {/* Repo reasoning panel */}
+      <ReasonPanel
+        isOpen={reasonPanelOpen}
+        onClose={() => setReasonPanelOpen(false)}
         apiBase={BASE}
       />
 

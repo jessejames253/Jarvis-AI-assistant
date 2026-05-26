@@ -44,6 +44,7 @@ import autoLoopRouter      from "./autoLoop";
 import plansRouter         from "./plans";
 import prioritizerRouter   from "./prioritizer";
 import workspaceRouter     from "./workspace";
+import repoReasonerRouter  from "./repoReasoner";
 
 // Register agents (self-register on import)
 import "../agents/plannerAgent";
@@ -75,5 +76,6 @@ router.use(autoLoopRouter);
 router.use(plansRouter);
 router.use(prioritizerRouter);
 router.use(workspaceRouter);
+router.use(repoReasonerRouter);
 
 export default router;
