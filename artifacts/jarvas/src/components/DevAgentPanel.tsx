@@ -28,6 +28,7 @@ import MarkdownContent       from "./MarkdownContent";
 import InlinePatchActions     from "./InlinePatchActions";
 import PatchActionButtons     from "./PatchActionButtons";
 import { approvePatch, rejectPatch as logRejectPatch } from "@/lib/patchApproval";
+import { parseApprovalInput } from "@/lib/approvalInput";
 
 const BASE          = import.meta.env.BASE_URL;
 const STREAM_URL    = `${BASE}api/dev/stream`;
@@ -2317,16 +2318,18 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
     if (!overrideMsg) setInput("");
 
     // ── Typed approval shortcuts (keep as fallback alongside inline buttons) ──
-    const upperGoal = goal.toUpperCase();
-    if (upperGoal === "APPROVE" || upperGoal === "REJECT") {
+    const approvalIntent = parseApprovalInput(goal);
+    if (approvalIntent) {
       const pending = [...messagesRef.current]
         .reverse()
         .find(m => m.type === "patch_proposed" && m.patch && !m.applying);
       if (pending?.patch) {
-        if (upperGoal === "APPROVE") await handleApprove(pending.patch);
+        if (approvalIntent === "approve") await handleApprove(pending.patch);
         else handleReject(pending.patch.patchId);
-        return;
+      } else {
+        addMsg({ type: "agent_text", text: "No pending patch to approve or reject." });
       }
+      return;
     }
 
     setIsRunning(true);

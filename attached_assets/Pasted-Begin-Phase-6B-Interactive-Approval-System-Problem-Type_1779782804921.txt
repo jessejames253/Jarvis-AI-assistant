@@ -1,0 +1,84 @@
+Begin Phase 6B: Interactive Approval System.
+
+Problem:
+Typed APPROVE/REJECT works, but Jarvis still does not render real clickable approval buttons, and pending patches do not appear/sync correctly in DEV → Patches.
+
+Goal:
+Finish Phase 6B by making approvals fully interactive, synced, persistent, and testable.
+
+Requirements:
+
+1. Shared approval state
+- Create one shared approval/patch state source used by:
+  - Jarvis chat
+  - DEV → Patches panel
+  - typed APPROVE/REJECT fallback
+- Every pending proposal must have:
+  - proposalId / patchId
+  - status: pending/applied/rejected/failed
+  - target file
+  - risk
+  - diff summary
+  - validation status
+  - createdAt / updatedAt
+
+2. Jarvis chat buttons
+- Under every pending proposal message, render actual clickable buttons:
+  - Approve Patch
+  - Reject Patch
+- These must be real button elements, not markdown/text.
+- Buttons must call the same approval/rejection logic as typed commands.
+- Disable buttons while submitting.
+- Show success/failure inline.
+
+3. DEV → Patches panel
+- Pending patches must appear in the DEV Patches area.
+- Each pending patch card must have:
+  - Approve
+  - Reject
+  - View Diff
+- After approval:
+  - show applied status
+  - show validation result
+  - show rollback button if available
+- After rejection:
+  - show rejected status
+  - keep audit history visible
+
+4. Approval handler
+- Create shared functions:
+  - approvePatch(patchId)
+  - rejectPatch(patchId)
+- Use them for:
+  - chat buttons
+  - DEV patch buttons
+  - typed APPROVE/REJECT
+- If no patchId is supplied, use the active pending patch.
+- If no pending patch exists, show clear message.
+
+5. Sync + persistence
+- Approval state must sync between Jarvis chat and DEV Patches.
+- Approval state must survive refresh.
+- No duplicate approval on double tap/click.
+- Revalidate permissions before apply.
+- Never auto-apply without user click/type approval.
+
+6. Errors
+- Replace generic errors with exact backend error messages.
+- Log which patchId is approved/rejected.
+- Show inline error if backend rejects action.
+
+7. Tests
+Add tests for:
+- typed APPROVE still works
+- lowercase approve works
+- Jarvis chat renders real approve/reject buttons
+- DEV Patches renders real approve/reject buttons
+- clicking Approve calls approvePatch with correct patchId
+- clicking Reject calls rejectPatch with correct patchId
+- double-click does not duplicate apply
+- approval state persists after refresh
+- backend errors display inline
+- existing tests still pass
+
+Do not mark complete unless real clickable buttons appear in BOTH Jarvis chat and DEV → Patches.

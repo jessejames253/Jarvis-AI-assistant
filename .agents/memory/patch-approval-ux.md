@@ -20,9 +20,16 @@ All three approval surfaces (Jarvis main chat, DEV panel chat tab, DEV panel Pat
 - Props: `patchId, isApplying?, onApprove, onReject`
 - Always renders buttons with `aria-label="Approve Patch"` / `aria-label="Reject Patch"` so tests can use `getByRole("button", { name: /approve patch/i })` regardless of text content during `isApplying` state.
 
-## Tests
-- `src/__tests__/patchApprovalUX.test.tsx` — 21 tests covering lib functions (approvePatch, rejectPatch, fetchPendingPatches), PatchActionButtons, and InlinePatchActions.
-- `src/__tests__/InlinePatchActions.test.tsx` — 10 tests for the DEV chat-tab look-ahead component.
-- Total: 31/31 passing.
+## Key utilities
+- `src/lib/approvalInput.ts` — `parseApprovalInput(input)` returns `"approve" | "reject" | null`; used by DevAgentPanel sendMessage for typed shortcut detection (case-insensitive, whitespace-trimmed).
+- `src/components/PatchNotificationBar.tsx` — standalone component (extracted from Chat.tsx) that accepts `patches`, `approvingId`, `errorMessage`, `onApprove`, `onReject` as props. No fetch/state inside — Chat.tsx owns that. Enables independent rendering in tests.
+
+## Typed APPROVE / no-pending-patch message
+DevAgentPanel sendMessage now uses `parseApprovalInput(goal)` and shows `"No pending patch to approve or reject."` if no patch_proposed message is found in the backlog.
+
+## Tests (Phase 6B complete)
+- `src/__tests__/patchApprovalUX.test.tsx` — 45 tests: parseApprovalInput (8), approvePatch lib (6), rejectPatch (1), fetchPendingPatches/persistence (3), PatchActionButtons (7), PatchNotificationBar (11), InlinePatchActions (7 in this file) + 2 act-warning-only
+- `src/__tests__/InlinePatchActions.test.tsx` — 8 tests for the DEV chat-tab look-ahead component.
+- Total: 53/53 passing, 0 TypeScript errors.
 
 **Why:** Centralising in one lib + one shared component ensures consistent HTTP payload, consistent console logging, and a single place to update when the approval API changes. Without this, each surface was duplicating the fetch logic with subtle differences (e.g., project inference, taskId handling).

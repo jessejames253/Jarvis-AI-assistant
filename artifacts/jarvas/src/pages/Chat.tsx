@@ -25,9 +25,6 @@ import {
   VolumeX,
   ListChecks,
   Code2,
-  CheckCircle,
-  XCircle,
-  FileEdit,
 } from "lucide-react";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
 import { useSpeechSession } from "@/hooks/useSpeechSession";
@@ -44,6 +41,7 @@ import MarkdownContent from "@/components/MarkdownContent";
 import ToolStatusBubble, { type ToolCallInfo } from "@/components/ToolStatusBubble";
 import DevAgentPanel from "@/components/DevAgentPanel";
 import { approvePatch, rejectPatch as logRejectPatch, fetchPendingPatches, type PendingPatchSummary } from "@/lib/patchApproval";
+import PatchNotificationBar from "@/components/PatchNotificationBar";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1342,62 +1340,13 @@ export default function Chat() {
       </main>
 
       {/* ── Pending patch notification bar ────────────────────────────────── */}
-      {pendingPatches.filter(p => !dismissedIds.has(p.patchId)).length > 0 && (
-        <div
-          data-testid="patch-notification-bar"
-          className="relative z-10 flex-shrink-0 border-t border-b flex flex-col gap-1.5 px-4 sm:px-8 py-2.5"
-          style={{ borderColor: "hsl(38 100% 55% / 0.35)", background: "hsl(38 100% 55% / 0.06)" }}
-        >
-          <div className="flex items-center gap-1.5">
-            <FileEdit className="w-3 h-3 flex-shrink-0" style={{ color: "hsl(38 100% 62%)" }} />
-            <span className="text-xs font-semibold tracking-wider" style={{ color: "hsl(38 100% 62%)" }}>
-              PENDING PATCHES — approve or reject:
-            </span>
-          </div>
-
-          {patchBarError && (
-            <p className="text-xs pl-4" style={{ color: "hsl(355 80% 62%)" }}>
-              {patchBarError}
-            </p>
-          )}
-
-          {pendingPatches
-            .filter(p => !dismissedIds.has(p.patchId))
-            .map(p => (
-              <div key={p.patchId} className="flex items-center gap-2 pl-4 min-w-0">
-                <span className="font-mono text-xs truncate flex-1 min-w-0" style={{ color: "hsl(196 50% 65%)" }}>
-                  {p.file.split("/").pop()}
-                </span>
-
-                <button
-                  type="button"
-                  onClick={() => handleApprovePatch(p)}
-                  disabled={approvingPatchId === p.patchId}
-                  aria-label="Approve Patch"
-                  data-testid={`approve-patch-${p.patchId}`}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold active:scale-95 transition-all disabled:opacity-40 flex-shrink-0"
-                  style={{ background: "hsl(142 60% 35% / 0.22)", border: "1px solid hsl(142 60% 40% / 0.45)", color: "hsl(142 71% 65%)" }}
-                >
-                  <CheckCircle className="w-3 h-3" />
-                  {approvingPatchId === p.patchId ? "Applying…" : "Approve Patch"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleRejectPatch(p)}
-                  disabled={approvingPatchId === p.patchId}
-                  aria-label="Reject Patch"
-                  data-testid={`reject-patch-${p.patchId}`}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold active:scale-95 transition-all disabled:opacity-40 flex-shrink-0"
-                  style={{ background: "hsl(355 80% 40% / 0.12)", border: "1px solid hsl(355 80% 45% / 0.35)", color: "hsl(355 80% 62%)" }}
-                >
-                  <XCircle className="w-3 h-3" />
-                  Reject Patch
-                </button>
-              </div>
-            ))}
-        </div>
-      )}
+      <PatchNotificationBar
+        patches={pendingPatches.filter(p => !dismissedIds.has(p.patchId))}
+        approvingId={approvingPatchId}
+        errorMessage={patchBarError}
+        onApprove={handleApprovePatch}
+        onReject={handleRejectPatch}
+      />
 
       {/* ── Input bar ── */}
       <footer className="relative z-10 flex-shrink-0 border-t border-border/60 bg-background/90 backdrop-blur-sm px-3 sm:px-8 pt-3 pb-safe"
