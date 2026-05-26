@@ -12,7 +12,7 @@
 import { Router } from "express";
 import { runDevAgent } from "../lib/dev/agent";
 import {
-  applyPatch, rollbackFile, listProjectFilesRest, readProjectFileRest,
+  applyPatch, rollbackFile, listProjectFilesRest, readProjectFileRest, PROJECT_ROOT,
 } from "../lib/dev/tools";
 import { createSnapshot } from "../lib/dev/snapshotStore";
 import { createTask, updateTask, addMessage, addPatchToTask, markPatchApplied } from "../lib/dev/taskStore";
@@ -195,6 +195,41 @@ router.post("/dev/apply", async (req, res) => {
     },
     validationEvents,
   });
+});
+
+// ─── POST /dev/snapshots/:id/restore ─────────────────────────────────────────
+// Restore a file to its pre-patch state using a saved snapshot.
+// Creates a backup of the current file before restoring, then runs validation.
+// This is the clean rollback path when a snapshotId is known after apply.
+
+router.post("/dev/snapshots/:id/restore", async (req, res): Promise<void> => {
+  const { id } = req.params as { id: string };
+  try {
+    const { restoreSnapshot, getSnapshot } = await import("../lib/dev/snapshotStore");
+    const snap = getSnapshot(id);
+    if (!snap) { res.status(404).json({ ok: false, error: "Snapshot not found" }); return; }
+
+    // Back up the current file before restoring (so rollback itself is reversible)
+    const { default: fs } = await import("fs/promises");
+    const { default: path } = await import("path");
+    const abs = path.resolve(PROJECT_ROOT, snap.file);
+    try {
+      await fs.copyFile(abs, `${abs}.devbak.${Date.now()}`);
+    } catch { /* new file — no backup needed */ }
+
+    const result = await restoreSnapshot(id);
+    if (!result.ok) { res.status(400).json({ ok: false, error: result.error }); return; }
+
+    // Run validation after restore so the user can see the health impact
+    const validationEvents: object[] = [];
+    const { runValidation } = await import("../lib/dev/validator");
+    const project = snap.file.startsWith("artifacts/api-server") ? "api-server" : "jarvas";
+    const validation = await runValidation(project as "jarvas" | "api-server", (d) => validationEvents.push(d));
+
+    res.json({ ok: true, file: snap.file, validation: { passed: validation.passed, summary: validation.summary }, validationEvents });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err) });
+  }
 });
 
 // ─── POST /dev/rollback ───────────────────────────────────────────────────────

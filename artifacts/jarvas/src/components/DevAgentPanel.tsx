@@ -40,6 +40,7 @@ const IMPROVEMENTS_URL = `${BASE}api/dev/improvements`;
 const AUTOFIX_URL      = `${BASE}api/dev/autofix`;
 const AUTOFIX_HIST_URL = `${BASE}api/dev/autofix/history`;
 const DEV_CONTEXT_URL  = `${BASE}api/dev/context`;
+const SNAP_RESTORE_URL = `${BASE}api/dev/snapshots`;
 
 const LS_MESSAGES   = "jarvas_dev_messages";
 const LS_TASK_ID    = "jarvas_dev_current_task";
@@ -802,7 +803,18 @@ interface PendingPatchFull {
   uiImpact?: string;
   logicImpact?: string;
   safeToTest?: boolean;
+  testCommand?: string;
   createdAt: number;
+}
+
+interface AppliedPatch extends PendingPatchFull {
+  appliedAt: number;
+  snapshotId?: string;
+  validationPassed: boolean;
+  validationSummary: string;
+  rolledBack?: boolean;
+  rollbackPending?: boolean;
+  rollbackValidationPassed?: boolean;
 }
 
 // ─── Improvements Section ────────────────────────────────────────────────────
@@ -1168,9 +1180,10 @@ function ImprovementsSection({
 // in a single row. Diff is hidden until the user taps ▼. Sticky bulk-action
 // bar sits above the list when patches are present.
 function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean) => void }) {
-  const [patches,  setPatches]  = useState<PendingPatchFull[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [applying, setApplying] = useState<Record<string, boolean>>({});
+  const [patches,       setPatches]       = useState<PendingPatchFull[]>([]);
+  const [appliedPatches,setAppliedPatches] = useState<AppliedPatch[]>([]);
+  const [loading,       setLoading]       = useState(true);
+  const [applying,      setApplying]      = useState<Record<string, boolean>>({});
   // expanded[patchId] = true → show diff; false / absent → collapsed
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
@@ -1194,17 +1207,28 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
   const handleApprove = useCallback(async (p: PendingPatchFull) => {
     setApplying(prev => ({ ...prev, [p.patchId]: true }));
     try {
+      const project = p.file.startsWith("artifacts/api-server") ? "api-server" : "jarvas";
       const r = await fetch(APPLY_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patchId: p.patchId, project: "jarvas" }),
+        body: JSON.stringify({ patchId: p.patchId, project }),
       });
-      const d = await r.json() as { ok: boolean; error?: string; validation?: { passed: boolean; summary: string } };
+      const d = await r.json() as {
+        ok: boolean; error?: string; snapshotId?: string;
+        validation?: { passed: boolean; summary: string };
+      };
       if (d.ok) {
-        onMessage(`✓ Applied \`${p.file}\` — validation ${d.validation?.passed ? "passed" : "failed"}: ${d.validation?.summary ?? ""}`);
-        // remove only this patch; leave all other cards + expanded state intact
+        const applied: AppliedPatch = {
+          ...p,
+          appliedAt: Date.now(),
+          snapshotId: d.snapshotId,
+          validationPassed: d.validation?.passed ?? false,
+          validationSummary: d.validation?.summary ?? "no summary",
+        };
         setPatches(prev => prev.filter(x => x.patchId !== p.patchId));
         setExpanded(prev => { const n = { ...prev }; delete n[p.patchId]; return n; });
+        setAppliedPatches(prev => [applied, ...prev].slice(0, 20));
+        onMessage(`✓ Applied \`${p.file}\` — TS check ${d.validation?.passed ? "passed ✓" : "failed ✗"}: ${d.validation?.summary ?? ""}`);
       } else {
         onMessage(d.error ?? "Apply failed", true);
       }
@@ -1218,6 +1242,37 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
     setPatches(prev => prev.filter(p => p.patchId !== patchId));
     setExpanded(prev => { const n = { ...prev }; delete n[patchId]; return n; });
     onMessage("Patch rejected — removed from queue.");
+  }, [onMessage]);
+
+  const handleRollback = useCallback(async (ap: AppliedPatch) => {
+    setAppliedPatches(prev => prev.map(x => x.patchId === ap.patchId ? { ...x, rollbackPending: true } : x));
+    try {
+      let r: Response;
+      if (ap.snapshotId) {
+        r = await fetch(`${SNAP_RESTORE_URL}/${ap.snapshotId}/restore`, { method: "POST" });
+      } else {
+        r = await fetch(ROLLBACK_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file: ap.file }),
+        });
+      }
+      const d = await r.json() as { ok: boolean; error?: string; validation?: { passed: boolean; summary: string } };
+      if (d.ok) {
+        setAppliedPatches(prev => prev.map(x =>
+          x.patchId === ap.patchId
+            ? { ...x, rolledBack: true, rollbackPending: false, rollbackValidationPassed: d.validation?.passed }
+            : x
+        ));
+        onMessage(`↩ Rolled back \`${ap.file}\` — TS check ${d.validation?.passed ? "passed ✓" : "failed ✗"}`);
+      } else {
+        setAppliedPatches(prev => prev.map(x => x.patchId === ap.patchId ? { ...x, rollbackPending: false } : x));
+        onMessage(d.error ?? "Rollback failed", true);
+      }
+    } catch (err) {
+      setAppliedPatches(prev => prev.map(x => x.patchId === ap.patchId ? { ...x, rollbackPending: false } : x));
+      onMessage(`Network error: ${String(err)}`, true);
+    }
   }, [onMessage]);
 
   /* ── bulk actions ── */
@@ -1362,12 +1417,33 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
                 </button>
               </div>
 
-              {/* ── Expanded: description + scrollable diff ── */}
+              {/* ── Expanded: description + metadata + scrollable diff ── */}
               {isExpanded && (
                 <div className="border-t" style={{ borderColor: "hsl(210 15% 13%)" }}>
-                  <p className="px-3 py-1.5 text-xs leading-snug" style={{ color: "hsl(196 40% 58%)" }}>
+                  <p className="px-3 pt-2 pb-1 text-xs leading-snug" style={{ color: "hsl(196 40% 58%)" }}>
                     {p.description}
                   </p>
+                  {/* Metadata row: impacts + test command */}
+                  <div className="px-3 pb-2 flex flex-wrap gap-x-4 gap-y-1">
+                    {p.uiImpact && p.uiImpact !== "unknown" && (
+                      <span className="text-[10px] opacity-70" style={{ color: "hsl(264 60% 70%)" }}>
+                        <span className="opacity-60">UI·</span> {p.uiImpact}
+                      </span>
+                    )}
+                    {p.logicImpact && p.logicImpact !== "unknown" && (
+                      <span className="text-[10px] opacity-70" style={{ color: "hsl(196 50% 65%)" }}>
+                        <span className="opacity-60">Logic·</span> {p.logicImpact}
+                      </span>
+                    )}
+                    {p.testCommand && (
+                      <div className="w-full mt-1 flex items-start gap-1.5">
+                        <Play className="w-3 h-3 flex-shrink-0 mt-0.5" style={{ color: "hsl(142 70% 55%)" }} />
+                        <code className="text-[10px] font-mono break-all" style={{ color: "hsl(142 70% 65%)" }}>
+                          {p.testCommand}
+                        </code>
+                      </div>
+                    )}
+                  </div>
                   <div className="overflow-y-auto overflow-x-auto" style={{ maxHeight: "min(240px, 42vh)" }}>
                     <DiffViewer
                       file={p.file}
@@ -1387,6 +1463,103 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
             </div>
           );
         })}
+
+        {/* ── Applied patches history ─────────────────────────────────────── */}
+        {appliedPatches.length > 0 && (
+          <div className="mt-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider px-1 mb-1.5 opacity-50"
+              style={{ color: "hsl(210 15% 65%)" }}>
+              Applied ({appliedPatches.length})
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {appliedPatches.map(ap => {
+                const rc = riskColor(ap.riskLevel);
+                const isRollingBack = ap.rollbackPending ?? false;
+                return (
+                  <div key={ap.patchId} className="rounded-lg overflow-hidden"
+                    style={{
+                      border: `1px solid ${ap.rolledBack ? "hsl(38 100% 50% / 0.25)" : "hsl(210 15% 15%)"}`,
+                      background: ap.rolledBack ? "hsl(38 100% 50% / 0.04)" : "hsl(220 20% 5.5%)",
+                      opacity: ap.rolledBack ? 0.7 : 1,
+                    }}>
+
+                    {/* Card header */}
+                    <div className="flex items-center gap-2 px-3 py-2 min-w-0">
+                      {ap.rolledBack
+                        ? <RotateCcw className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(38 100% 62%)" }} />
+                        : <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(142 71% 55%)" }} />
+                      }
+
+                      <span className="font-mono text-xs truncate flex-1 min-w-0" style={{ color: "hsl(196 40% 55%)" }}>
+                        {ap.file.split("/").pop()}
+                      </span>
+
+                      {/* Snapshot / checkpoint badge */}
+                      {ap.snapshotId && !ap.rolledBack && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded flex-shrink-0"
+                          style={{ background: "hsl(264 80% 60% / 0.12)", border: "1px solid hsl(264 80% 60% / 0.25)", color: "hsl(264 80% 72%)" }}>
+                          checkpoint
+                        </span>
+                      )}
+
+                      {/* Risk pill */}
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-mono flex-shrink-0"
+                        style={{ background: `${rc}10`, border: `1px solid ${rc}30`, color: `${rc}` }}>
+                        {ap.riskLevel ?? "?"}
+                      </span>
+
+                      {/* Validation badge */}
+                      {!ap.rolledBack && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded flex-shrink-0 font-semibold"
+                          style={{
+                            background: ap.validationPassed ? "hsl(142 70% 50% / 0.12)" : "hsl(355 80% 50% / 0.12)",
+                            border: `1px solid ${ap.validationPassed ? "hsl(142 70% 50% / 0.3)" : "hsl(355 80% 50% / 0.3)"}`,
+                            color: ap.validationPassed ? "hsl(142 70% 65%)" : "hsl(355 80% 65%)",
+                          }}>
+                          {ap.validationPassed ? "TS ✓" : "TS ✗"}
+                        </span>
+                      )}
+
+                      {/* Rollback status or button */}
+                      {ap.rolledBack ? (
+                        <span className="text-[9px] flex-shrink-0 opacity-60"
+                          style={{ color: "hsl(38 100% 62%)" }}>
+                          rolled back {ap.rollbackValidationPassed !== undefined && (ap.rollbackValidationPassed ? "· TS ✓" : "· TS ✗")}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={isRollingBack}
+                          onClick={() => handleRollback(ap)}
+                          title="Restore file to pre-patch state using saved checkpoint"
+                          className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-all disabled:opacity-40 active:scale-95"
+                          style={{ background: "hsl(38 100% 50% / 0.08)", border: "1px solid hsl(38 100% 50% / 0.3)", color: "hsl(38 100% 65%)" }}>
+                          <RotateCcw className="w-2.5 h-2.5" />
+                          {isRollingBack ? "…" : "↩"}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Description + test command (always shown on applied cards) */}
+                    <div className="px-3 pb-2 border-t" style={{ borderColor: "hsl(210 15% 10%)" }}>
+                      <p className="text-[10px] pt-1.5 leading-snug opacity-60" style={{ color: "hsl(196 30% 60%)" }}>
+                        {ap.description}
+                      </p>
+                      {ap.testCommand && (
+                        <div className="flex items-start gap-1 mt-1">
+                          <Play className="w-2.5 h-2.5 flex-shrink-0 mt-0.5 opacity-60" style={{ color: "hsl(142 70% 55%)" }} />
+                          <code className="text-[10px] font-mono opacity-50" style={{ color: "hsl(142 60% 60%)" }}>
+                            {ap.testCommand}
+                          </code>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* ── Improvements section (below patches, same scrollable container) ── */}
         <ImprovementsSection onMessage={onMessage} />

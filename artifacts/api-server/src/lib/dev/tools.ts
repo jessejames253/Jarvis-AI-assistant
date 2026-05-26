@@ -56,6 +56,8 @@ export interface PendingPatch {
   uiImpact?: string;
   logicImpact?: string;
   safeToTest?: boolean;
+  /** Allowlisted shell command to verify the patch (shown in UI, run on apply). */
+  testCommand?: string;
 }
 
 const PATCHES_FILE = "/tmp/jarvis_pending_patches.json";
@@ -203,6 +205,7 @@ export async function proposePatchHunk(
     uiImpact?: string;
     logicImpact?: string;
     safeToTest?: boolean;
+    testCommand?: string;
   },
   send: (d: object) => void,
 ): Promise<string> {
@@ -239,6 +242,7 @@ export async function proposePatchHunk(
       uiImpact: params.uiImpact,
       logicImpact: params.logicImpact,
       safeToTest: params.safeToTest,
+      testCommand: params.testCommand,
     },
     send,
   );
@@ -253,6 +257,7 @@ export async function proposeFilePatch(
     uiImpact?: string;
     logicImpact?: string;
     safeToTest?: boolean;
+    testCommand?: string;
   },
   send: (d: object) => void,
 ): Promise<string> {
@@ -274,6 +279,7 @@ export async function proposeFilePatch(
     uiImpact: params.uiImpact ?? "unknown",
     logicImpact: params.logicImpact ?? "unknown",
     safeToTest: params.safeToTest ?? false,
+    testCommand: params.testCommand,
   };
   pendingPatches.set(patchId, patch);
   savePatches();
@@ -290,6 +296,7 @@ export async function proposeFilePatch(
     uiImpact: patch.uiImpact,
     logicImpact: patch.logicImpact,
     safeToTest: patch.safeToTest,
+    testCommand: patch.testCommand,
   });
 
   return JSON.stringify({ patchId, status: "pending_approval", message: "Patch proposed. Do not apply until the user approves." });
@@ -440,6 +447,7 @@ export const DEV_TOOL_DEFINITIONS = [
         uiImpact:     { type: "string", description: "What the user will see differently in the UI, or 'none'." },
         logicImpact:  { type: "string", description: "How backend/state/data flow changes, or 'none'." },
         safeToTest:   { type: "boolean", description: "True if the change can be safely previewed in dev without side effects." },
+        testCommand:  { type: "string", description: "Optional allowlisted shell command to verify this patch (e.g. 'pnpm --filter @workspace/jarvas exec tsc --noEmit'). Shown in the UI and run automatically after apply." },
       },
     },
   },
@@ -450,13 +458,14 @@ export const DEV_TOOL_DEFINITIONS = [
       type: "object" as const,
       required: ["file", "newContent", "description", "riskLevel", "uiImpact", "logicImpact", "safeToTest"],
       properties: {
-        file: { type: "string", description: "File path relative to project root." },
-        newContent: { type: "string", description: "Complete new content for the file." },
+        file:        { type: "string", description: "File path relative to project root." },
+        newContent:  { type: "string", description: "Complete new content for the file." },
         description: { type: "string", description: "What changed and why (1–2 sentences)." },
-        riskLevel: { type: "string", enum: ["low", "medium", "high"], description: "Risk of this change causing breakage." },
-        uiImpact: { type: "string", description: "What the user will see differently in the UI, or 'none'." },
+        riskLevel:   { type: "string", enum: ["low", "medium", "high"], description: "Risk of this change causing breakage." },
+        uiImpact:    { type: "string", description: "What the user will see differently in the UI, or 'none'." },
         logicImpact: { type: "string", description: "How backend/state/data flow changes, or 'none'." },
-        safeToTest: { type: "boolean", description: "True if the change can be safely previewed in dev without side effects." },
+        safeToTest:  { type: "boolean", description: "True if the change can be safely previewed in dev without side effects." },
+        testCommand: { type: "string", description: "Optional allowlisted shell command to verify this patch (e.g. 'pnpm --filter @workspace/jarvas exec tsc --noEmit'). Shown in the UI and run automatically after apply." },
       },
     },
   },
@@ -502,11 +511,13 @@ export async function executeDevTool(
       return proposePatchHunk(input as {
         file: string; oldText: string; newText: string; description: string;
         riskLevel?: "low" | "medium" | "high"; uiImpact?: string; logicImpact?: string; safeToTest?: boolean;
+        testCommand?: string;
       }, send);
     case "propose_file_patch":
       return proposeFilePatch(input as {
         file: string; newContent: string; description: string;
         riskLevel?: "low" | "medium" | "high"; uiImpact?: string; logicImpact?: string; safeToTest?: boolean;
+        testCommand?: string;
       }, send);
     case "run_typecheck":
       return runTypecheck(input as { project?: string }, send);
