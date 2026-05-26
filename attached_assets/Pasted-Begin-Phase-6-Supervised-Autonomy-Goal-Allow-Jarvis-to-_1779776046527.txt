@@ -1,0 +1,144 @@
+Begin Phase 6: Supervised Autonomy.
+
+Goal:
+Allow Jarvis to run bounded, supervised improvement cycles using the existing agents, memory, patch queue, validation, rollback, and permission systems.
+
+Requirements:
+
+1. Add autonomy controller
+Create:
+- lib/autonomy/autonomyController.ts
+- lib/autonomy/autonomyPolicy.ts
+- lib/autonomy/improvementCycle.ts
+- lib/autonomy/autonomyBudget.ts
+- lib/autonomy/autonomyAudit.ts
+
+2. Improvement cycles
+Jarvis should be able to suggest and run supervised cycles such as:
+- fix recurring TypeScript issues
+- reduce risk hotspots
+- improve unstable modules
+- clean unused code
+- improve tests
+- improve documentation
+- strengthen validation coverage
+
+3. Manual start only
+No background autonomy yet.
+
+Rules:
+- user must click Start Cycle
+- user must choose cycle type
+- user must approve risky patches
+- user can pause, stop, or rollback
+- no scheduled unattended runs
+
+4. Autonomy budget
+Each cycle must have strict limits:
+- max tasks
+- max patches
+- max retries
+- max changed files
+- max changed lines
+- max runtime
+- max model calls if tracked
+- max AutoFix attempts
+
+Default conservative budget:
+- 3 tasks
+- 3 patch proposals
+- 2 applied patches
+- 2 retries total
+- 2 files changed
+- 80 changed lines
+- 10 minutes max
+
+5. Policy gates
+Block autonomy from touching:
+- auth
+- payments
+- database migrations
+- env/config files
+- package files
+- secrets
+- deployment settings
+- permission system files
+- rollback/checkpoint core files
+
+6. Autonomy flow
+Start Cycle
+→ memory recommends improvement target
+→ PlannerAgent creates bounded task graph
+→ ResearchAgent retrieves relevant memory/context
+→ BuilderAgent proposes patches
+→ TesterAgent validates
+→ AutoFix handles safe minor failures
+→ GitAgent checkpoints/rollback metadata
+→ user approves anything risky
+→ final cycle report generated
+
+7. Scoring
+Each proposed improvement should include:
+- expected benefit
+- risk score
+- confidence
+- affected files
+- test plan
+- rollback plan
+- memory evidence used
+
+8. UI
+Add Autonomy tab with:
+- Start Cycle button
+- cycle type selector
+- budget settings
+- active cycle status
+- current task
+- budget used vs remaining
+- patches proposed/applied
+- approvals waiting
+- validation status
+- stop/pause/rollback buttons
+- final report
+
+9. Audit trail
+Log every autonomy action:
+- why it started
+- memory evidence used
+- agent involved
+- permission checks
+- patch decisions
+- validation results
+- user approvals
+- rollback events
+- final outcome
+
+10. Safety invariants
+- No unattended background execution
+- No permission escalation
+- No risky auto-apply
+- Budget limits are hard stops
+- All writes checkpointed
+- All writes validated
+- Rollback always available
+- Memory cannot override safety policy
+- User can stop cycle at any time
+
+11. Tests
+Add tests for:
+- budget enforcement
+- blocked file enforcement
+- manual start requirement
+- pause/stop behavior
+- audit log creation
+- approval gates
+- rollback after cycle
+- memory evidence retrieval
+- final report generation
+- no permission escalation
+- existing 210 tests still pass
+
+12. Stability
+Keep app buildable.
+Preserve all previous safety systems.
+Do not add background scheduled autonomy yet.

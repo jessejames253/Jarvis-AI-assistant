@@ -34,6 +34,7 @@ import devRouter          from "./dev";
 import devExtendedRouter  from "./devExtended";
 import agentsRouter       from "./agents";
 import intelRouter        from "./intel";
+import { autonomyRouter } from "./autonomy";
 
 // Register agents (self-register on import)
 import "../agents/plannerAgent";
@@ -55,5 +56,6 @@ router.use(devRouter);
 router.use(devExtendedRouter);
 router.use(agentsRouter);
 router.use(intelRouter);
+router.use(autonomyRouter);
 
 export default router;
