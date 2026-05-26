@@ -35,6 +35,7 @@ const MEMORY_URL    = `${BASE}api/dev/project-memory`;
 const SNAP_URL      = `${BASE}api/dev/snapshots`;
 const PATCHES_URL   = `${BASE}api/dev/patches`;
 const HEALTH_URL    = `${BASE}api/healthz`;
+const DEV_HEALTH_URL = `${BASE}api/dev/health`;
 
 const LS_MESSAGES   = "jarvas_dev_messages";
 const LS_TASK_ID    = "jarvas_dev_current_task";
@@ -502,6 +503,17 @@ function MemoryTab() {
 
 // ─── Status Bar ───────────────────────────────────────────────────────────────
 
+interface HealthData {
+  score: number;
+  label: "healthy" | "degraded" | "failing";
+  typescript: {
+    frontend: { ok: boolean; errorCount: number; errors: string[] };
+    backend:  { ok: boolean; errorCount: number; errors: string[] };
+  };
+  lastChecked: number;
+  cached: boolean;
+}
+
 interface StatusData {
   apiOnline: boolean;
   patchCount: number;
@@ -509,6 +521,7 @@ interface StatusData {
   gitDirty: boolean;
   taskStatus: string | null;
   tmpWarning: boolean;
+  health: HealthData | null;
 }
 
 function StatusBar({
@@ -520,44 +533,69 @@ function StatusBar({
 }) {
   const [status, setStatus] = useState<StatusData>({
     apiOnline: false, patchCount: 0, gitBranch: "main",
-    gitDirty: false, taskStatus, tmpWarning: true,
+    gitDirty: false, taskStatus, tmpWarning: true, health: null,
   });
+  const [showFlyout, setShowFlyout] = useState(false);
+  const flyoutRef = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
     try {
-      const [health, patches, git] = await Promise.all([
+      const [apiOk, patches, git, devHealth] = await Promise.all([
         fetch(HEALTH_URL).then(r => r.ok).catch(() => false),
         fetch(PATCHES_URL).then(r => r.json() as Promise<{ ok: boolean; patches?: unknown[] }>).catch(() => ({ ok: false, patches: [] })),
         fetch(`${GIT_URL}/status`).then(r => r.json() as Promise<{ branch?: string; changes?: Array<{ status: string; file: string }> | number }>).catch(() => ({} as { branch?: string; changes?: Array<{ status: string; file: string }> | number })),
+        fetch(DEV_HEALTH_URL).then(r => r.json() as Promise<HealthData & { ok: boolean }>).catch(() => null),
       ]);
       setStatus({
-        apiOnline: health === true,
+        apiOnline: apiOk === true,
         patchCount: (patches.patches ?? []).length,
         gitBranch: git.branch ?? "main",
         gitDirty: (Array.isArray(git.changes) ? git.changes.length : (git.changes ?? 0)) > 0,
         taskStatus,
         tmpWarning: true,
+        health: devHealth?.ok ? devHealth : null,
       });
     } catch { /* ignore */ }
   }, [taskStatus]);
 
   useEffect(() => {
     refresh();
-    const t = setInterval(refresh, 12000);
+    const t = setInterval(refresh, 30_000);
     return () => clearInterval(t);
   }, [refresh]);
 
+  useEffect(() => { setStatus(s => ({ ...s, taskStatus })); }, [taskStatus]);
+
+  // Close flyout on outside click
   useEffect(() => {
-    setStatus(s => ({ ...s, taskStatus }));
-  }, [taskStatus]);
+    if (!showFlyout) return;
+    const handler = (e: MouseEvent) => {
+      if (flyoutRef.current && !flyoutRef.current.contains(e.target as Node)) {
+        setShowFlyout(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showFlyout]);
 
   const dot = (on: boolean) => (
     <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 inline-block"
       style={{ background: on ? "hsl(142 71% 55%)" : "hsl(355 80% 55%)" }} />
   );
 
+  const h = status.health;
+  const healthColor =
+    !h              ? "hsl(196 30% 45%)"
+    : h.label === "healthy"  ? "hsl(142 71% 55%)"
+    : h.label === "degraded" ? "hsl(38 100% 62%)"
+    : "hsl(355 80% 62%)";
+
+  const totalErrors = h
+    ? h.typescript.frontend.errorCount + h.typescript.backend.errorCount
+    : 0;
+
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-1.5 border-b flex-shrink-0 text-[10px]"
+    <div className="relative flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-1.5 border-b flex-shrink-0 text-[10px]"
       style={{ borderColor: "hsl(210 15% 12%)", background: "hsl(220 20% 5.5%)" }}>
 
       {/* API */}
@@ -566,6 +604,21 @@ function StatusBar({
         <Server className="w-2.5 h-2.5" />
         {status.apiOnline ? "API online" : "API offline"}
       </span>
+
+      {/* Health badge — opens flyout */}
+      <button type="button"
+        onClick={() => setShowFlyout(v => !v)}
+        className="flex items-center gap-1.5 transition-opacity hover:opacity-100 opacity-90"
+        style={{ color: healthColor }}>
+        <Zap className="w-2.5 h-2.5" />
+        {h ? `${h.score} ${h.label}` : "health …"}
+        {totalErrors > 0 && (
+          <span className="px-1 py-0.5 rounded text-[9px] font-mono"
+            style={{ background: `${healthColor}20`, border: `1px solid ${healthColor}40` }}>
+            {totalErrors} err
+          </span>
+        )}
+      </button>
 
       {/* Patches */}
       <button type="button" onClick={() => onSwitchTab("patches")}
@@ -596,6 +649,122 @@ function StatusBar({
         <HardDrive className="w-2.5 h-2.5" />
         data in /tmp (ephemeral)
       </span>
+
+      {/* ── Health flyout ── */}
+      {showFlyout && (
+        <div ref={flyoutRef}
+          className="absolute bottom-full left-0 mb-1 z-10 rounded-xl overflow-hidden shadow-2xl"
+          style={{
+            width: "min(480px, 95vw)",
+            background: "hsl(220 20% 6%)",
+            border: "1px solid hsl(210 15% 16%)",
+            boxShadow: "0 0 40px hsl(194 100% 40% / 0.06), 0 16px 40px hsl(220 25% 2% / 0.7)",
+          }}>
+
+          {/* Flyout header */}
+          <div className="flex items-center justify-between px-4 py-2.5 border-b"
+            style={{ borderColor: "hsl(210 15% 13%)" }}>
+            <div className="flex items-center gap-2">
+              <Zap className="w-3.5 h-3.5" style={{ color: healthColor }} />
+              <span className="text-xs font-semibold" style={{ color: healthColor }}>
+                Build Health
+                {h && <span className="ml-2 font-mono">{h.score}/100 — {h.label}</span>}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {h && (
+                <span className="text-[9px] opacity-40" style={{ color: "hsl(196 30% 55%)" }}>
+                  {h.cached ? "cached" : "fresh"} · {new Date(h.lastChecked).toLocaleTimeString()}
+                </span>
+              )}
+              <button type="button"
+                onClick={e => { e.stopPropagation(); void refresh(); setShowFlyout(false); }}
+                className="p-1 rounded opacity-50 hover:opacity-100 transition-opacity"
+                style={{ color: "hsl(196 30% 55%)" }}>
+                <RefreshCw className="w-3 h-3" />
+              </button>
+              <button type="button" onClick={() => setShowFlyout(false)}
+                className="p-1 rounded opacity-50 hover:opacity-100 transition-opacity"
+                style={{ color: "hsl(196 30% 55%)" }}>
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+
+          {!h && (
+            <div className="px-4 py-3 text-xs opacity-50" style={{ color: "hsl(196 30% 55%)" }}>
+              Loading health data… (first check takes ~10s)
+            </div>
+          )}
+
+          {h && (
+            <div className="px-4 py-3 flex flex-col gap-3">
+              {/* Score bar */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "hsl(210 15% 14%)" }}>
+                  <div className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${h.score}%`, background: healthColor }} />
+                </div>
+                <span className="text-xs font-mono font-semibold w-8 text-right" style={{ color: healthColor }}>
+                  {h.score}
+                </span>
+              </div>
+
+              {/* Frontend check */}
+              <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                  {h.typescript.frontend.ok
+                    ? <CheckCircle className="w-3 h-3" style={{ color: "hsl(142 71% 55%)" }} />
+                    : <AlertTriangle className="w-3 h-3" style={{ color: "hsl(38 100% 62%)" }} />}
+                  <span className="text-[10px] font-semibold" style={{ color: "hsl(196 40% 60%)" }}>
+                    Frontend (jarvas)
+                  </span>
+                  {!h.typescript.frontend.ok && (
+                    <span className="text-[9px] ml-auto font-mono" style={{ color: "hsl(38 100% 62%)" }}>
+                      {h.typescript.frontend.errorCount} error{h.typescript.frontend.errorCount !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {h.typescript.frontend.ok && (
+                    <span className="text-[9px] ml-auto" style={{ color: "hsl(142 71% 55%)" }}>clean</span>
+                  )}
+                </div>
+                {h.typescript.frontend.errors.length > 0 && (
+                  <div className="rounded-lg overflow-y-auto text-[9px] font-mono px-2 py-1.5 flex flex-col gap-0.5"
+                    style={{ maxHeight: "80px", background: "hsl(220 20% 5%)", color: "hsl(355 70% 62%)" }}>
+                    {h.typescript.frontend.errors.map((e, i) => <div key={i}>{e}</div>)}
+                  </div>
+                )}
+              </div>
+
+              {/* Backend check */}
+              <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                  {h.typescript.backend.ok
+                    ? <CheckCircle className="w-3 h-3" style={{ color: "hsl(142 71% 55%)" }} />
+                    : <AlertTriangle className="w-3 h-3" style={{ color: "hsl(38 100% 62%)" }} />}
+                  <span className="text-[10px] font-semibold" style={{ color: "hsl(196 40% 60%)" }}>
+                    Backend (api-server)
+                  </span>
+                  {!h.typescript.backend.ok && (
+                    <span className="text-[9px] ml-auto font-mono" style={{ color: "hsl(38 100% 62%)" }}>
+                      {h.typescript.backend.errorCount} error{h.typescript.backend.errorCount !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {h.typescript.backend.ok && (
+                    <span className="text-[9px] ml-auto" style={{ color: "hsl(142 71% 55%)" }}>clean</span>
+                  )}
+                </div>
+                {h.typescript.backend.errors.length > 0 && (
+                  <div className="rounded-lg overflow-y-auto text-[9px] font-mono px-2 py-1.5 flex flex-col gap-0.5"
+                    style={{ maxHeight: "80px", background: "hsl(220 20% 5%)", color: "hsl(355 70% 62%)" }}>
+                    {h.typescript.backend.errors.map((e, i) => <div key={i}>{e}</div>)}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -914,6 +1083,9 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
   const [gitAvailable, setGitAvailable] = useState(false);
   const [currentStage, setCurrentStage] = useState<string | null>(null);
   const [taskStatus, setTaskStatus] = useState<string | null>(null);
+  const [startupBanner, setStartupBanner] = useState<{
+    score: number; label: string; patchCount: number; tsErrors: number;
+  } | null>(null);
 
   const bottomRef        = useRef<HTMLDivElement>(null);
   const inputRef         = useRef<HTMLTextAreaElement>(null);
@@ -925,6 +1097,22 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
       .then(r => r.json() as Promise<{ available?: boolean }>)
       .then(d => setGitAvailable(d.available === true))
       .catch(() => {});
+  }, []);
+
+  // Startup health + patch summary banner (auto-dismisses after 8 s)
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    Promise.all([
+      fetch(DEV_HEALTH_URL).then(r => r.json() as Promise<HealthData & { ok: boolean }>).catch(() => null),
+      fetch(PATCHES_URL).then(r => r.json() as Promise<{ ok: boolean; patches?: unknown[] }>).catch(() => null),
+    ]).then(([h, p]) => {
+      if (!h?.ok) return;
+      const tsErrors = (h.typescript?.frontend?.errorCount ?? 0) + (h.typescript?.backend?.errorCount ?? 0);
+      const patchCount = (p?.patches ?? []).length;
+      setStartupBanner({ score: h.score, label: h.label, patchCount, tsErrors });
+      timer = setTimeout(() => setStartupBanner(null), 8_000);
+    }).catch(() => {});
+    return () => clearTimeout(timer);
   }, []);
 
   const scrollToBottom = () => bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1278,6 +1466,55 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
             </button>
           </div>
         </div>
+
+        {/* Startup health summary banner — auto-dismisses after 8 s */}
+        {startupBanner && (
+          <div className="flex items-center gap-2.5 mx-4 mt-3 px-3 py-2 rounded-lg flex-shrink-0"
+            style={{
+              background: startupBanner.label === "healthy"
+                ? "hsl(142 71% 45% / 0.07)"
+                : startupBanner.label === "degraded"
+                ? "hsl(38 100% 50% / 0.07)"
+                : "hsl(355 80% 55% / 0.07)",
+              border: `1px solid ${startupBanner.label === "healthy"
+                ? "hsl(142 71% 45% / 0.25)"
+                : startupBanner.label === "degraded"
+                ? "hsl(38 100% 50% / 0.25)"
+                : "hsl(355 80% 55% / 0.25)"}`,
+            }}>
+            <Zap className="w-3.5 h-3.5 flex-shrink-0" style={{
+              color: startupBanner.label === "healthy"
+                ? "hsl(142 71% 55%)"
+                : startupBanner.label === "degraded"
+                ? "hsl(38 100% 62%)"
+                : "hsl(355 80% 62%)",
+            }} />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold" style={{
+                color: startupBanner.label === "healthy"
+                  ? "hsl(142 71% 65%)"
+                  : startupBanner.label === "degraded"
+                  ? "hsl(38 100% 70%)"
+                  : "hsl(355 80% 68%)",
+              }}>
+                Build health {startupBanner.score}/100 — {startupBanner.label}
+              </p>
+              <p className="text-[10px] opacity-70 truncate" style={{ color: "hsl(196 30% 55%)" }}>
+                {startupBanner.tsErrors > 0
+                  ? `${startupBanner.tsErrors} TypeScript error${startupBanner.tsErrors !== 1 ? "s" : ""}`
+                  : "No TypeScript errors"}
+                {startupBanner.patchCount > 0
+                  ? ` · ${startupBanner.patchCount} patch${startupBanner.patchCount !== 1 ? "es" : ""} pending`
+                  : ""}
+              </p>
+            </div>
+            <button type="button" onClick={() => setStartupBanner(null)}
+              className="p-1 rounded opacity-40 hover:opacity-80 transition-opacity flex-shrink-0"
+              style={{ color: "hsl(196 30% 55%)" }}>
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
 
         {/* Workspace tab */}
         {tab === "workspace" && <div className="flex-1 overflow-hidden"><WorkspaceTab onInsertPath={insertPath} /></div>}

@@ -217,6 +217,22 @@ router.get("/dev/patches", async (_req, res) => {
   res.json({ ok: true, patches });
 });
 
+// ─── GET /dev/health ──────────────────────────────────────────────────────────
+// Returns a 0–100 health score plus TypeScript error details for both packages.
+// Results are cached for 30 seconds. Add ?refresh=1 to force a fresh check.
+// Read-only — never writes any files.
+
+router.get("/dev/health", async (req, res): Promise<void> => {
+  const force = req.query.refresh === "1";
+  try {
+    const { getHealth } = await import("../lib/dev/health");
+    const health = await getHealth(force);
+    res.json({ ok: true, ...health });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
 // ─── GET /dev/files ───────────────────────────────────────────────────────────
 
 router.get("/dev/files", async (req, res) => {
