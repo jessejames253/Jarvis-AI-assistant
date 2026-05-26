@@ -24,18 +24,25 @@ const ACTIONS_FILE = path.join(ACTIONS_DIR, "pending-actions.json");
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type RiskLevel    = "low" | "medium" | "high";
-export type ActionStatus = "pending" | "approved" | "rejected";
+export type RiskLevel     = "low" | "medium" | "high";
+export type ActionStatus  = "pending" | "approved" | "rejected";
+export type ExecutionMode = "dry-run" | "manual";
+
+export type { DryRunResult } from "./agentActionExecutor";
 
 export interface AgentAction {
-  id:          string;
-  title:       string;
-  description: string;
-  riskLevel:   RiskLevel;
-  proposedBy:  string;
-  status:      ActionStatus;
-  createdAt:   string;
-  updatedAt:   string;
+  id:               string;
+  title:            string;
+  description:      string;
+  riskLevel:        RiskLevel;
+  proposedBy:       string;
+  status:           ActionStatus;
+  createdAt:        string;
+  updatedAt:        string;
+  // Execution fields (set after a dry-run; undefined until then)
+  executionMode?:   ExecutionMode;
+  executedAt?:      string;
+  executionResult?: import("./agentActionExecutor").DryRunResult;
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -130,6 +137,44 @@ export function approveAction(id: string): AgentAction {
  */
 export function rejectAction(id: string): AgentAction {
   return _transition(id, "rejected");
+}
+
+/**
+ * Record the result of a dry-run on an approved action.
+ * Only approved actions may be dry-run.
+ * Sets executionMode, executedAt, executionResult, and updatedAt.
+ * Throws if the action is not found or is not approved.
+ */
+export function recordDryRun(
+  id:     string,
+  result: import("./agentActionExecutor").DryRunResult,
+): AgentAction {
+  const actions = readRaw();
+  const idx     = actions.findIndex(a => a.id === id);
+
+  if (idx === -1) {
+    throw new Error(`Action "${id}" not found.`);
+  }
+
+  const action = actions[idx];
+  if (action.status !== "approved") {
+    throw new Error(
+      `Action "${id}" must be approved before a dry-run can be recorded (current status: ${action.status}).`,
+    );
+  }
+
+  const now     = new Date().toISOString();
+  const updated: AgentAction = {
+    ...action,
+    executionMode:   "dry-run",
+    executedAt:      now,
+    executionResult: result,
+    updatedAt:       now,
+  };
+
+  const all = actions.map((a, i) => (i === idx ? updated : a));
+  writeRaw(all);
+  return updated;
 }
 
 function _transition(id: string, next: "approved" | "rejected"): AgentAction {

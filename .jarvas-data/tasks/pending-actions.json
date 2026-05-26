@@ -18,5 +18,122 @@
     "status": "approved",
     "createdAt": "2026-05-26T22:01:58.266Z",
     "updatedAt": "2026-05-26T22:01:58.408Z"
+  },
+  {
+    "id": "0fa7f92b-32b2-4649-aa9e-a210e9d048fb",
+    "title": "Clear build cache",
+    "description": "Remove all cached build artifacts and temp files to force a clean rebuild",
+    "riskLevel": "medium",
+    "proposedBy": "builder-agent",
+    "status": "approved",
+    "createdAt": "2026-05-26T22:13:28.619Z",
+    "updatedAt": "2026-05-26T22:13:28.929Z",
+    "executionMode": "dry-run",
+    "executedAt": "2026-05-26T22:13:28.929Z",
+    "executionResult": {
+      "verdict": "caution",
+      "summary": "This action carries elevated risk. Review all steps and ensure preconditions are met before real execution.",
+      "steps": [
+        {
+          "step": "Scan target paths",
+          "description": "Identify all files and directories matching the action scope.",
+          "safe": true
+        },
+        {
+          "step": "Verify permissions",
+          "description": "Check that the process has write access to the targets.",
+          "safe": true
+        },
+        {
+          "step": "Snapshot manifest",
+          "description": "Record a manifest of items that would be removed.",
+          "safe": true
+        },
+        {
+          "step": "Dry-delete (skip)",
+          "description": "In a real run, the identified items would be permanently removed.",
+          "safe": false
+        },
+        {
+          "step": "Locate cache directory",
+          "description": "Find the configured cache or artifact output path.",
+          "safe": true
+        },
+        {
+          "step": "Calculate size",
+          "description": "Measure total size of cached data to be cleared.",
+          "safe": true
+        },
+        {
+          "step": "Dry-clear (skip)",
+          "description": "In a real run, all cache entries would be deleted.",
+          "safe": false
+        },
+        {
+          "step": "Check lockfile",
+          "description": "Verify pnpm-lock.yaml is up to date and consistent.",
+          "safe": true
+        },
+        {
+          "step": "Validate manifests",
+          "description": "Check package.json files for missing scripts or bad versions.",
+          "safe": true
+        },
+        {
+          "step": "Dry-install (skip)",
+          "description": "In a real run, packages would be installed or the project compiled.",
+          "safe": false
+        }
+      ],
+      "estimatedImpact": [
+        "One or more files or directories would be permanently removed.",
+        "This operation cannot be undone without a backup.",
+        "Cached or temporary build artifacts would be removed.",
+        "Next build or operation will need to regenerate from scratch (slower).",
+        "Project dependencies may be installed or upgraded.",
+        "Build output artifacts would be (re)generated."
+      ],
+      "safetyChecks": [
+        {
+          "check": "Action is approved",
+          "passed": true,
+          "note": "Only approved actions may be dry-run."
+        },
+        {
+          "check": "Execution mode is dry-run",
+          "passed": true,
+          "note": "No real operations will be performed."
+        },
+        {
+          "check": "Risk level acknowledged",
+          "passed": true,
+          "note": "Risk level is medium."
+        },
+        {
+          "check": "Backup / snapshot exists",
+          "passed": false,
+          "note": "A backup or snapshot should be verified before real execution of destructive operations."
+        }
+      ],
+      "risks": [
+        "Data loss if the wrong paths are matched.",
+        "Downstream services depending on the deleted files may break.",
+        "Increased build time until cache is rebuilt.",
+        "Potential downtime if running services depend on cached state.",
+        "New package versions may introduce breaking changes.",
+        "Build failures halt downstream CI/CD pipelines."
+      ],
+      "ranAt": "2026-05-26T22:13:28.929Z"
+    }
+  },
+  {
+    "id": "e85f3940-6b00-4317-8f69-07ced5f21d8d",
+    "title": "Test pending",
+    "description": "Test",
+    "riskLevel": "low",
+    "proposedBy": "test",
+    "status": "pending",
+    "createdAt": "2026-05-26T22:13:29.089Z",
+    "updatedAt": "2026-05-26T22:13:29.089Z"
   }
 ]

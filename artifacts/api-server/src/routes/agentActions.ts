@@ -15,9 +15,11 @@ import {
   createAction,
   approveAction,
   rejectAction,
+  recordDryRun,
   type ActionStatus,
   type RiskLevel,
 } from "../lib/agentActions";
+import { runDryRun } from "../lib/agentActionExecutor";
 
 const router = Router();
 
@@ -97,6 +99,37 @@ router.patch("/agent-actions/:id/reject", (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     const status  = message.includes("not found") ? 404 : message.includes("already") ? 409 : 500;
+    res.status(status).json({ ok: false, error: message });
+  }
+});
+
+// ─── POST /api/agent-actions/:id/dry-run ─────────────────────────────────────
+
+router.post("/agent-actions/:id/dry-run", (req, res) => {
+  try {
+    const actions = listActions();
+    const action  = actions.find(a => a.id === req.params["id"]);
+
+    if (!action) {
+      res.status(404).json({ ok: false, error: `Action "${req.params["id"]}" not found.` });
+      return;
+    }
+    if (action.status !== "approved") {
+      res.status(409).json({
+        ok:    false,
+        error: `Only approved actions may be dry-run. This action is "${action.status}".`,
+      });
+      return;
+    }
+
+    // Pure analysis — no I/O, no destructive operations
+    const result  = runDryRun(action);
+    const updated = recordDryRun(action.id, result);
+
+    res.json({ ok: true, action: updated, dryRunResult: result });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    const status  = message.includes("not found") ? 404 : message.includes("approved") ? 409 : 500;
     res.status(status).json({ ok: false, error: message });
   }
 });
