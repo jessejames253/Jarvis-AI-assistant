@@ -1,0 +1,1850 @@
+{
+  "scannedAt": "2026-05-26T23:41:49.485Z",
+  "rootPath": "/home/runner/workspace",
+  "workspaceGlobs": [
+    "artifacts/*",
+    "lib/*",
+    "lib/integrations/*",
+    "scripts"
+  ],
+  "packages": [
+    {
+      "name": "@workspace/api-server",
+      "version": "0.0.0",
+      "relativePath": "artifacts/api-server",
+      "kind": "api",
+      "scripts": [
+        "dev",
+        "build",
+        "start",
+        "typecheck",
+        "test"
+      ],
+      "depCount": 18
+    },
+    {
+      "name": "@workspace/jarvas",
+      "version": "0.0.0",
+      "relativePath": "artifacts/jarvas",
+      "kind": "web",
+      "scripts": [
+        "dev",
+        "build",
+        "serve",
+        "typecheck",
+        "test"
+      ],
+      "depCount": 73
+    },
+    {
+      "name": "@workspace/mockup-sandbox",
+      "version": "2.0.0",
+      "relativePath": "artifacts/mockup-sandbox",
+      "kind": "design",
+      "scripts": [
+        "dev",
+        "build",
+        "preview",
+        "typecheck"
+      ],
+      "depCount": 60
+    },
+    {
+      "name": "@workspace/api-client-react",
+      "version": "0.0.0",
+      "relativePath": "lib/api-client-react",
+      "kind": "api",
+      "scripts": [],
+      "depCount": 1
+    },
+    {
+      "name": "@workspace/api-spec",
+      "version": "0.0.0",
+      "relativePath": "lib/api-spec",
+      "kind": "api",
+      "scripts": [
+        "codegen"
+      ],
+      "depCount": 1
+    },
+    {
+      "name": "@workspace/api-zod",
+      "version": "0.0.0",
+      "relativePath": "lib/api-zod",
+      "kind": "api",
+      "scripts": [],
+      "depCount": 1
+    },
+    {
+      "name": "@workspace/db",
+      "version": "0.0.0",
+      "relativePath": "lib/db",
+      "kind": "web",
+      "scripts": [
+        "push",
+        "push-force"
+      ],
+      "depCount": 7
+    },
+    {
+      "name": "@workspace/integrations-anthropic-ai",
+      "version": "0.0.0",
+      "relativePath": "lib/integrations-anthropic-ai",
+      "kind": "lib",
+      "scripts": [],
+      "depCount": 4
+    }
+  ],
+  "apiRoutes": [
+    {
+      "file": "agentActions.ts",
+      "moduleName": "agentActions",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/agent-actions"
+        },
+        {
+          "method": "POST",
+          "path": "/agent-actions"
+        },
+        {
+          "method": "PATCH",
+          "path": "/agent-actions/:id/approve"
+        },
+        {
+          "method": "PATCH",
+          "path": "/agent-actions/:id/reject"
+        },
+        {
+          "method": "POST",
+          "path": "/agent-actions/:id/dry-run"
+        }
+      ]
+    },
+    {
+      "file": "agents.ts",
+      "moduleName": "agents",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/agents"
+        },
+        {
+          "method": "GET",
+          "path": "/agents/tasks"
+        },
+        {
+          "method": "GET",
+          "path": "/agents/tasks/ready"
+        },
+        {
+          "method": "GET",
+          "path": "/agents/context"
+        },
+        {
+          "method": "POST",
+          "path": "/agents/orchestrate"
+        },
+        {
+          "method": "GET",
+          "path": "/agents/orchestrations/:id"
+        },
+        {
+          "method": "POST",
+          "path": "/agents/tasks/:id/run"
+        },
+        {
+          "method": "PATCH",
+          "path": "/agents/tasks/:id"
+        },
+        {
+          "method": "DELETE",
+          "path": "/agents/tasks"
+        },
+        {
+          "method": "GET",
+          "path": "/agents/permissions/audit"
+        },
+        {
+          "method": "POST",
+          "path": "/agents/plan/:id/run"
+        },
+        {
+          "method": "POST",
+          "path": "/agents/plan/:id/step"
+        },
+        {
+          "method": "POST",
+          "path": "/agents/plan/:id/pause"
+        },
+        {
+          "method": "POST",
+          "path": "/agents/plan/:id/resume"
+        },
+        {
+          "method": "GET",
+          "path": "/agents/plan/:id/summary"
+        },
+        {
+          "method": "GET",
+          "path": "/agents/plan/:id/timeline"
+        },
+        {
+          "method": "GET",
+          "path": "/agents/messages"
+        },
+        {
+          "method": "GET",
+          "path": "/agents/retries"
+        }
+      ]
+    },
+    {
+      "file": "autoLoop.ts",
+      "moduleName": "autoLoop",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/auto-loop/state"
+        },
+        {
+          "method": "POST",
+          "path": "/auto-loop/enable"
+        },
+        {
+          "method": "POST",
+          "path": "/auto-loop/disable"
+        },
+        {
+          "method": "POST",
+          "path": "/auto-loop/tick"
+        },
+        {
+          "method": "GET",
+          "path": "/auto-loop/activity"
+        },
+        {
+          "method": "POST",
+          "path": "/auto-loop/reset-lockout"
+        }
+      ]
+    },
+    {
+      "file": "autonomy.ts",
+      "moduleName": "autonomy",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/autonomy/cycle-types"
+        },
+        {
+          "method": "GET",
+          "path": "/autonomy/active"
+        },
+        {
+          "method": "POST",
+          "path": "/autonomy/cycles"
+        },
+        {
+          "method": "GET",
+          "path": "/autonomy/cycles"
+        },
+        {
+          "method": "GET",
+          "path": "/autonomy/cycles/:id"
+        },
+        {
+          "method": "GET",
+          "path": "/autonomy/cycles/:id/report"
+        },
+        {
+          "method": "POST",
+          "path": "/autonomy/cycles/:id/pause"
+        },
+        {
+          "method": "POST",
+          "path": "/autonomy/cycles/:id/stop"
+        },
+        {
+          "method": "POST",
+          "path": "/autonomy/cycles/:id/resume"
+        },
+        {
+          "method": "GET",
+          "path": "/autonomy/audit"
+        },
+        {
+          "method": "GET",
+          "path": "/autonomy/audit/:cycleId"
+        },
+        {
+          "method": "GET",
+          "path": "/autonomy/proposals"
+        },
+        {
+          "method": "GET",
+          "path": "/autonomy/budget/default"
+        },
+        {
+          "method": "POST",
+          "path": "/autonomy/budget/validate"
+        },
+        {
+          "method": "GET",
+          "path": "/autonomy/policy/blocked"
+        },
+        {
+          "method": "POST",
+          "path": "/autonomy/policy/check-files"
+        }
+      ]
+    },
+    {
+      "file": "chat.ts",
+      "moduleName": "chat",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/chat"
+        },
+        {
+          "method": "POST",
+          "path": "/chat/stream"
+        }
+      ]
+    },
+    {
+      "file": "checkpoints.ts",
+      "moduleName": "checkpoints",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/checkpoints"
+        },
+        {
+          "method": "POST",
+          "path": "/checkpoints/create"
+        },
+        {
+          "method": "POST",
+          "path": "/checkpoints/:id/restore-preview"
+        }
+      ]
+    },
+    {
+      "file": "dev.ts",
+      "moduleName": "dev",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/dev/stream"
+        },
+        {
+          "method": "POST",
+          "path": "/dev/apply"
+        },
+        {
+          "method": "POST",
+          "path": "/dev/snapshots/:id/restore"
+        },
+        {
+          "method": "POST",
+          "path": "/dev/rollback"
+        },
+        {
+          "method": "POST",
+          "path": "/dev/patches"
+        },
+        {
+          "method": "GET",
+          "path": "/dev/patches"
+        },
+        {
+          "method": "DELETE",
+          "path": "/dev/patches/:id"
+        },
+        {
+          "method": "GET",
+          "path": "/dev/server-status"
+        },
+        {
+          "method": "GET",
+          "path": "/dev/health"
+        },
+        {
+          "method": "GET",
+          "path": "/dev/context"
+        },
+        {
+          "method": "POST",
+          "path": "/dev/autofix"
+        },
+        {
+          "method": "GET",
+          "path": "/dev/autofix/history"
+        },
+        {
+          "method": "GET",
+          "path": "/dev/improvements"
+        },
+        {
+          "method": "POST",
+          "path": "/dev/improvements"
+        },
+        {
+          "method": "PATCH",
+          "path": "/dev/improvements/:id"
+        },
+        {
+          "method": "POST",
+          "path": "/dev/improvements/:id/apply"
+        },
+        {
+          "method": "GET",
+          "path": "/dev/autofix/latest"
+        },
+        {
+          "method": "GET",
+          "path": "/dev/files"
+        },
+        {
+          "method": "GET",
+          "path": "/dev/file"
+        }
+      ]
+    },
+    {
+      "file": "devExtended.ts",
+      "moduleName": "devExtended",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/dev/tasks"
+        },
+        {
+          "method": "GET",
+          "path": "/dev/tasks/:id"
+        },
+        {
+          "method": "POST",
+          "path": "/dev/tasks"
+        },
+        {
+          "method": "PATCH",
+          "path": "/dev/tasks/:id"
+        },
+        {
+          "method": "DELETE",
+          "path": "/dev/tasks/:id"
+        },
+        {
+          "method": "POST",
+          "path": "/dev/tasks/:id/cancel"
+        },
+        {
+          "method": "GET",
+          "path": "/dev/snapshots"
+        },
+        {
+          "method": "GET",
+          "path": "/dev/snapshots/:id"
+        },
+        {
+          "method": "POST",
+          "path": "/dev/snapshots/:id/restore"
+        },
+        {
+          "method": "GET",
+          "path": "/dev/project-memory"
+        },
+        {
+          "method": "POST",
+          "path": "/dev/project-memory"
+        },
+        {
+          "method": "PATCH",
+          "path": "/dev/project-memory/:id"
+        },
+        {
+          "method": "DELETE",
+          "path": "/dev/project-memory/:id"
+        },
+        {
+          "method": "GET",
+          "path": "/dev/git/status"
+        },
+        {
+          "method": "POST",
+          "path": "/dev/git/commit"
+        },
+        {
+          "method": "GET",
+          "path": "/dev/index"
+        },
+        {
+          "method": "POST",
+          "path": "/dev/index/rebuild"
+        }
+      ]
+    },
+    {
+      "file": "executions.ts",
+      "moduleName": "executions",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/agent-actions/:id/execute"
+        },
+        {
+          "method": "GET",
+          "path": "/executions"
+        },
+        {
+          "method": "GET",
+          "path": "/executions/:id"
+        }
+      ]
+    },
+    {
+      "file": "health.ts",
+      "moduleName": "health",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/healthz"
+        }
+      ]
+    },
+    {
+      "file": "intel.ts",
+      "moduleName": "intel",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/intel/graph"
+        },
+        {
+          "method": "GET",
+          "path": "/intel/graph/nodes"
+        },
+        {
+          "method": "GET",
+          "path": "/intel/graph/nodes/:id"
+        },
+        {
+          "method": "POST",
+          "path": "/intel/graph/nodes"
+        },
+        {
+          "method": "GET",
+          "path": "/intel/graph/hotspots"
+        },
+        {
+          "method": "GET",
+          "path": "/intel/history"
+        },
+        {
+          "method": "POST",
+          "path": "/intel/history"
+        },
+        {
+          "method": "GET",
+          "path": "/intel/history/rollbacks"
+        },
+        {
+          "method": "GET",
+          "path": "/intel/decisions"
+        },
+        {
+          "method": "POST",
+          "path": "/intel/decisions"
+        },
+        {
+          "method": "GET",
+          "path": "/intel/patterns"
+        },
+        {
+          "method": "GET",
+          "path": "/intel/recommendations"
+        },
+        {
+          "method": "POST",
+          "path": "/intel/patterns/analyze"
+        },
+        {
+          "method": "GET",
+          "path": "/intel/timeline"
+        },
+        {
+          "method": "GET",
+          "path": "/intel/search"
+        },
+        {
+          "method": "POST",
+          "path": "/intel/compress"
+        },
+        {
+          "method": "GET",
+          "path": "/intel/context"
+        },
+        {
+          "method": "GET",
+          "path": "/intel/stats"
+        }
+      ]
+    },
+    {
+      "file": "kb.ts",
+      "moduleName": "kb",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/kb/stats/:sessionId"
+        },
+        {
+          "method": "GET",
+          "path": "/kb/search/:sessionId"
+        },
+        {
+          "method": "GET",
+          "path": "/kb/note/:noteId"
+        },
+        {
+          "method": "GET",
+          "path": "/kb/:sessionId"
+        },
+        {
+          "method": "POST",
+          "path": "/kb"
+        },
+        {
+          "method": "PATCH",
+          "path": "/kb/:noteId"
+        },
+        {
+          "method": "DELETE",
+          "path": "/kb/:noteId"
+        }
+      ]
+    },
+    {
+      "file": "masterTasks.ts",
+      "moduleName": "masterTasks",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/master-tasks"
+        },
+        {
+          "method": "POST",
+          "path": "/master-tasks"
+        },
+        {
+          "method": "PATCH",
+          "path": "/master-tasks/:id/status"
+        }
+      ]
+    },
+    {
+      "file": "memory.ts",
+      "moduleName": "memory",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/memory/:sessionId"
+        },
+        {
+          "method": "PUT",
+          "path": "/memory/:sessionId/prefs"
+        },
+        {
+          "method": "DELETE",
+          "path": "/memory/:sessionId"
+        },
+        {
+          "method": "GET",
+          "path": "/memory/:sessionId/ltm"
+        },
+        {
+          "method": "DELETE",
+          "path": "/memory/:sessionId/ltm"
+        },
+        {
+          "method": "DELETE",
+          "path": "/memory/:sessionId/ltm/:entryId"
+        }
+      ]
+    },
+    {
+      "file": "plan.ts",
+      "moduleName": "plan",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/plan/stream"
+        }
+      ]
+    },
+    {
+      "file": "plans.ts",
+      "moduleName": "plans",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/plans"
+        },
+        {
+          "method": "GET",
+          "path": "/plans/:id"
+        },
+        {
+          "method": "POST",
+          "path": "/plans"
+        },
+        {
+          "method": "POST",
+          "path": "/plans/:id/convert-to-tasks"
+        },
+        {
+          "method": "PATCH",
+          "path": "/plans/:id/status"
+        }
+      ]
+    },
+    {
+      "file": "prioritizer.ts",
+      "moduleName": "prioritizer",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/priority/recalculate"
+        },
+        {
+          "method": "GET",
+          "path": "/priority/recommendations"
+        },
+        {
+          "method": "GET",
+          "path": "/priority/ranked"
+        }
+      ]
+    },
+    {
+      "file": "search.ts",
+      "moduleName": "search",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/search"
+        }
+      ]
+    },
+    {
+      "file": "system.ts",
+      "moduleName": "system",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/system/diagnostics"
+        },
+        {
+          "method": "GET",
+          "path": "/system/logs"
+        }
+      ]
+    },
+    {
+      "file": "tasks.ts",
+      "moduleName": "tasks",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/tasks/stats/:sessionId"
+        },
+        {
+          "method": "GET",
+          "path": "/tasks/:sessionId"
+        },
+        {
+          "method": "POST",
+          "path": "/tasks"
+        },
+        {
+          "method": "PATCH",
+          "path": "/tasks/:taskId"
+        },
+        {
+          "method": "DELETE",
+          "path": "/tasks/:taskId"
+        },
+        {
+          "method": "GET",
+          "path": "/projects/:sessionId"
+        },
+        {
+          "method": "POST",
+          "path": "/projects"
+        },
+        {
+          "method": "PATCH",
+          "path": "/projects/:projectId"
+        },
+        {
+          "method": "DELETE",
+          "path": "/projects/:projectId"
+        },
+        {
+          "method": "GET",
+          "path": "/goals/:sessionId"
+        },
+        {
+          "method": "POST",
+          "path": "/goals"
+        },
+        {
+          "method": "PATCH",
+          "path": "/goals/:goalId"
+        },
+        {
+          "method": "DELETE",
+          "path": "/goals/:goalId"
+        }
+      ]
+    },
+    {
+      "file": "workspace.ts",
+      "moduleName": "workspace",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/workspace/map"
+        },
+        {
+          "method": "POST",
+          "path": "/workspace/scan"
+        }
+      ]
+    }
+  ],
+  "frontendComponents": [
+    {
+      "name": "ActivityLogPanel",
+      "relativePath": "artifacts/jarvas/src/components/ActivityLogPanel.tsx",
+      "kind": "panel"
+    },
+    {
+      "name": "AgentActionsPanel",
+      "relativePath": "artifacts/jarvas/src/components/AgentActionsPanel.tsx",
+      "kind": "panel"
+    },
+    {
+      "name": "AutoLoopPanel",
+      "relativePath": "artifacts/jarvas/src/components/AutoLoopPanel.tsx",
+      "kind": "panel"
+    },
+    {
+      "name": "AutonomyPanel",
+      "relativePath": "artifacts/jarvas/src/components/AutonomyPanel.tsx",
+      "kind": "panel"
+    },
+    {
+      "name": "ChatPatchProposal",
+      "relativePath": "artifacts/jarvas/src/components/ChatPatchProposal.tsx",
+      "kind": "component"
+    },
+    {
+      "name": "CheckpointsPanel",
+      "relativePath": "artifacts/jarvas/src/components/CheckpointsPanel.tsx",
+      "kind": "panel"
+    },
+    {
+      "name": "DebugPanel",
+      "relativePath": "artifacts/jarvas/src/components/DebugPanel.tsx",
+      "kind": "panel"
+    },
+    {
+      "name": "DevAgentPanel",
+      "relativePath": "artifacts/jarvas/src/components/DevAgentPanel.tsx",
+      "kind": "panel"
+    },
+    {
+      "name": "DiagnosticsPanel",
+      "relativePath": "artifacts/jarvas/src/components/DiagnosticsPanel.tsx",
+      "kind": "panel"
+    },
+    {
+      "name": "DiffViewer",
+      "relativePath": "artifacts/jarvas/src/components/DiffViewer.tsx",
+      "kind": "component"
+    },
+    {
+      "name": "ExecutionsPanel",
+      "relativePath": "artifacts/jarvas/src/components/ExecutionsPanel.tsx",
+      "kind": "panel"
+    },
+    {
+      "name": "InlinePatchActions",
+      "relativePath": "artifacts/jarvas/src/components/InlinePatchActions.tsx",
+      "kind": "component"
+    },
+    {
+      "name": "IntelPanel",
+      "relativePath": "artifacts/jarvas/src/components/IntelPanel.tsx",
+      "kind": "panel"
+    },
+    {
+      "name": "JarvisTasksPanel",
+      "relativePath": "artifacts/jarvas/src/components/JarvisTasksPanel.tsx",
+      "kind": "panel"
+    },
+    {
+      "name": "MarkdownContent",
+      "relativePath": "artifacts/jarvas/src/components/MarkdownContent.tsx",
+      "kind": "component"
+    },
+    {
+      "name": "MemoryPanel",
+      "relativePath": "artifacts/jarvas/src/components/MemoryPanel.tsx",
+      "kind": "panel"
+    },
+    {
+      "name": "MultiAgentPanel",
+      "relativePath": "artifacts/jarvas/src/components/MultiAgentPanel.tsx",
+      "kind": "panel"
+    },
+    {
+      "name": "NoteCard",
+      "relativePath": "artifacts/jarvas/src/components/NoteCard.tsx",
+      "kind": "component"
+    },
+    {
+      "name": "NoteEditor",
+      "relativePath": "artifacts/jarvas/src/components/NoteEditor.tsx",
+      "kind": "component"
+    },
+    {
+      "name": "NotificationToast",
+      "relativePath": "artifacts/jarvas/src/components/NotificationToast.tsx",
+      "kind": "component"
+    },
+    {
+      "name": "PatchActionButtons",
+      "relativePath": "artifacts/jarvas/src/components/PatchActionButtons.tsx",
+      "kind": "component"
+    },
+    {
+      "name": "PatchNotificationBar",
+      "relativePath": "artifacts/jarvas/src/components/PatchNotificationBar.tsx",
+      "kind": "component"
+    },
+    {
+      "name": "PlanCard",
+      "relativePath": "artifacts/jarvas/src/components/PlanCard.tsx",
+      "kind": "component"
+    },
+    {
+      "name": "PlannerPanel",
+      "relativePath": "artifacts/jarvas/src/components/PlannerPanel.tsx",
+      "kind": "panel"
+    },
+    {
+      "name": "PlansPanel",
+      "relativePath": "artifacts/jarvas/src/components/PlansPanel.tsx",
+      "kind": "panel"
+    },
+    {
+      "name": "PriorityPanel",
+      "relativePath": "artifacts/jarvas/src/components/PriorityPanel.tsx",
+      "kind": "panel"
+    },
+    {
+      "name": "QuickAddTask",
+      "relativePath": "artifacts/jarvas/src/components/QuickAddTask.tsx",
+      "kind": "component"
+    },
+    {
+      "name": "RuntimeInspector",
+      "relativePath": "artifacts/jarvas/src/components/RuntimeInspector.tsx",
+      "kind": "component"
+    },
+    {
+      "name": "SpeechDebugOverlay",
+      "relativePath": "artifacts/jarvas/src/components/SpeechDebugOverlay.tsx",
+      "kind": "component"
+    },
+    {
+      "name": "SystemStatusPanel",
+      "relativePath": "artifacts/jarvas/src/components/SystemStatusPanel.tsx",
+      "kind": "panel"
+    },
+    {
+      "name": "TaskCard",
+      "relativePath": "artifacts/jarvas/src/components/TaskCard.tsx",
+      "kind": "component"
+    },
+    {
+      "name": "ToolStatusBubble",
+      "relativePath": "artifacts/jarvas/src/components/ToolStatusBubble.tsx",
+      "kind": "component"
+    },
+    {
+      "name": "WorkspacePanel",
+      "relativePath": "artifacts/jarvas/src/components/WorkspacePanel.tsx",
+      "kind": "panel"
+    },
+    {
+      "name": "Chat",
+      "relativePath": "artifacts/jarvas/src/pages/Chat.tsx",
+      "kind": "page"
+    },
+    {
+      "name": "Dashboard",
+      "relativePath": "artifacts/jarvas/src/pages/Dashboard.tsx",
+      "kind": "page"
+    },
+    {
+      "name": "KnowledgeBase",
+      "relativePath": "artifacts/jarvas/src/pages/KnowledgeBase.tsx",
+      "kind": "page"
+    },
+    {
+      "name": "not-found",
+      "relativePath": "artifacts/jarvas/src/pages/not-found.tsx",
+      "kind": "page"
+    },
+    {
+      "name": "use-mobile",
+      "relativePath": "artifacts/jarvas/src/hooks/use-mobile.tsx",
+      "kind": "hook"
+    },
+    {
+      "name": "use-toast",
+      "relativePath": "artifacts/jarvas/src/hooks/use-toast.ts",
+      "kind": "hook"
+    },
+    {
+      "name": "useRuntime",
+      "relativePath": "artifacts/jarvas/src/hooks/useRuntime.ts",
+      "kind": "hook"
+    },
+    {
+      "name": "useSpeechInput",
+      "relativePath": "artifacts/jarvas/src/hooks/useSpeechInput.ts",
+      "kind": "hook"
+    },
+    {
+      "name": "useSpeechOutput",
+      "relativePath": "artifacts/jarvas/src/hooks/useSpeechOutput.ts",
+      "kind": "hook"
+    },
+    {
+      "name": "useSpeechSession",
+      "relativePath": "artifacts/jarvas/src/hooks/useSpeechSession.ts",
+      "kind": "hook"
+    }
+  ],
+  "backendModules": [
+    {
+      "name": "agent",
+      "relativePath": "artifacts/api-server/src/lib/agent",
+      "isDir": true
+    },
+    {
+      "name": "registry",
+      "relativePath": "artifacts/api-server/src/lib/agent/registry.ts",
+      "isDir": false
+    },
+    {
+      "name": "runner",
+      "relativePath": "artifacts/api-server/src/lib/agent/runner.ts",
+      "isDir": false
+    },
+    {
+      "name": "tools",
+      "relativePath": "artifacts/api-server/src/lib/agent/tools",
+      "isDir": true
+    },
+    {
+      "name": "calculator",
+      "relativePath": "artifacts/api-server/src/lib/agent/tools/calculator.ts",
+      "isDir": false
+    },
+    {
+      "name": "code",
+      "relativePath": "artifacts/api-server/src/lib/agent/tools/code.ts",
+      "isDir": false
+    },
+    {
+      "name": "memory",
+      "relativePath": "artifacts/api-server/src/lib/agent/tools/memory.ts",
+      "isDir": false
+    },
+    {
+      "name": "propose",
+      "relativePath": "artifacts/api-server/src/lib/agent/tools/propose.ts",
+      "isDir": false
+    },
+    {
+      "name": "reminders",
+      "relativePath": "artifacts/api-server/src/lib/agent/tools/reminders.ts",
+      "isDir": false
+    },
+    {
+      "name": "search",
+      "relativePath": "artifacts/api-server/src/lib/agent/tools/search.ts",
+      "isDir": false
+    },
+    {
+      "name": "weather",
+      "relativePath": "artifacts/api-server/src/lib/agent/tools/weather.ts",
+      "isDir": false
+    },
+    {
+      "name": "agentActionExecutor",
+      "relativePath": "artifacts/api-server/src/lib/agentActionExecutor.ts",
+      "isDir": false
+    },
+    {
+      "name": "agentActions",
+      "relativePath": "artifacts/api-server/src/lib/agentActions.ts",
+      "isDir": false
+    },
+    {
+      "name": "agents",
+      "relativePath": "artifacts/api-server/src/lib/agents",
+      "isDir": true
+    },
+    {
+      "name": "agentMessages",
+      "relativePath": "artifacts/api-server/src/lib/agents/agentMessages.ts",
+      "isDir": false
+    },
+    {
+      "name": "baseAgent",
+      "relativePath": "artifacts/api-server/src/lib/agents/baseAgent.ts",
+      "isDir": false
+    },
+    {
+      "name": "contextBus",
+      "relativePath": "artifacts/api-server/src/lib/agents/contextBus.ts",
+      "isDir": false
+    },
+    {
+      "name": "executionState",
+      "relativePath": "artifacts/api-server/src/lib/agents/executionState.ts",
+      "isDir": false
+    },
+    {
+      "name": "orchestrator",
+      "relativePath": "artifacts/api-server/src/lib/agents/orchestrator.ts",
+      "isDir": false
+    },
+    {
+      "name": "permissions",
+      "relativePath": "artifacts/api-server/src/lib/agents/permissions.ts",
+      "isDir": false
+    },
+    {
+      "name": "registry",
+      "relativePath": "artifacts/api-server/src/lib/agents/registry.ts",
+      "isDir": false
+    },
+    {
+      "name": "retryPolicy",
+      "relativePath": "artifacts/api-server/src/lib/agents/retryPolicy.ts",
+      "isDir": false
+    },
+    {
+      "name": "taskGraph",
+      "relativePath": "artifacts/api-server/src/lib/agents/taskGraph.ts",
+      "isDir": false
+    },
+    {
+      "name": "autoLoop",
+      "relativePath": "artifacts/api-server/src/lib/autoLoop.ts",
+      "isDir": false
+    },
+    {
+      "name": "autonomy",
+      "relativePath": "artifacts/api-server/src/lib/autonomy",
+      "isDir": true
+    },
+    {
+      "name": "autonomyAudit",
+      "relativePath": "artifacts/api-server/src/lib/autonomy/autonomyAudit.ts",
+      "isDir": false
+    },
+    {
+      "name": "autonomyBudget",
+      "relativePath": "artifacts/api-server/src/lib/autonomy/autonomyBudget.ts",
+      "isDir": false
+    },
+    {
+      "name": "autonomyController",
+      "relativePath": "artifacts/api-server/src/lib/autonomy/autonomyController.ts",
+      "isDir": false
+    },
+    {
+      "name": "autonomyPolicy",
+      "relativePath": "artifacts/api-server/src/lib/autonomy/autonomyPolicy.ts",
+      "isDir": false
+    },
+    {
+      "name": "improvementCycle",
+      "relativePath": "artifacts/api-server/src/lib/autonomy/improvementCycle.ts",
+      "isDir": false
+    },
+    {
+      "name": "checkpointPreview",
+      "relativePath": "artifacts/api-server/src/lib/checkpointPreview.ts",
+      "isDir": false
+    },
+    {
+      "name": "checkpoints",
+      "relativePath": "artifacts/api-server/src/lib/checkpoints.ts",
+      "isDir": false
+    },
+    {
+      "name": "dev",
+      "relativePath": "artifacts/api-server/src/lib/dev",
+      "isDir": true
+    },
+    {
+      "name": "agent",
+      "relativePath": "artifacts/api-server/src/lib/dev/agent.ts",
+      "isDir": false
+    },
+    {
+      "name": "autoFixEngine",
+      "relativePath": "artifacts/api-server/src/lib/dev/autoFixEngine.ts",
+      "isDir": false
+    },
+    {
+      "name": "autofix",
+      "relativePath": "artifacts/api-server/src/lib/dev/autofix.ts",
+      "isDir": false
+    },
+    {
+      "name": "context",
+      "relativePath": "artifacts/api-server/src/lib/dev/context.ts",
+      "isDir": false
+    },
+    {
+      "name": "gitHelper",
+      "relativePath": "artifacts/api-server/src/lib/dev/gitHelper.ts",
+      "isDir": false
+    },
+    {
+      "name": "health",
+      "relativePath": "artifacts/api-server/src/lib/dev/health.ts",
+      "isDir": false
+    },
+    {
+      "name": "improvements",
+      "relativePath": "artifacts/api-server/src/lib/dev/improvements.ts",
+      "isDir": false
+    },
+    {
+      "name": "projectMemory",
+      "relativePath": "artifacts/api-server/src/lib/dev/projectMemory.ts",
+      "isDir": false
+    },
+    {
+      "name": "snapshotStore",
+      "relativePath": "artifacts/api-server/src/lib/dev/snapshotStore.ts",
+      "isDir": false
+    },
+    {
+      "name": "taskStore",
+      "relativePath": "artifacts/api-server/src/lib/dev/taskStore.ts",
+      "isDir": false
+    },
+    {
+      "name": "tools",
+      "relativePath": "artifacts/api-server/src/lib/dev/tools.ts",
+      "isDir": false
+    },
+    {
+      "name": "validator",
+      "relativePath": "artifacts/api-server/src/lib/dev/validator.ts",
+      "isDir": false
+    },
+    {
+      "name": "diagnostics",
+      "relativePath": "artifacts/api-server/src/lib/diagnostics.ts",
+      "isDir": false
+    },
+    {
+      "name": "executionEngine",
+      "relativePath": "artifacts/api-server/src/lib/executionEngine.ts",
+      "isDir": false
+    },
+    {
+      "name": "executionRecords",
+      "relativePath": "artifacts/api-server/src/lib/executionRecords.ts",
+      "isDir": false
+    },
+    {
+      "name": "intent",
+      "relativePath": "artifacts/api-server/src/lib/intent.ts",
+      "isDir": false
+    },
+    {
+      "name": "kb",
+      "relativePath": "artifacts/api-server/src/lib/kb",
+      "isDir": true
+    },
+    {
+      "name": "manager",
+      "relativePath": "artifacts/api-server/src/lib/kb/manager.ts",
+      "isDir": false
+    },
+    {
+      "name": "storage",
+      "relativePath": "artifacts/api-server/src/lib/kb/storage.ts",
+      "isDir": false
+    },
+    {
+      "name": "types",
+      "relativePath": "artifacts/api-server/src/lib/kb/types.ts",
+      "isDir": false
+    },
+    {
+      "name": "logger",
+      "relativePath": "artifacts/api-server/src/lib/logger.ts",
+      "isDir": false
+    },
+    {
+      "name": "ltm",
+      "relativePath": "artifacts/api-server/src/lib/ltm",
+      "isDir": true
+    },
+    {
+      "name": "extractor",
+      "relativePath": "artifacts/api-server/src/lib/ltm/extractor.ts",
+      "isDir": false
+    },
+    {
+      "name": "store",
+      "relativePath": "artifacts/api-server/src/lib/ltm/store.ts",
+      "isDir": false
+    },
+    {
+      "name": "masterTasks",
+      "relativePath": "artifacts/api-server/src/lib/masterTasks.ts",
+      "isDir": false
+    },
+    {
+      "name": "memory",
+      "relativePath": "artifacts/api-server/src/lib/memory",
+      "isDir": true
+    },
+    {
+      "name": "architectureGraph",
+      "relativePath": "artifacts/api-server/src/lib/memory/architectureGraph.ts",
+      "isDir": false
+    },
+    {
+      "name": "contextCompression",
+      "relativePath": "artifacts/api-server/src/lib/memory/contextCompression.ts",
+      "isDir": false
+    },
+    {
+      "name": "decisionLog",
+      "relativePath": "artifacts/api-server/src/lib/memory/decisionLog.ts",
+      "isDir": false
+    },
+    {
+      "name": "memoryStore",
+      "relativePath": "artifacts/api-server/src/lib/memory/memoryStore.ts",
+      "isDir": false
+    },
+    {
+      "name": "patternLearning",
+      "relativePath": "artifacts/api-server/src/lib/memory/patternLearning.ts",
+      "isDir": false
+    },
+    {
+      "name": "projectHistory",
+      "relativePath": "artifacts/api-server/src/lib/memory/projectHistory.ts",
+      "isDir": false
+    },
+    {
+      "name": "memory",
+      "relativePath": "artifacts/api-server/src/lib/memory.ts",
+      "isDir": false
+    },
+    {
+      "name": "planner",
+      "relativePath": "artifacts/api-server/src/lib/planner",
+      "isDir": true
+    },
+    {
+      "name": "creator",
+      "relativePath": "artifacts/api-server/src/lib/planner/creator.ts",
+      "isDir": false
+    },
+    {
+      "name": "executor",
+      "relativePath": "artifacts/api-server/src/lib/planner/executor.ts",
+      "isDir": false
+    },
+    {
+      "name": "types",
+      "relativePath": "artifacts/api-server/src/lib/planner/types.ts",
+      "isDir": false
+    },
+    {
+      "name": "plans",
+      "relativePath": "artifacts/api-server/src/lib/plans.ts",
+      "isDir": false
+    },
+    {
+      "name": "prioritizer",
+      "relativePath": "artifacts/api-server/src/lib/prioritizer.ts",
+      "isDir": false
+    },
+    {
+      "name": "responder",
+      "relativePath": "artifacts/api-server/src/lib/responder.ts",
+      "isDir": false
+    },
+    {
+      "name": "router",
+      "relativePath": "artifacts/api-server/src/lib/router.ts",
+      "isDir": false
+    },
+    {
+      "name": "search",
+      "relativePath": "artifacts/api-server/src/lib/search.ts",
+      "isDir": false
+    },
+    {
+      "name": "tasks",
+      "relativePath": "artifacts/api-server/src/lib/tasks",
+      "isDir": true
+    },
+    {
+      "name": "manager",
+      "relativePath": "artifacts/api-server/src/lib/tasks/manager.ts",
+      "isDir": false
+    },
+    {
+      "name": "storage",
+      "relativePath": "artifacts/api-server/src/lib/tasks/storage.ts",
+      "isDir": false
+    },
+    {
+      "name": "types",
+      "relativePath": "artifacts/api-server/src/lib/tasks/types.ts",
+      "isDir": false
+    },
+    {
+      "name": "tools",
+      "relativePath": "artifacts/api-server/src/lib/tools",
+      "isDir": true
+    },
+    {
+      "name": "ai",
+      "relativePath": "artifacts/api-server/src/lib/tools/ai.ts",
+      "isDir": false
+    },
+    {
+      "name": "casual",
+      "relativePath": "artifacts/api-server/src/lib/tools/casual.ts",
+      "isDir": false
+    },
+    {
+      "name": "coding",
+      "relativePath": "artifacts/api-server/src/lib/tools/coding.ts",
+      "isDir": false
+    },
+    {
+      "name": "identity",
+      "relativePath": "artifacts/api-server/src/lib/tools/identity.ts",
+      "isDir": false
+    },
+    {
+      "name": "kb",
+      "relativePath": "artifacts/api-server/src/lib/tools/kb.ts",
+      "isDir": false
+    },
+    {
+      "name": "knowledge",
+      "relativePath": "artifacts/api-server/src/lib/tools/knowledge.ts",
+      "isDir": false
+    },
+    {
+      "name": "math",
+      "relativePath": "artifacts/api-server/src/lib/tools/math.ts",
+      "isDir": false
+    },
+    {
+      "name": "memoryUpdate",
+      "relativePath": "artifacts/api-server/src/lib/tools/memoryUpdate.ts",
+      "isDir": false
+    },
+    {
+      "name": "planning",
+      "relativePath": "artifacts/api-server/src/lib/tools/planning.ts",
+      "isDir": false
+    },
+    {
+      "name": "registry",
+      "relativePath": "artifacts/api-server/src/lib/tools/registry.ts",
+      "isDir": false
+    },
+    {
+      "name": "research",
+      "relativePath": "artifacts/api-server/src/lib/tools/research.ts",
+      "isDir": false
+    },
+    {
+      "name": "tasks",
+      "relativePath": "artifacts/api-server/src/lib/tools/tasks.ts",
+      "isDir": false
+    },
+    {
+      "name": "types",
+      "relativePath": "artifacts/api-server/src/lib/types.ts",
+      "isDir": false
+    },
+    {
+      "name": "workspace",
+      "relativePath": "artifacts/api-server/src/lib/workspace.ts",
+      "isDir": false
+    }
+  ],
+  "dataStores": [
+    {
+      "name": "auto-loop",
+      "relativePath": ".jarvas-data/auto-loop",
+      "fileCount": 2,
+      "totalBytes": 2545,
+      "files": [
+        "activity.json",
+        "state.json"
+      ]
+    },
+    {
+      "name": "checkpoints",
+      "relativePath": ".jarvas-data/checkpoints",
+      "fileCount": 1,
+      "totalBytes": 4518,
+      "files": [
+        "checkpoints.json"
+      ]
+    },
+    {
+      "name": "executions",
+      "relativePath": ".jarvas-data/executions",
+      "fileCount": 1,
+      "totalBytes": 3366,
+      "files": [
+        "executions.json"
+      ]
+    },
+    {
+      "name": "kb",
+      "relativePath": ".jarvas-data/kb",
+      "fileCount": 21,
+      "totalBytes": 2043,
+      "files": [
+        "6c1e0418-5348-4bf4-b818-0e8beadaff9d.json",
+        "8da1ab5b-f8f6-48ec-af14-01f021ca7d10.json",
+        "agent-suite-mplnz1qe.json",
+        "agent-test-mplny39z.json",
+        "cfb6c397-6057-4b84-99be-0d5123d51466.json",
+        "claude-test-12345.json",
+        "dbg-12345678.json",
+        "e06a9e81-6c8c-417b-bbc5-22945719f115.json",
+        "fix-test-12345.json",
+        "ltm-test-session-abc1.json",
+        "ltm-test2-abcdef01.json",
+        "ltm-test3-mplnfvni.json",
+        "stream-test-1.json",
+        "stream-test-2.json",
+        "test-12345678.json",
+        "test-smoke-1.json",
+        "test-smoke-2.json",
+        "test-smoke-3.json",
+        "test-smoke.json",
+        "verify-1.json",
+        "verify-2.json"
+      ]
+    },
+    {
+      "name": "logs",
+      "relativePath": ".jarvas-data/logs",
+      "fileCount": 1,
+      "totalBytes": 0,
+      "files": [
+        ".gitkeep"
+      ]
+    },
+    {
+      "name": "ltm",
+      "relativePath": ".jarvas-data/ltm",
+      "fileCount": 1,
+      "totalBytes": 99,
+      "files": [
+        "ltm-test3-mplnfvni.json"
+      ]
+    },
+    {
+      "name": "memory",
+      "relativePath": ".jarvas-data/memory",
+      "fileCount": 1,
+      "totalBytes": 0,
+      "files": [
+        ".gitkeep"
+      ]
+    },
+    {
+      "name": "plans",
+      "relativePath": ".jarvas-data/plans",
+      "fileCount": 1,
+      "totalBytes": 28767,
+      "files": [
+        "plans.json"
+      ]
+    },
+    {
+      "name": "projects",
+      "relativePath": ".jarvas-data/projects",
+      "fileCount": 1,
+      "totalBytes": 0,
+      "files": [
+        ".gitkeep"
+      ]
+    },
+    {
+      "name": "reports",
+      "relativePath": ".jarvas-data/reports",
+      "fileCount": 1,
+      "totalBytes": 271,
+      "files": [
+        "2026-05-26T23-08-52-generate-weekly-agent-report.md"
+      ]
+    },
+    {
+      "name": "sessions",
+      "relativePath": ".jarvas-data/sessions",
+      "fileCount": 71,
+      "totalBytes": 61245,
+      "files": [
+        "0e141d96-1bcd-4565-ac08-f8e218690249.json",
+        "0ff16d9f-d0d1-4802-99c1-d38b25dbe7df.json",
+        "1db607e2-64e4-4017-b033-8f31c05aa854.json",
+        "1f288472-2964-448f-93ab-03dde571d476.json",
+        "1fb53094-175d-4cee-8047-9da521053701.json",
+        "2ec52072-49d8-4621-b454-eb4452d77bd5.json",
+        "34b40d59-0cb6-4021-bbc2-e976d89f859d.json",
+        "39f65327-8bc5-4382-abdf-95e5727453f0.json",
+        "41c28d5e-a01c-4ea5-8034-d87959d9757d.json",
+        "57d16cfb-b83a-4a61-a632-4f94db632277.json",
+        "5b19093a-7a18-4c30-91e7-7ea05120971c.json",
+        "5d07fcff-192c-44cc-b2c6-4d041bc31575.json",
+        "62966ea6-0c2e-4fab-be96-65f3cbc43843.json",
+        "6680d956-1f86-4b09-8650-fd7a05839e79.json",
+        "6c1e0418-5348-4bf4-b818-0e8beadaff9d.json",
+        "6d426cd9-ee46-4548-8678-076d83fcd5d5.json",
+        "6daa3484-f183-47e3-ac58-d098f5b92fa6.json",
+        "7b06107f-5859-41d5-a5e8-7b0b1baebacf.json",
+        "7ef952af-eed3-434f-9d09-39e209a7412b.json",
+        "80696cb1-ac08-4856-b09e-edbab757b559.json",
+        "8c40d25f-82d1-4aae-b97d-d394d129b853.json",
+        "8da1ab5b-f8f6-48ec-af14-01f021ca7d10.json",
+        "8ee4842e-a30a-4623-84d2-af811be769cb.json",
+        "9114d4d8-003f-4229-9551-3938c327583a.json",
+        "94e22ebe-92ff-41fa-a3dc-99c631ae4a58.json",
+        "9bc6f1d2-563b-450d-9927-936fb2a28572.json",
+        "a4e0d432-ef8b-4d54-bc46-f0438eff874f.json",
+        "af85ff13-41ee-4ad0-9340-2a008d987aeb.json",
+        "afc0c720-884a-4d9c-a54d-8ef267bf92bc.json",
+        "agent-suite-mplnz1qe.json",
+        "agent-test-mplny39z.json",
+        "b5523f7f-99bd-405b-add5-d0f8769a1573.json",
+        "b7227b92-6ade-4319-8533-206dc0b59d3e.json",
+        "bd4133ff-f9f3-42a5-b7b7-12bd8c794177.json",
+        "be599b5a-9293-43d5-a3c1-539dfce1e139.json",
+        "c099d01c-1352-4e39-896e-329311830449.json",
+        "c3632214-cd2a-4175-bb78-e452e00e4ba3.json",
+        "c86f33fa-a68b-48e2-9508-53a6401d3b2b.json",
+        "c8978279-5c22-49b0-8ed3-9c8f6b8a3889.json",
+        "cb4e5cd4-5077-4a75-84c7-98a756515384.json",
+        "cfb6c397-6057-4b84-99be-0d5123d51466.json",
+        "claude-test-12345.json",
+        "d949793c-4c31-4802-a4e9-0e531c503ef9.json",
+        "dashboard-test-001.json",
+        "dbg-12345678.json",
+        "dd1e2c78-2928-489e-84bd-cd22dccdcb05.json",
+        "debug-test-001.json",
+        "e06a9e81-6c8c-417b-bbc5-22945719f115.json",
+        "e5349964-2eb1-4c86-a04f-98e9d67d32f9.json",
+        "e97f669f-843f-4afd-9dff-6af71efc62d7.json",
+        "efac0a18-9cfe-49a8-beca-e1db8758c5cb.json",
+        "f449c052-5822-4a30-b315-232d9d165098.json",
+        "fa7d83df-02b8-4a10-b77e-e5ab997795fc.json",
+        "fa7dad24-394b-42b9-bad9-7fa14e60f31c.json",
+        "final-verify.json",
+        "fix-test-12345.json",
+        "ltm-test-session-abc1.json",
+        "ltm-test2-abcdef01.json",
+        "ltm-test3-mplnfvni.json",
+        "nodets-abcde123.json",
+        "stream-test-1.json",
+        "stream-test-2.json",
+        "test-12345678.json",
+        "test-session-1234.json",
+        "test-smoke-1.json",
+        "test-smoke-2.json",
+        "test-smoke-3.json",
+        "test-smoke.json",
+        "verify-001.json",
+        "verify-1.json",
+        "verify-2.json"
+      ]
+    },
+    {
+      "name": "skills",
+      "relativePath": ".jarvas-data/skills",
+      "fileCount": 1,
+      "totalBytes": 0,
+      "files": [
+        ".gitkeep"
+      ]
+    },
+    {
+      "name": "tasks",
+      "relativePath": ".jarvas-data/tasks",
+      "fileCount": 13,
+      "totalBytes": 43072,
+      "files": [
+        "1db607e2-64e4-4017-b033-8f31c05aa854.json",
+        "6c1e0418-5348-4bf4-b818-0e8beadaff9d.json",
+        "agent-suite-mplnz1qe.json",
+        "cfb6c397-6057-4b84-99be-0d5123d51466.json",
+        "dashboard-test-001.json",
+        "default.json",
+        "e06a9e81-6c8c-417b-bbc5-22945719f115.json",
+        "live-verify.json",
+        "master-task-list.json",
+        "pending-actions.json",
+        "priority-scores.json",
+        "ranked.json",
+        "recommendations.json"
+      ]
+    },
+    {
+      "name": "workspace",
+      "relativePath": ".jarvas-data/workspace",
+      "fileCount": 1,
+      "totalBytes": 44798,
+      "files": [
+        "workspace-map.json"
+      ]
+    }
+  ],
+  "importantFiles": [
+    "pnpm-workspace.yaml",
+    "package.json",
+    ".replit",
+    "artifacts/api-server/package.json",
+    "artifacts/api-server/tsconfig.json",
+    "artifacts/api-server/src/app.ts",
+    "artifacts/api-server/src/routes/index.ts",
+    "artifacts/jarvas/package.json",
+    "artifacts/jarvas/tsconfig.json",
+    "artifacts/jarvas/vite.config.ts",
+    "artifacts/jarvas/index.html"
+  ],
+  "folderTree": [
+    {
+      "name": "artifacts",
+      "relativePath": "artifacts",
+      "children": [
+        {
+          "name": "api-server",
+          "relativePath": "artifacts/api-server"
+        },
+        {
+          "name": "jarvas",
+          "relativePath": "artifacts/jarvas"
+        },
+        {
+          "name": "mockup-sandbox",
+          "relativePath": "artifacts/mockup-sandbox"
+        }
+      ]
+    },
+    {
+      "name": "attached_assets",
+      "relativePath": "attached_assets",
+      "children": []
+    },
+    {
+      "name": "lib",
+      "relativePath": "lib",
+      "children": [
+        {
+          "name": "api-client-react",
+          "relativePath": "lib/api-client-react"
+        },
+        {
+          "name": "api-spec",
+          "relativePath": "lib/api-spec"
+        },
+        {
+          "name": "api-zod",
+          "relativePath": "lib/api-zod"
+        },
+        {
+          "name": "db",
+          "relativePath": "lib/db"
+        },
+        {
+          "name": "integrations",
+          "relativePath": "lib/integrations"
+        },
+        {
+          "name": "integrations-anthropic-ai",
+          "relativePath": "lib/integrations-anthropic-ai"
+        }
+      ]
+    },
+    {
+      "name": "scripts",
+      "relativePath": "scripts",
+      "children": [
+        {
+          "name": "src",
+          "relativePath": "scripts/src"
+        }
+      ]
+    },
+    {
+      "name": "src",
+      "relativePath": "src",
+      "children": [
+        {
+          "name": "agents",
+          "relativePath": "src/agents"
+        },
+        {
+          "name": "components",
+          "relativePath": "src/components"
+        }
+      ]
+    }
+  ],
+  "stats": {
+    "totalPackages": 8,
+    "totalApiRoutes": 151,
+    "totalComponents": 43,
+    "totalModules": 94,
+    "totalDataStores": 14,
+    "totalDataKB": 186
+  }
+}

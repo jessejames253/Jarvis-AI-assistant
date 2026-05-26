@@ -34,6 +34,7 @@ import {
   Bot,
   Layers,
   TrendingUp,
+  Map,
 } from "lucide-react";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
 import { useSpeechSession } from "@/hooks/useSpeechSession";
@@ -59,6 +60,7 @@ import ExecutionsPanel     from "@/components/ExecutionsPanel";
 import AutoLoopPanel       from "@/components/AutoLoopPanel";
 import PlansPanel          from "@/components/PlansPanel";
 import PriorityPanel       from "@/components/PriorityPanel";
+import WorkspacePanel      from "@/components/WorkspacePanel";
 import {
   approvePatch, rejectPatch as logRejectPatch, fetchPendingPatches,
   fetchServerStatus,
@@ -552,6 +554,7 @@ export default function Chat() {
   const [autoLoopPanelOpen,     setAutoLoopPanelOpen]     = useState(false);
   const [plansPanelOpen,        setPlansPanelOpen]        = useState(false);
   const [priorityPanelOpen,     setPriorityPanelOpen]     = useState(false);
+  const [workspacePanelOpen,    setWorkspacePanelOpen]    = useState(false);
   const autoRoutedRef = useRef(false);
 
   // ── Patch notification bar + server status ───────────────────────────────
@@ -1446,6 +1449,21 @@ export default function Chat() {
             <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: priorityPanelOpen ? "hsl(175 70% 70%)" : "hsl(196 60% 55%)" }}>PRIORITY</span>
           </button>
 
+          {/* Workspace */}
+          <button
+            onClick={() => setWorkspacePanelOpen(v => !v)}
+            title="Workspace Intelligence — repo map, routes, components"
+            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
+            style={{
+              background:  workspacePanelOpen ? "hsl(28 100% 62% / 0.12)" : "transparent",
+              borderColor: workspacePanelOpen ? "hsl(28 100% 62% / 0.5)"  : "hsl(210 15% 30%)",
+            }}
+            aria-label="Open workspace panel"
+          >
+            <Map className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: workspacePanelOpen ? "hsl(28 100% 72%)" : "hsl(196 60% 55%)" }} />
+            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: workspacePanelOpen ? "hsl(28 100% 72%)" : "hsl(196 60% 55%)" }}>WORKSPACE</span>
+          </button>
+
           {/* Dev Agent — visible on all screen sizes */}
           <button
             onClick={() => setDevPanelOpen(true)}
@@ -1816,6 +1834,13 @@ export default function Chat() {
       <PriorityPanel
         isOpen={priorityPanelOpen}
         onClose={() => setPriorityPanelOpen(false)}
+        apiBase={BASE}
+      />
+
+      {/* Workspace panel */}
+      <WorkspacePanel
+        isOpen={workspacePanelOpen}
+        onClose={() => setWorkspacePanelOpen(false)}
         apiBase={BASE}
       />
 
