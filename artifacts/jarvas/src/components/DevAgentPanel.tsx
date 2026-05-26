@@ -60,7 +60,7 @@ type DevEventType =
   | "patch_proposed" | "patch_applied" | "patch_rejected"
   | "check_started" | "check_passed" | "check_failed"
   | "validation_started" | "validation_done"
-  | "manual_patch" | "restore_notice" | "error" | "done";
+  | "status" | "manual_patch" | "restore_notice" | "error" | "done";
 
 interface DevMessage {
   id: string;
@@ -80,6 +80,8 @@ interface DevMessage {
   taskId?: string;
   validationPassed?: boolean;
   validationSummary?: string;
+  stage?: string;
+  stageDetail?: string;
 }
 
 interface MemoryEntry {
@@ -464,6 +466,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
   const [lastMsg, setLastMsg]       = useState("");
   const [taskId, setTaskId]         = useState<string | null>(() => getSavedTaskId());
   const [gitAvailable, setGitAvailable] = useState(false);
+  const [currentStage, setCurrentStage] = useState<string | null>(null);
 
   const bottomRef        = useRef<HTMLDivElement>(null);
   const inputRef         = useRef<HTMLTextAreaElement>(null);
@@ -496,6 +499,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
     streamingTextRef.current = "";
     setTaskId(null);
     setSseDropped(false);
+    setCurrentStage(null);
   }, []);
 
   // ── Apply ──────────────────────────────────────────────────────────────────
@@ -728,6 +732,20 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
               addMsg({ type: "check_failed", check: ev.check as string, output: ev.output as string, project: ev.project as string });
             } else if (t === "dev:error" || t === "error") {
               addMsg({ type: "error", error: (ev.error as string) ?? (ev.message as string) });
+            } else if (t === "dev:status") {
+              const stage = ev.stage as string;
+              setCurrentStage(stage === "done" || stage === "thinking" ? null : stage);
+            } else if (t === "dev:manual_patch") {
+              addMsg({
+                type: "manual_patch",
+                patch: {
+                  patchId:     `manual-${Date.now()}`,
+                  file:        ev.file        as string,
+                  description: ev.description as string,
+                  oldContent:  ev.oldText     as string ?? "",
+                  newContent:  ev.newContent  as string,
+                },
+              });
             }
           } catch { /* malformed SSE */ }
         }
@@ -735,6 +753,7 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
     } catch { /* stream read error */ }
 
     setIsRunning(false);
+    setCurrentStage(null);
     streamingTextRef.current = "";
     setStreamingText("");
     if (!cleanClose) setSseDropped(true);
@@ -955,7 +974,15 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
                       <div key={msg.id} className="px-3 py-2 rounded-lg text-xs" style={{ background: "hsl(355 80% 40% / 0.1)", border: "1px solid hsl(355 80% 45% / 0.3)" }}>
                         <div className="flex items-start gap-2">
                           <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: "hsl(355 80% 62%)" }} />
-                          <span className="font-mono break-all" style={{ color: "hsl(355 80% 62%)" }}>{msg.error}</span>
+                          <span className="font-mono break-all flex-1" style={{ color: "hsl(355 80% 62%)" }}>{msg.error}</span>
+                          {!isRunning && lastMsg && (
+                            <button type="button"
+                              onClick={() => sendMessage(lastMsg)}
+                              className="flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-md transition-all"
+                              style={{ background: "hsl(355 60% 40% / 0.15)", border: "1px solid hsl(355 60% 45% / 0.35)", color: "hsl(355 80% 72%)" }}>
+                              <RefreshCw className="w-2.5 h-2.5" />Retry
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -974,7 +1001,15 @@ export default function DevAgentPanel({ onClose }: DevAgentPanelProps) {
               {isRunning && !streamingText && (
                 <div className="flex items-center gap-2 text-xs" style={{ color: "hsl(194 100% 55%)" }}>
                   <span className="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin inline-block" />
-                  <span>Thinking…</span>
+                  <span>
+                    {currentStage === "reading"      && "Reading file…"}
+                    {currentStage === "searching"    && "Searching…"}
+                    {currentStage === "proposing"    && "Proposing patch…"}
+                    {currentStage === "validating"   && "Validating…"}
+                    {currentStage === "direct_patch" && "Direct patch mode…"}
+                    {currentStage === "blocked"      && "Skipping redundant step…"}
+                    {(!currentStage || currentStage === "thinking") && "Thinking…"}
+                  </span>
                 </div>
               )}
 

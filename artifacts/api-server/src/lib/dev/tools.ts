@@ -193,6 +193,57 @@ export async function searchProjectFiles(
   }
 }
 
+export async function proposePatchHunk(
+  params: {
+    file: string;
+    oldText: string;
+    newText: string;
+    description: string;
+    riskLevel?: "low" | "medium" | "high";
+    uiImpact?: string;
+    logicImpact?: string;
+    safeToTest?: boolean;
+  },
+  send: (d: object) => void,
+): Promise<string> {
+  if (!isPathSafe(params.file)) throw new Error(`Path not allowed: ${params.file}`);
+  const abs = path.resolve(PROJECT_ROOT, params.file);
+
+  let oldContent: string;
+  try { oldContent = await fs.readFile(abs, "utf8"); } catch {
+    throw new Error(`File not found: ${params.file}`);
+  }
+
+  if (!oldContent.includes(params.oldText)) {
+    // Anchor not found — emit a manual-patch event so the frontend shows a card
+    send({
+      type: "dev:manual_patch",
+      file: params.file,
+      description: `Anchor text not found in ${params.file}. Apply this replacement manually.`,
+      oldText: params.oldText,
+      newContent: params.newText,
+    });
+    return JSON.stringify({
+      error: "anchor_not_found",
+      message: `The exact text to replace was not found in ${params.file}. A Manual Patch Required card has been shown to the user.`,
+    });
+  }
+
+  const newContent = oldContent.replace(params.oldText, params.newText);
+  return proposeFilePatch(
+    {
+      file: params.file,
+      newContent,
+      description: params.description,
+      riskLevel: params.riskLevel,
+      uiImpact: params.uiImpact,
+      logicImpact: params.logicImpact,
+      safeToTest: params.safeToTest,
+    },
+    send,
+  );
+}
+
 export async function proposeFilePatch(
   params: {
     file: string;
@@ -375,8 +426,26 @@ export const DEV_TOOL_DEFINITIONS = [
     },
   },
   {
+    name: "propose_patch_hunk",
+    description: "Propose a targeted change to a file by specifying the EXACT old text to replace and the new text. Preferred over propose_file_patch for all edits to existing files — much safer and more precise. If oldText is not found exactly, a Manual Patch Required card is shown.",
+    input_schema: {
+      type: "object" as const,
+      required: ["file", "oldText", "newText", "description", "riskLevel", "uiImpact", "logicImpact", "safeToTest"],
+      properties: {
+        file:         { type: "string", description: "File path relative to project root." },
+        oldText:      { type: "string", description: "The EXACT text to replace — copy it verbatim from the read_project_file output, including surrounding lines for uniqueness." },
+        newText:      { type: "string", description: "The replacement text." },
+        description:  { type: "string", description: "What changed and why (1–2 sentences)." },
+        riskLevel:    { type: "string", enum: ["low", "medium", "high"], description: "Risk of this change causing breakage." },
+        uiImpact:     { type: "string", description: "What the user will see differently in the UI, or 'none'." },
+        logicImpact:  { type: "string", description: "How backend/state/data flow changes, or 'none'." },
+        safeToTest:   { type: "boolean", description: "True if the change can be safely previewed in dev without side effects." },
+      },
+    },
+  },
+  {
     name: "propose_file_patch",
-    description: "Propose a file change. Shows the user a labeled diff with risk/impact metadata. NEVER edits files directly. Always read the file first.",
+    description: "Propose a full file replacement. Use propose_patch_hunk instead for edits to existing files. Only use this for new files or files under 50 lines.",
     input_schema: {
       type: "object" as const,
       required: ["file", "newContent", "description", "riskLevel", "uiImpact", "logicImpact", "safeToTest"],
@@ -415,7 +484,7 @@ export const DEV_TOOL_DEFINITIONS = [
 
 export type DevToolName =
   | "list_project_files" | "read_project_file" | "search_project_files"
-  | "propose_file_patch" | "run_typecheck" | "run_build";
+  | "propose_patch_hunk" | "propose_file_patch" | "run_typecheck" | "run_build";
 
 export async function executeDevTool(
   name: string,
@@ -429,6 +498,11 @@ export async function executeDevTool(
       return readProjectFile(input as { file: string; startLine?: number; endLine?: number }, send);
     case "search_project_files":
       return searchProjectFiles(input as { pattern: string; directory?: string; fileGlob?: string }, send);
+    case "propose_patch_hunk":
+      return proposePatchHunk(input as {
+        file: string; oldText: string; newText: string; description: string;
+        riskLevel?: "low" | "medium" | "high"; uiImpact?: string; logicImpact?: string; safeToTest?: boolean;
+      }, send);
     case "propose_file_patch":
       return proposeFilePatch(input as {
         file: string; newContent: string; description: string;
