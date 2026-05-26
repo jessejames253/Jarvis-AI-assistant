@@ -233,6 +233,114 @@ router.get("/dev/health", async (req, res): Promise<void> => {
   }
 });
 
+// ─── POST /dev/autofix ────────────────────────────────────────────────────────
+// Scans both packages for low-risk TypeScript errors and adds them to the
+// improvement store. Returns newly created improvements (duplicates skipped).
+
+router.post("/dev/autofix", async (_req, res): Promise<void> => {
+  try {
+    const { scanForImprovements } = await import("../lib/dev/autofix");
+    const created = await scanForImprovements();
+    res.json({ ok: true, created: created.length, improvements: created });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
+// ─── GET /dev/autofix/history ─────────────────────────────────────────────────
+
+router.get("/dev/autofix/history", async (_req, res): Promise<void> => {
+  try {
+    const { getAutofixHistory } = await import("../lib/dev/autofix");
+    res.json({ ok: true, history: getAutofixHistory() });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
+// ─── GET /dev/improvements ────────────────────────────────────────────────────
+
+router.get("/dev/improvements", async (_req, res): Promise<void> => {
+  try {
+    const { getImprovements } = await import("../lib/dev/improvements");
+    res.json({ ok: true, improvements: getImprovements() });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
+// ─── POST /dev/improvements ───────────────────────────────────────────────────
+// Add a manually authored improvement entry.
+
+router.post("/dev/improvements", async (req, res): Promise<void> => {
+  const body = req.body as {
+    title?: string;
+    description?: string;
+    category?: string;
+    riskLevel?: string;
+    files?: string[];
+    patch?: { file: string; oldContent: string; newContent: string };
+  };
+  if (!body.title?.trim()) {
+    res.status(400).json({ ok: false, error: "title is required" });
+    return;
+  }
+  try {
+    const { addImprovement } = await import("../lib/dev/improvements");
+    const imp = addImprovement({
+      title: body.title.trim(),
+      description: body.description?.trim() ?? "",
+      category: (body.category ?? "lint") as import("../lib/dev/improvements").ImprovementCategory,
+      riskLevel: (body.riskLevel ?? "medium") as import("../lib/dev/improvements").RiskLevel,
+      status: "proposed",
+      files: body.files ?? [],
+      autoFixable: body.riskLevel === "low",
+      patch: body.patch,
+    });
+    res.json({ ok: true, improvement: imp });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
+// ─── PATCH /dev/improvements/:id ──────────────────────────────────────────────
+
+router.patch("/dev/improvements/:id", async (req, res): Promise<void> => {
+  const { id } = req.params;
+  const updates = req.body as Partial<import("../lib/dev/improvements").Improvement>;
+  try {
+    const { updateImprovement } = await import("../lib/dev/improvements");
+    const updated = updateImprovement(id, updates);
+    if (!updated) {
+      res.status(404).json({ ok: false, error: "Improvement not found" });
+      return;
+    }
+    res.json({ ok: true, improvement: updated });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
+// ─── POST /dev/improvements/:id/apply ────────────────────────────────────────
+// Guarded apply pipeline: safety checks → snapshot → write → tsc × 2 → health
+// → commit to history OR rollback + log failure.
+// Human must trigger this explicitly — never autonomous.
+
+router.post("/dev/improvements/:id/apply", async (req, res): Promise<void> => {
+  const { id } = req.params;
+  try {
+    const { applyImprovement } = await import("../lib/dev/autofix");
+    const result = await applyImprovement(id);
+    if (!result.ok) {
+      res.status(result.rolledBack ? 422 : 400).json(result);
+      return;
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
 // ─── GET /dev/files ───────────────────────────────────────────────────────────
 
 router.get("/dev/files", async (req, res) => {

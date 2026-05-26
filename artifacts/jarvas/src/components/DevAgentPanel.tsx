@@ -33,9 +33,12 @@ const TASKS_URL     = `${BASE}api/dev/tasks`;
 const GIT_URL       = `${BASE}api/dev/git`;
 const MEMORY_URL    = `${BASE}api/dev/project-memory`;
 const SNAP_URL      = `${BASE}api/dev/snapshots`;
-const PATCHES_URL   = `${BASE}api/dev/patches`;
-const HEALTH_URL    = `${BASE}api/healthz`;
-const DEV_HEALTH_URL = `${BASE}api/dev/health`;
+const PATCHES_URL      = `${BASE}api/dev/patches`;
+const HEALTH_URL       = `${BASE}api/healthz`;
+const DEV_HEALTH_URL   = `${BASE}api/dev/health`;
+const IMPROVEMENTS_URL = `${BASE}api/dev/improvements`;
+const AUTOFIX_URL      = `${BASE}api/dev/autofix`;
+const AUTOFIX_HIST_URL = `${BASE}api/dev/autofix/history`;
 
 const LS_MESSAGES   = "jarvas_dev_messages";
 const LS_TASK_ID    = "jarvas_dev_current_task";
@@ -784,6 +787,364 @@ interface PendingPatchFull {
   createdAt: number;
 }
 
+// ─── Improvements Section ────────────────────────────────────────────────────
+// Shows proposed code improvements with risk badges and guarded apply button.
+// Human approval is always required — no autonomous execution.
+
+interface FrontendImprovement {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  riskLevel: "low" | "medium" | "high";
+  status: string;
+  files: string[];
+  autoFixable: boolean;
+  createdAt: number;
+  updatedAt: number;
+  appliedAt?: number;
+  failureReason?: string;
+}
+
+interface AutofixHistEntry {
+  id: string;
+  improvementTitle: string;
+  file: string;
+  category: string;
+  appliedAt: number;
+  validationPassed: boolean;
+  rolledBack: boolean;
+  rollbackReason?: string;
+  healthScoreBefore: number;
+  healthScoreAfter: number;
+}
+
+function ImprovementsSection({
+  onMessage,
+}: {
+  onMessage: (msg: string, isError?: boolean) => void;
+}) {
+  const [improvements, setImprovements] = useState<FrontendImprovement[]>([]);
+  const [loading,     setLoading]       = useState(true);
+  const [scanning,    setScanning]      = useState(false);
+  const [applying,    setApplying]      = useState<Record<string, boolean>>({});
+  const [expanded,    setExpanded]      = useState<Record<string, boolean>>({});
+  const [showHistory, setShowHistory]   = useState(false);
+  const [history,     setHistory]       = useState<AutofixHistEntry[]>([]);
+  const [histLoading, setHistLoading]   = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(IMPROVEMENTS_URL);
+      const d = await r.json() as { ok: boolean; improvements?: FrontendImprovement[] };
+      if (d.ok) setImprovements(d.improvements ?? []);
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleScan = useCallback(async () => {
+    setScanning(true);
+    try {
+      const r = await fetch(AUTOFIX_URL, { method: "POST" });
+      const d = await r.json() as { ok: boolean; created?: number; error?: string };
+      if (d.ok) {
+        onMessage(`✓ Scan complete — ${d.created ?? 0} new improvement${d.created !== 1 ? "s" : ""} found`);
+        await load();
+      } else {
+        onMessage(d.error ?? "Scan failed", true);
+      }
+    } catch (err) {
+      onMessage(`Scan error: ${String(err)}`, true);
+    }
+    setScanning(false);
+  }, [load, onMessage]);
+
+  const handleApply = useCallback(async (imp: FrontendImprovement) => {
+    setApplying(prev => ({ ...prev, [imp.id]: true }));
+    try {
+      const r = await fetch(`${IMPROVEMENTS_URL}/${imp.id}/apply`, { method: "POST" });
+      const d = await r.json() as {
+        ok: boolean; rolledBack?: boolean; healthBefore?: number;
+        healthAfter?: number; error?: string;
+      };
+      if (d.ok) {
+        onMessage(
+          `✓ Applied improvement "${imp.title}" — health ${d.healthBefore}→${d.healthAfter}`,
+        );
+        setImprovements(prev => prev.filter(i => i.id !== imp.id));
+      } else if (d.rolledBack) {
+        onMessage(`⟲ Rolled back "${imp.title}" — ${d.error ?? "validation failed"}`, true);
+        await load(); // refresh to show failed status
+      } else {
+        onMessage(d.error ?? "Apply failed", true);
+        await load();
+      }
+    } catch (err) {
+      onMessage(`Network error: ${String(err)}`, true);
+    }
+    setApplying(prev => ({ ...prev, [imp.id]: false }));
+  }, [load, onMessage]);
+
+  const handleReject = useCallback(async (imp: FrontendImprovement) => {
+    try {
+      await fetch(`${IMPROVEMENTS_URL}/${imp.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "rejected" }),
+      });
+      setImprovements(prev => prev.filter(i => i.id !== imp.id));
+      onMessage(`Improvement "${imp.title}" rejected.`);
+    } catch { /* ignore */ }
+  }, [onMessage]);
+
+  const toggleHistory = useCallback(async () => {
+    if (!showHistory) {
+      setHistLoading(true);
+      try {
+        const r = await fetch(AUTOFIX_HIST_URL);
+        const d = await r.json() as { ok: boolean; history?: AutofixHistEntry[] };
+        if (d.ok) setHistory((d.history ?? []).slice().reverse());
+      } catch { /* ignore */ }
+      setHistLoading(false);
+    }
+    setShowHistory(v => !v);
+  }, [showHistory]);
+
+  const catColor = (cat: string) => {
+    const m: Record<string, string> = {
+      "unused-imports":   "hsl(38 100% 62%)",
+      "type-annotations": "hsl(194 100% 55%)",
+      "null-checks":      "hsl(264 80% 72%)",
+      "readonly-typing":  "hsl(280 70% 65%)",
+      "formatting":       "hsl(142 71% 55%)",
+      "lint":             "hsl(196 50% 60%)",
+      "ui-text":          "hsl(30 80% 62%)",
+    };
+    return m[cat] ?? "hsl(196 30% 55%)";
+  };
+
+  const riskColor = (r: string) =>
+    r === "high" ? "hsl(355 80% 62%)" : r === "medium" ? "hsl(38 100% 62%)" : "hsl(142 71% 55%)";
+
+  const statusColor = (s: string) => {
+    const m: Record<string, string> = {
+      proposed: "hsl(196 30% 55%)", approved: "hsl(194 100% 60%)",
+      applying: "hsl(38 100% 62%)", applied: "hsl(142 71% 55%)",
+      failed: "hsl(355 80% 62%)",   rejected: "hsl(196 20% 40%)",
+    };
+    return m[s] ?? "hsl(196 30% 55%)";
+  };
+
+  const activeImprovements = improvements.filter(
+    i => !["applied", "rejected"].includes(i.status),
+  );
+
+  if (loading && improvements.length === 0) return null;
+
+  return (
+    <>
+      {/* ── Section divider ── */}
+      <div className="flex items-center gap-2 mt-2 mb-0.5">
+        <div className="flex-1 h-px" style={{ background: "hsl(210 15% 14%)" }} />
+        <span className="text-[9px] font-mono opacity-40 flex-shrink-0" style={{ color: "hsl(194 100% 55%)" }}>
+          IMPROVEMENTS
+        </span>
+        <div className="flex-1 h-px" style={{ background: "hsl(210 15% 14%)" }} />
+      </div>
+
+      {/* ── Improvements header bar ── */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <span className="text-[10px] font-semibold" style={{ color: "hsl(194 100% 60%)" }}>
+          <Zap className="w-3 h-3 inline mr-1" />
+          {activeImprovements.length} improvement{activeImprovements.length !== 1 ? "s" : ""}
+        </span>
+        <div className="flex items-center gap-1 ml-auto">
+          <button type="button" onClick={toggleHistory}
+            className="text-[9px] px-2 py-1 rounded-lg transition-opacity opacity-60 hover:opacity-100"
+            style={{ border: "1px solid hsl(210 15% 20%)", color: "hsl(196 30% 55%)" }}>
+            {showHistory ? "Hide history" : "History"}
+          </button>
+          <button type="button" onClick={handleScan} disabled={scanning}
+            className="flex items-center gap-1 text-[9px] px-2.5 py-1 rounded-lg transition-all disabled:opacity-40"
+            style={{ background: "hsl(194 100% 50% / 0.1)", border: "1px solid hsl(194 100% 50% / 0.3)", color: "hsl(194 100% 65%)" }}>
+            {scanning ? <><RefreshCw className="w-2.5 h-2.5 animate-spin" />Scanning…</> : <><Play className="w-2.5 h-2.5" />Scan</>}
+          </button>
+          <button type="button" onClick={load}
+            className="p-1 rounded-lg opacity-50 hover:opacity-100 transition-opacity"
+            style={{ color: "hsl(196 30% 55%)" }}>
+            <RefreshCw className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+
+      {/* ── Empty state ── */}
+      {activeImprovements.length === 0 && (
+        <div className="flex flex-col items-center gap-1.5 py-4 opacity-40">
+          <CheckCircle className="w-5 h-5" style={{ color: "hsl(142 71% 55%)" }} />
+          <p className="text-[10px]" style={{ color: "hsl(196 30% 55%)" }}>
+            No improvements — click Scan to check
+          </p>
+        </div>
+      )}
+
+      {/* ── Improvement cards ── */}
+      {activeImprovements.map(imp => {
+        const isApplying = applying[imp.id] ?? false;
+        const isExpanded = expanded[imp.id] ?? false;
+        const cc = catColor(imp.category);
+        const rc = riskColor(imp.riskLevel);
+        const sc = statusColor(imp.status);
+        const canApply = imp.autoFixable && imp.riskLevel === "low" && !!imp.id;
+
+        return (
+          <div key={imp.id} className="rounded-lg overflow-hidden"
+            style={{ border: "1px solid hsl(210 15% 16%)", background: "hsl(220 20% 6%)" }}>
+
+            {/* ── Collapsed row ── */}
+            <div className="flex items-center gap-2 px-3 py-2.5 min-w-0">
+
+              {/* Category pill */}
+              <span className="text-[8px] px-1.5 py-0.5 rounded font-mono flex-shrink-0 uppercase"
+                style={{ background: `${cc}14`, border: `1px solid ${cc}35`, color: cc }}>
+                {imp.category.replace("-", " ")}
+              </span>
+
+              {/* Title */}
+              <span className="text-xs truncate flex-1 min-w-0" style={{ color: "hsl(196 40% 68%)" }}>
+                {imp.title}
+              </span>
+
+              {/* Auto-fixable badge */}
+              {imp.autoFixable && (
+                <span className="text-[8px] px-1 py-0.5 rounded flex-shrink-0"
+                  style={{ background: "hsl(142 60% 40% / 0.12)", border: "1px solid hsl(142 60% 40% / 0.35)", color: "hsl(142 71% 55%)" }}>
+                  auto
+                </span>
+              )}
+
+              {/* Risk pill */}
+              <span className="text-[8px] px-1.5 py-0.5 rounded font-mono flex-shrink-0"
+                style={{ background: `${rc}14`, border: `1px solid ${rc}35`, color: rc }}>
+                {imp.riskLevel}
+              </span>
+
+              {/* Status */}
+              {imp.status !== "proposed" && (
+                <span className="text-[8px] flex-shrink-0" style={{ color: sc }}>
+                  {imp.status}
+                </span>
+              )}
+
+              {/* Apply button — only when autoFixable + low risk */}
+              {canApply && imp.status !== "failed" && (
+                <button type="button"
+                  onClick={() => handleApply(imp)}
+                  disabled={isApplying || imp.status === "applying"}
+                  title="Apply improvement (snapshot + tsc + health check)"
+                  className="flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold active:scale-95 transition-all disabled:opacity-40"
+                  style={{ background: "hsl(142 60% 35% / 0.2)", border: "1px solid hsl(142 60% 40% / 0.45)", color: "hsl(142 71% 65%)" }}>
+                  {isApplying || imp.status === "applying" ? "…" : "✓"}
+                </button>
+              )}
+
+              {/* Reject */}
+              <button type="button"
+                onClick={() => handleReject(imp)}
+                disabled={isApplying}
+                title="Reject improvement"
+                className="flex-shrink-0 px-2 py-1.5 rounded-lg text-xs active:scale-95 transition-all disabled:opacity-40"
+                style={{ background: "hsl(355 80% 40% / 0.1)", border: "1px solid hsl(355 80% 45% / 0.3)", color: "hsl(355 80% 62%)" }}>
+                ✕
+              </button>
+
+              {/* Expand toggle */}
+              <button type="button"
+                onClick={() => setExpanded(prev => ({ ...prev, [imp.id]: !prev[imp.id] }))}
+                className="flex-shrink-0 w-6 py-1.5 rounded-lg text-xs text-center transition-all"
+                style={{ background: "transparent", border: "1px solid hsl(210 15% 20%)", color: "hsl(196 30% 50%)" }}>
+                {isExpanded ? "▲" : "▼"}
+              </button>
+            </div>
+
+            {/* ── Expanded: file + description ── */}
+            {isExpanded && (
+              <div className="border-t px-3 py-2 flex flex-col gap-1.5"
+                style={{ borderColor: "hsl(210 15% 13%)" }}>
+                {imp.files.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {imp.files.map(f => (
+                      <span key={f} className="font-mono text-[9px] px-1.5 py-0.5 rounded"
+                        style={{ background: "hsl(220 20% 5%)", color: "hsl(194 80% 55%)" }}>
+                        {f.split("/").pop()}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="text-[10px] leading-snug whitespace-pre-wrap"
+                  style={{ color: "hsl(196 30% 55%)" }}>
+                  {imp.description}
+                </p>
+                {imp.failureReason && (
+                  <p className="text-[9px] leading-snug"
+                    style={{ color: "hsl(355 80% 60%)" }}>
+                    ✗ {imp.failureReason}
+                  </p>
+                )}
+                {!imp.autoFixable && (
+                  <p className="text-[9px] italic opacity-60" style={{ color: "hsl(38 80% 60%)" }}>
+                    This improvement requires manual intervention — no patch data available.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* ── History panel ── */}
+      {showHistory && (
+        <div className="mt-1 rounded-lg overflow-hidden"
+          style={{ border: "1px solid hsl(210 15% 14%)", background: "hsl(220 20% 5%)" }}>
+          <div className="px-3 py-2 border-b flex items-center justify-between"
+            style={{ borderColor: "hsl(210 15% 13%)" }}>
+            <span className="text-[10px] font-semibold" style={{ color: "hsl(196 40% 55%)" }}>
+              Autofix history
+            </span>
+            {histLoading && <RefreshCw className="w-3 h-3 animate-spin opacity-50" style={{ color: "hsl(196 30% 55%)" }} />}
+          </div>
+          {history.length === 0 && !histLoading && (
+            <p className="px-3 py-2 text-[9px] opacity-40" style={{ color: "hsl(196 30% 55%)" }}>
+              No history yet
+            </p>
+          )}
+          {history.slice(0, 20).map(h => (
+            <div key={h.id} className="flex items-start gap-2 px-3 py-2 border-b last:border-0"
+              style={{ borderColor: "hsl(210 15% 11%)" }}>
+              {h.rolledBack
+                ? <RotateCcw className="w-3 h-3 flex-shrink-0 mt-0.5" style={{ color: "hsl(38 100% 62%)" }} />
+                : <CheckCircle className="w-3 h-3 flex-shrink-0 mt-0.5" style={{ color: "hsl(142 71% 55%)" }} />}
+              <div className="flex-1 min-w-0">
+                <p className="text-[9px] font-medium truncate" style={{ color: "hsl(196 40% 62%)" }}>
+                  {h.improvementTitle}
+                </p>
+                <p className="text-[8px] opacity-60" style={{ color: "hsl(196 20% 50%)" }}>
+                  {h.rolledBack ? `rolled back — ${h.rollbackReason ?? ""}` : `✓ applied  · health ${h.healthScoreBefore}→${h.healthScoreAfter}`}
+                </p>
+              </div>
+              <span className="text-[8px] opacity-40 flex-shrink-0" style={{ color: "hsl(196 20% 50%)" }}>
+                {new Date(h.appliedAt).toLocaleTimeString()}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 // ─── PatchesTab ─────────────────────────────────────────────────────────────
 // Collapsed-card layout: each card shows file + risk + Apply / Reject / Expand
 // in a single row. Diff is hidden until the user taps ▼. Sticky bulk-action
@@ -1008,6 +1369,10 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
             </div>
           );
         })}
+
+        {/* ── Improvements section (below patches, same scrollable container) ── */}
+        <ImprovementsSection onMessage={onMessage} />
+
       </div>
     </div>
   );
