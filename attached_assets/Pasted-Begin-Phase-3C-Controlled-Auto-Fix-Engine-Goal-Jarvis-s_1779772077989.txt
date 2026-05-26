@@ -1,0 +1,89 @@
+Begin Phase 3C: Controlled Auto-Fix Engine.
+
+Goal:
+Jarvis should detect common TypeScript/build/runtime problems, propose safe fixes, validate them, and only auto-apply extremely low-risk fixes inside strict limits.
+
+Requirements:
+
+1. Add an AutoFix engine
+- Create lib/dev/autoFix.ts
+- It should read validation output from TypeScript/build checks.
+- It should classify issues by type:
+  - missing import
+  - unused import
+  - invalid CSS/React style prop
+  - missing type/interface
+  - wrong export/import name
+  - endpoint route mismatch
+  - simple syntax typo
+  - unknown/unsafe
+
+2. Add risk levels
+- safe
+- review
+- risky
+- blocked
+
+3. Safe auto-fix rules
+Auto-apply only when:
+- risk is "safe"
+- exactly one file is changed
+- no deletion occurs
+- no env/config/auth/database files are touched
+- patch is under 40 changed lines
+- TypeScript passes after apply
+- checkpoint exists before write
+
+4. Review-required fixes
+For anything not safe:
+- create a patch proposal in the existing patch queue
+- include reason, risk, diff preview, affected file, test command, and confidence score
+- user must approve manually
+
+5. Blocked fixes
+Never auto-fix:
+- auth logic
+- payment logic
+- database migrations
+- deleting files
+- package/env config changes
+- security-related changes
+- changes over 40 lines
+- multi-file refactors
+
+6. UI
+Add an AutoFix panel/section showing:
+- detected issue
+- classification
+- risk
+- confidence
+- proposed action
+- validation result
+- whether it was auto-applied or queued for approval
+
+7. Dev Agent integration
+After every failed validation:
+- run AutoFix analysis
+- auto-apply safe fixes only
+- otherwise queue the proposed patch
+- re-run validation after any applied safe fix
+- never loop more than 2 auto-fix attempts per request
+
+8. Safety invariants
+- No hidden autonomous execution
+- No risky auto-apply
+- Always checkpoint before write
+- Always validate after write
+- Always preserve rollback
+- App must stay buildable
+
+9. Tests
+Add/extend tests to verify:
+- safe single-file fix can auto-apply
+- risky fix goes to patch queue
+- blocked files are never modified
+- validation runs after apply
+- rollback still works
+- TypeScript checks exit 0
+
+Implement Phase 3C carefully and keep the existing Phase 3B approval system intact.

@@ -17,6 +17,7 @@ import {
 import { createSnapshot } from "../lib/dev/snapshotStore";
 import { createTask, updateTask, addMessage, addPatchToTask, markPatchApplied } from "../lib/dev/taskStore";
 import { runValidation } from "../lib/dev/validator";
+import { runAutoFixAnalysis, getLastAutoFixResult } from "../lib/dev/autoFixEngine";
 
 const router = Router();
 
@@ -183,6 +184,16 @@ router.post("/dev/apply", async (req, res) => {
     });
   }
 
+  // ── Phase 3C: Auto-Fix Engine ─────────────────────────────────────────────
+  // Run auto-fix analysis only on failure.
+  // Safe fixes are applied automatically (max 2 attempts).
+  // Review/risky issues are queued as pending patches for human approval.
+  let autoFixResult = null;
+  if (!validation.passed) {
+    const failedOutput = validation.checks.find(c => !c.passed)?.output ?? "";
+    autoFixResult = await runAutoFixAnalysis(failedOutput, proj, 2);
+  }
+
   res.json({
     ok: true,
     backupPath: result.backupPath,
@@ -194,6 +205,7 @@ router.post("/dev/apply", async (req, res) => {
       checks: validation.checks,
     },
     validationEvents,
+    autoFixResult,
   });
 });
 
@@ -392,6 +404,18 @@ router.post("/dev/improvements/:id/apply", async (req, res): Promise<void> => {
   } catch (err) {
     res.status(500).json({ ok: false, error: String(err) });
   }
+});
+
+// ─── GET /dev/autofix/latest ──────────────────────────────────────────────────
+// Returns the result of the most recent auto-fix analysis run.
+
+router.get("/dev/autofix/latest", (_req, res) => {
+  const result = getLastAutoFixResult();
+  if (!result) {
+    res.json({ ok: true, result: null });
+    return;
+  }
+  res.json({ ok: true, result });
 });
 
 // ─── GET /dev/files ───────────────────────────────────────────────────────────

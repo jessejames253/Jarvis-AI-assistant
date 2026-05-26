@@ -37,8 +37,9 @@ const PATCHES_URL      = `${BASE}api/dev/patches`;
 const HEALTH_URL       = `${BASE}api/healthz`;
 const DEV_HEALTH_URL   = `${BASE}api/dev/health`;
 const IMPROVEMENTS_URL = `${BASE}api/dev/improvements`;
-const AUTOFIX_URL      = `${BASE}api/dev/autofix`;
-const AUTOFIX_HIST_URL = `${BASE}api/dev/autofix/history`;
+const AUTOFIX_URL        = `${BASE}api/dev/autofix`;
+const AUTOFIX_HIST_URL   = `${BASE}api/dev/autofix/history`;
+const AUTOFIX_LATEST_URL = `${BASE}api/dev/autofix/latest`;
 const DEV_CONTEXT_URL  = `${BASE}api/dev/context`;
 const SNAP_RESTORE_URL = `${BASE}api/dev/snapshots`;
 
@@ -817,6 +818,50 @@ interface AppliedPatch extends PendingPatchFull {
   rollbackValidationPassed?: boolean;
 }
 
+// ─── AutoFix types (Phase 3C) ─────────────────────────────────────────────────
+
+type FixRisk = "safe" | "review" | "risky" | "blocked";
+type IssueType =
+  | "unused-import" | "missing-import" | "invalid-css-style"
+  | "missing-type" | "wrong-export-name" | "endpoint-route-mismatch"
+  | "syntax-typo" | "unknown";
+
+interface DetectedIssueFE {
+  id: string;
+  type: IssueType;
+  file: string;
+  line?: number;
+  errorCode?: number;
+  errorText: string;
+  risk: FixRisk;
+  confidence: number;
+}
+
+interface AutoFixProposalFE {
+  issueId: string;
+  issue: DetectedIssueFE;
+  description: string;
+  file: string;
+  patchId?: string;
+  testCommand: string;
+  status: "auto-applied" | "queued" | "blocked" | "skipped" | "failed";
+  validationPassed?: boolean;
+  snapshotId?: string;
+  reason?: string;
+  confidence: number;
+  appliedAt?: number;
+}
+
+interface AutoFixResultFE {
+  proposals: AutoFixProposalFE[];
+  autoApplied: number;
+  queued: number;
+  blocked: number;
+  attempts: number;
+  finalValidationPassed?: boolean;
+  ranAt: number;
+}
+
 // ─── Improvements Section ────────────────────────────────────────────────────
 // Shows proposed code improvements with risk badges and guarded apply button.
 // Human approval is always required — no autonomous execution.
@@ -1175,6 +1220,172 @@ function ImprovementsSection({
   );
 }
 
+// ─── AutoFixPanel ─────────────────────────────────────────────────────────────
+// Shows the result of the most recent auto-fix analysis run.
+// Triggered automatically after a failed patch validation.
+
+function autoFixRiskColor(risk: FixRisk) {
+  return risk === "safe"    ? "hsl(142 71% 55%)"
+       : risk === "review"  ? "hsl(196 60% 60%)"
+       : risk === "risky"   ? "hsl(38 100% 62%)"
+       : "hsl(355 80% 62%)";
+}
+
+function autoFixStatusBadge(status: AutoFixProposalFE["status"]) {
+  switch (status) {
+    case "auto-applied":
+      return { label: "auto-applied", bg: "hsl(142 70% 50% / 0.12)", border: "hsl(142 70% 50% / 0.3)", color: "hsl(142 70% 65%)" };
+    case "queued":
+      return { label: "queued", bg: "hsl(196 60% 50% / 0.12)", border: "hsl(196 60% 50% / 0.3)", color: "hsl(196 60% 65%)" };
+    case "blocked":
+      return { label: "blocked", bg: "hsl(355 80% 50% / 0.12)", border: "hsl(355 80% 50% / 0.3)", color: "hsl(355 80% 65%)" };
+    case "failed":
+      return { label: "failed", bg: "hsl(355 80% 50% / 0.12)", border: "hsl(355 80% 50% / 0.3)", color: "hsl(355 80% 65%)" };
+    default:
+      return { label: "skipped", bg: "hsl(210 15% 20% / 0.5)", border: "hsl(210 15% 25%)", color: "hsl(210 15% 55%)" };
+  }
+}
+
+function AutoFixPanel({
+  result,
+  onRefresh,
+  onSendMessage,
+}: {
+  result: AutoFixResultFE;
+  onRefresh: () => void;
+  onSendMessage: (msg: string) => void;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  const summaryParts = [
+    result.autoApplied > 0 && `${result.autoApplied} auto-applied`,
+    result.queued      > 0 && `${result.queued} queued`,
+    result.blocked     > 0 && `${result.blocked} blocked`,
+  ].filter(Boolean).join(" · ");
+
+  return (
+    <div className="mt-3 rounded-lg overflow-hidden"
+      style={{ border: "1px solid hsl(196 60% 30% / 0.35)", background: "hsl(196 20% 4%)" }}>
+
+      {/* Header */}
+      <button
+        type="button"
+        onClick={() => setCollapsed(c => !c)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-left"
+        style={{ borderBottom: collapsed ? "none" : "1px solid hsl(196 20% 10%)" }}>
+        <Zap className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "hsl(196 60% 60%)" }} />
+        <span className="text-xs font-semibold flex-1" style={{ color: "hsl(196 60% 65%)" }}>
+          AutoFix · {result.attempts} pass{result.attempts !== 1 ? "es" : ""}
+        </span>
+        {summaryParts && (
+          <span className="text-[10px] opacity-60" style={{ color: "hsl(196 40% 55%)" }}>
+            {summaryParts}
+          </span>
+        )}
+        {result.finalValidationPassed !== undefined && (
+          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
+            style={{
+              background: result.finalValidationPassed ? "hsl(142 70% 50% / 0.12)" : "hsl(355 80% 50% / 0.12)",
+              border: `1px solid ${result.finalValidationPassed ? "hsl(142 70% 50% / 0.3)" : "hsl(355 80% 50% / 0.3)"}`,
+              color: result.finalValidationPassed ? "hsl(142 70% 65%)" : "hsl(355 80% 65%)",
+            }}>
+            TS {result.finalValidationPassed ? "✓" : "✗"}
+          </span>
+        )}
+        <button type="button" onClick={e => { e.stopPropagation(); onRefresh(); }}
+          className="p-0.5 rounded opacity-50 hover:opacity-100 transition-opacity flex-shrink-0"
+          title="Refresh from server">
+          <RefreshCw className="w-3 h-3" style={{ color: "hsl(196 40% 55%)" }} />
+        </button>
+        <span className="text-[10px] opacity-40 flex-shrink-0">{collapsed ? "▼" : "▲"}</span>
+      </button>
+
+      {/* Proposals list */}
+      {!collapsed && (
+        <div className="flex flex-col" style={{ gap: 0 }}>
+          {result.proposals.length === 0 && (
+            <p className="px-3 py-2 text-[10px] opacity-40" style={{ color: "hsl(210 15% 60%)" }}>
+              No issues detected.
+            </p>
+          )}
+          {result.proposals.map(p => {
+            const rc   = autoFixRiskColor(p.issue.risk);
+            const badge = autoFixStatusBadge(p.status);
+            return (
+              <div key={p.issueId} className="px-3 py-2">
+                {/* Row 1: type · risk · file · status */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {/* Issue type */}
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded flex-shrink-0"
+                    style={{ background: `${rc}12`, border: `1px solid ${rc}30`, color: rc }}>
+                    {p.issue.type}
+                  </span>
+
+                  {/* Risk */}
+                  <span className="text-[9px] opacity-60 flex-shrink-0" style={{ color: rc }}>
+                    {p.issue.risk}
+                  </span>
+
+                  {/* Confidence bar */}
+                  <span className="text-[9px] opacity-40 flex-shrink-0" style={{ color: "hsl(210 15% 60%)" }}>
+                    {p.confidence}%
+                  </span>
+
+                  <span className="flex-1" />
+
+                  {/* Status badge */}
+                  <span className="text-[9px] px-1.5 py-0.5 rounded font-semibold flex-shrink-0"
+                    style={{ background: badge.bg, border: `1px solid ${badge.border}`, color: badge.color }}>
+                    {badge.label}
+                  </span>
+
+                  {/* TS validation badge (for auto-applied) */}
+                  {p.status === "auto-applied" && p.validationPassed !== undefined && (
+                    <span className="text-[9px] px-1 py-0.5 rounded flex-shrink-0"
+                      style={{
+                        background: p.validationPassed ? "hsl(142 70% 50% / 0.1)" : "hsl(355 80% 50% / 0.1)",
+                        color: p.validationPassed ? "hsl(142 70% 65%)" : "hsl(355 80% 65%)",
+                      }}>
+                      TS {p.validationPassed ? "✓" : "✗"}
+                    </span>
+                  )}
+                </div>
+
+                {/* Row 2: file:line + description */}
+                <p className="mt-0.5 text-[10px] font-mono truncate" style={{ color: "hsl(196 40% 50%)" }}>
+                  {p.file.split("/").pop()}{p.issue.line ? `:${p.issue.line}` : ""}
+                </p>
+                <p className="mt-0.5 text-[10px] leading-snug opacity-70 line-clamp-2"
+                  style={{ color: "hsl(196 30% 58%)" }}>
+                  {p.description}
+                </p>
+
+                {/* Row 3: reason (if skipped/blocked) or "Fix with Dev Agent" (if queued/failed) */}
+                {p.reason && (
+                  <p className="mt-0.5 text-[9px] opacity-50 italic" style={{ color: "hsl(38 60% 60%)" }}>
+                    {p.reason}
+                  </p>
+                )}
+                {(p.status === "queued" || p.status === "failed" || p.status === "skipped") && !p.reason && (
+                  <button
+                    type="button"
+                    onClick={() => onSendMessage(
+                      `Fix this TypeScript error: TS${p.issue.errorCode ?? ""} "${p.issue.errorText}" in \`${p.file}\`${p.issue.line ? ` at line ${p.issue.line}` : ""}`
+                    )}
+                    className="mt-1 text-[9px] px-2 py-0.5 rounded transition-all hover:opacity-80"
+                    style={{ background: "hsl(196 60% 50% / 0.08)", border: "1px solid hsl(196 60% 50% / 0.25)", color: "hsl(196 60% 65%)" }}>
+                    Ask Dev Agent →
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── PatchesTab ─────────────────────────────────────────────────────────────
 // Collapsed-card layout: each card shows file + risk + Apply / Reject / Expand
 // in a single row. Diff is hidden until the user taps ▼. Sticky bulk-action
@@ -1182,6 +1393,7 @@ function ImprovementsSection({
 function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean) => void }) {
   const [patches,       setPatches]       = useState<PendingPatchFull[]>([]);
   const [appliedPatches,setAppliedPatches] = useState<AppliedPatch[]>([]);
+  const [autoFixResult, setAutoFixResult] = useState<AutoFixResultFE | null>(null);
   const [loading,       setLoading]       = useState(true);
   const [applying,      setApplying]      = useState<Record<string, boolean>>({});
   // expanded[patchId] = true → show diff; false / absent → collapsed
@@ -1216,6 +1428,7 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
       const d = await r.json() as {
         ok: boolean; error?: string; snapshotId?: string;
         validation?: { passed: boolean; summary: string };
+        autoFixResult?: AutoFixResultFE;
       };
       if (d.ok) {
         const applied: AppliedPatch = {
@@ -1228,7 +1441,16 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
         setPatches(prev => prev.filter(x => x.patchId !== p.patchId));
         setExpanded(prev => { const n = { ...prev }; delete n[p.patchId]; return n; });
         setAppliedPatches(prev => [applied, ...prev].slice(0, 20));
-        onMessage(`✓ Applied \`${p.file}\` — TS check ${d.validation?.passed ? "passed ✓" : "failed ✗"}: ${d.validation?.summary ?? ""}`);
+        // Capture AutoFix results (populated only on validation failure)
+        if (d.autoFixResult) {
+          setAutoFixResult(d.autoFixResult);
+          // Reload patch queue — AutoFix may have added review patches
+          load();
+        }
+        const afSuffix = d.autoFixResult
+          ? ` · AutoFix: ${d.autoFixResult.autoApplied} applied, ${d.autoFixResult.queued} queued`
+          : "";
+        onMessage(`✓ Applied \`${p.file}\` — TS check ${d.validation?.passed ? "passed ✓" : "failed ✗"}: ${d.validation?.summary ?? ""}${afSuffix}`);
       } else {
         onMessage(d.error ?? "Apply failed", true);
       }
@@ -1559,6 +1781,21 @@ function PatchesTab({ onMessage }: { onMessage: (msg: string, isError?: boolean)
               })}
             </div>
           </div>
+        )}
+
+        {/* ── AutoFix results (Phase 3C) ── */}
+        {autoFixResult && (
+          <AutoFixPanel
+            result={autoFixResult}
+            onRefresh={async () => {
+              try {
+                const r = await fetch(AUTOFIX_LATEST_URL);
+                const d = await r.json() as { ok: boolean; result?: AutoFixResultFE };
+                if (d.ok && d.result) setAutoFixResult(d.result);
+              } catch { /* ignore */ }
+            }}
+            onSendMessage={msg => onMessage(msg)}
+          />
         )}
 
         {/* ── Improvements section (below patches, same scrollable container) ── */}
