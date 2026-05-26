@@ -20,6 +20,7 @@
 import { Router } from "express";
 import { listActions }         from "../lib/agentActions";
 import { runExecution, ExecutionBlockedError, ExecutionGateError } from "../lib/executionEngine";
+import { recalculateAllPriorities }                                from "../lib/prioritizer";
 import {
   listExecutions, getExecution,
   createExecution, updateExecution,
@@ -76,6 +77,7 @@ router.post("/agent-actions/:id/execute", async (req, res) => {
     });
 
     res.status(dryRun ? 200 : 201).json({ ok: true, execution: completed });
+    if (!dryRun) setImmediate(() => { try { recalculateAllPriorities(); } catch { /* ignore */ } });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     const status  =

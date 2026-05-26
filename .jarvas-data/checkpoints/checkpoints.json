@@ -52,5 +52,47 @@
       "artifacts/jarvas/src/components/AutoLoopPanel.tsx"
     ],
     "status": "active"
+  },
+  {
+    "id": "cf7ade5f-221f-45a7-82cf-ad37e28ff4b9",
+    "timestamp": "2026-05-26T23:28:30.199Z",
+    "description": "Auto-checkpoint before priority recalculation",
+    "commitHash": "9e48259c0165218a0f278404ae553c1bb1a9646e",
+    "branch": "main",
+    "changedFiles": [
+      "rtifacts/api-server/src/routes/executions.ts",
+      "artifacts/api-server/src/routes/index.ts",
+      "artifacts/api-server/src/routes/masterTasks.ts",
+      "artifacts/api-server/src/routes/plans.ts",
+      "artifacts/jarvas/src/pages/Chat.tsx",
+      ".jarvas-data/tasks/recommendations.json",
+      "artifacts/api-server/src/lib/prioritizer.ts",
+      "artifacts/api-server/src/routes/prioritizer.ts",
+      "artifacts/jarvas/src/components/PriorityPanel.tsx"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "b3a06215-d544-4ec1-8c9d-2d1b176c24b5",
+    "timestamp": "2026-05-26T23:30:38.462Z",
+    "description": "Auto-checkpoint before priority recalculation",
+    "commitHash": "9e48259c0165218a0f278404ae553c1bb1a9646e",
+    "branch": "main",
+    "changedFiles": [
+      "jarvas-data/checkpoints/checkpoints.json",
+      ".jarvas-data/tasks/master-task-list.json",
+      "artifacts/api-server/src/routes/executions.ts",
+      "artifacts/api-server/src/routes/index.ts",
+      "artifacts/api-server/src/routes/masterTasks.ts",
+      "artifacts/api-server/src/routes/plans.ts",
+      "artifacts/jarvas/src/pages/Chat.tsx",
+      ".jarvas-data/tasks/priority-scores.json",
+      ".jarvas-data/tasks/ranked.json",
+      ".jarvas-data/tasks/recommendations.json",
+      "artifacts/api-server/src/lib/prioritizer.ts",
+      "artifacts/api-server/src/routes/prioritizer.ts",
+      "artifacts/jarvas/src/components/PriorityPanel.tsx"
+    ],
+    "status": "active"
   }
 ]

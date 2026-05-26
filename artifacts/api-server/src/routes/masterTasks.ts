@@ -10,6 +10,7 @@
  */
 
 import { Router } from "express";
+import { recalculateAllPriorities } from "../lib/prioritizer";
 import {
   listTasks, addTask, updateTaskStatus,
   type TaskPriority, type TaskStatus,
@@ -98,6 +99,7 @@ router.patch("/master-tasks/:id/status", (req, res) => {
 
     const tasks = updateTaskStatus(id, status);
     res.json({ ok: true, tasks });
+    setImmediate(() => { try { recalculateAllPriorities(); } catch { /* ignore */ } });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     const isNotFound = message.includes("not found");

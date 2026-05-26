@@ -33,6 +33,7 @@ import {
   Cpu,
   Bot,
   Layers,
+  TrendingUp,
 } from "lucide-react";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
 import { useSpeechSession } from "@/hooks/useSpeechSession";
@@ -57,6 +58,7 @@ import CheckpointsPanel    from "@/components/CheckpointsPanel";
 import ExecutionsPanel     from "@/components/ExecutionsPanel";
 import AutoLoopPanel       from "@/components/AutoLoopPanel";
 import PlansPanel          from "@/components/PlansPanel";
+import PriorityPanel       from "@/components/PriorityPanel";
 import {
   approvePatch, rejectPatch as logRejectPatch, fetchPendingPatches,
   fetchServerStatus,
@@ -549,6 +551,7 @@ export default function Chat() {
   const [executionsPanelOpen,   setExecutionsPanelOpen]   = useState(false);
   const [autoLoopPanelOpen,     setAutoLoopPanelOpen]     = useState(false);
   const [plansPanelOpen,        setPlansPanelOpen]        = useState(false);
+  const [priorityPanelOpen,     setPriorityPanelOpen]     = useState(false);
   const autoRoutedRef = useRef(false);
 
   // ── Patch notification bar + server status ───────────────────────────────
@@ -1428,6 +1431,21 @@ export default function Chat() {
             <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: plansPanelOpen ? "hsl(264 80% 75%)" : "hsl(196 60% 55%)" }}>PLANS</span>
           </button>
 
+          {/* Priority */}
+          <button
+            onClick={() => setPriorityPanelOpen(v => !v)}
+            title="Task Prioritizer — AI-scored rankings and recommendations"
+            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
+            style={{
+              background:  priorityPanelOpen ? "hsl(175 70% 55% / 0.12)" : "transparent",
+              borderColor: priorityPanelOpen ? "hsl(175 70% 55% / 0.5)"  : "hsl(210 15% 30%)",
+            }}
+            aria-label="Open priority panel"
+          >
+            <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: priorityPanelOpen ? "hsl(175 70% 70%)" : "hsl(196 60% 55%)" }} />
+            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: priorityPanelOpen ? "hsl(175 70% 70%)" : "hsl(196 60% 55%)" }}>PRIORITY</span>
+          </button>
+
           {/* Dev Agent — visible on all screen sizes */}
           <button
             onClick={() => setDevPanelOpen(true)}
@@ -1791,6 +1809,13 @@ export default function Chat() {
       <PlansPanel
         isOpen={plansPanelOpen}
         onClose={() => setPlansPanelOpen(false)}
+        apiBase={BASE}
+      />
+
+      {/* Priority panel */}
+      <PriorityPanel
+        isOpen={priorityPanelOpen}
+        onClose={() => setPriorityPanelOpen(false)}
         apiBase={BASE}
       />
 

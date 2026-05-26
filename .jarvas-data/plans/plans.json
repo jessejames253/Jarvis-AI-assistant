@@ -4,7 +4,7 @@
     "title": "Jarvis v2 Mobile App",
     "goal": "Build a voice-first mobile companion app using React Native + Expo that mirrors the Jarvis web UI, supports offline mode, and syncs agent tasks via the API.",
     "createdAt": "2026-05-26T23:18:32.556Z",
-    "updatedAt": "2026-05-26T23:18:33.496Z",
+    "updatedAt": "2026-05-26T23:30:57.946Z",
     "status": "converted",
     "phases": [
       {

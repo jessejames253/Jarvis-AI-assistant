@@ -1,0 +1,492 @@
+{
+  "task-001": {
+    "taskId": "task-001",
+    "total": 65,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 45,
+      "riskLevel": 55,
+      "impact": 55,
+      "difficulty": 55,
+      "blocked": 75
+    },
+    "reasoning": "high urgency",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "task-002": {
+    "taskId": "task-002",
+    "total": 68,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 45,
+      "riskLevel": 80,
+      "impact": 55,
+      "difficulty": 55,
+      "blocked": 75
+    },
+    "reasoning": "high urgency",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "task-003": {
+    "taskId": "task-003",
+    "total": 59,
+    "factors": {
+      "urgency": 55,
+      "dependencies": 45,
+      "riskLevel": 80,
+      "impact": 55,
+      "difficulty": 55,
+      "blocked": 75
+    },
+    "reasoning": "Standard priority task",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "a0322bf0-e3e2-40e0-b43e-34acf22f25c8": {
+    "taskId": "a0322bf0-e3e2-40e0-b43e-34acf22f25c8",
+    "total": 75,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 90,
+      "riskLevel": 55,
+      "impact": 65,
+      "difficulty": 55,
+      "blocked": 75
+    },
+    "reasoning": "high urgency · unblocks downstream work · Planning & Architecture · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "a4a4153e-6414-4fd2-be00-b9b3d9011c8a": {
+    "taskId": "a4a4153e-6414-4fd2-be00-b9b3d9011c8a",
+    "total": 81,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 90,
+      "riskLevel": 55,
+      "impact": 90,
+      "difficulty": 55,
+      "blocked": 75
+    },
+    "reasoning": "high urgency · high impact · unblocks downstream work · Planning & Architecture · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "f7e2df01-c6f4-4669-bd92-f46a7b23142c": {
+    "taskId": "f7e2df01-c6f4-4669-bd92-f46a7b23142c",
+    "total": 77,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 90,
+      "riskLevel": 55,
+      "impact": 65,
+      "difficulty": 80,
+      "blocked": 75
+    },
+    "reasoning": "high urgency · quick win · unblocks downstream work · Planning & Architecture · small effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "7581896b-b432-48b6-ae63-26b887d0dcf9": {
+    "taskId": "7581896b-b432-48b6-ae63-26b887d0dcf9",
+    "total": 81,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 90,
+      "riskLevel": 55,
+      "impact": 90,
+      "difficulty": 55,
+      "blocked": 75
+    },
+    "reasoning": "high urgency · high impact · unblocks downstream work · Planning & Architecture · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "cf862968-0359-4db4-983d-269b19e5185a": {
+    "taskId": "cf862968-0359-4db4-983d-269b19e5185a",
+    "total": 75,
+    "factors": {
+      "urgency": 55,
+      "dependencies": 90,
+      "riskLevel": 80,
+      "impact": 90,
+      "difficulty": 55,
+      "blocked": 75
+    },
+    "reasoning": "high impact · unblocks downstream work · Planning & Architecture · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "29f829f4-a053-4ecc-8c66-fa13827f88c1": {
+    "taskId": "29f829f4-a053-4ecc-8c66-fa13827f88c1",
+    "total": 86,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 90,
+      "riskLevel": 80,
+      "impact": 90,
+      "difficulty": 80,
+      "blocked": 75
+    },
+    "reasoning": "high urgency · high impact · quick win · unblocks downstream work · Planning & Architecture · small effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "f279b526-6bb7-4075-aeef-1bc95bb93353": {
+    "taskId": "f279b526-6bb7-4075-aeef-1bc95bb93353",
+    "total": 55,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 76,
+      "riskLevel": 55,
+      "impact": 25,
+      "difficulty": 80,
+      "blocked": 12
+    },
+    "reasoning": "high urgency · blocked by earlier tasks · quick win · unblocks downstream work · Foundation & Core Infrastructure · small effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "9eef34c3-44a5-4107-9481-edd267b50fdb": {
+    "taskId": "9eef34c3-44a5-4107-9481-edd267b50fdb",
+    "total": 60,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 76,
+      "riskLevel": 55,
+      "impact": 55,
+      "difficulty": 55,
+      "blocked": 12
+    },
+    "reasoning": "high urgency · blocked by earlier tasks · unblocks downstream work · Foundation & Core Infrastructure · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "9be6b3a5-c650-4a14-82f0-e1c3288c8f47": {
+    "taskId": "9be6b3a5-c650-4a14-82f0-e1c3288c8f47",
+    "total": 69,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 76,
+      "riskLevel": 80,
+      "impact": 80,
+      "difficulty": 55,
+      "blocked": 12
+    },
+    "reasoning": "high urgency · blocked by earlier tasks · high impact · unblocks downstream work · Foundation & Core Infrastructure · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "950992f9-908f-495f-b3de-fbcd62724af1": {
+    "taskId": "950992f9-908f-495f-b3de-fbcd62724af1",
+    "total": 69,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 76,
+      "riskLevel": 80,
+      "impact": 80,
+      "difficulty": 55,
+      "blocked": 12
+    },
+    "reasoning": "high urgency · blocked by earlier tasks · high impact · unblocks downstream work · Foundation & Core Infrastructure · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "5cfd955b-41f5-4923-8198-04b020737f79": {
+    "taskId": "5cfd955b-41f5-4923-8198-04b020737f79",
+    "total": 67,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 76,
+      "riskLevel": 80,
+      "impact": 80,
+      "difficulty": 28,
+      "blocked": 12
+    },
+    "reasoning": "high urgency · blocked by earlier tasks · high impact · complex task · unblocks downstream work · Foundation & Core Infrastructure · large effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "3654cfde-7808-4f7f-892a-5777dc0c3b51": {
+    "taskId": "3654cfde-7808-4f7f-892a-5777dc0c3b51",
+    "total": 58,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 76,
+      "riskLevel": 55,
+      "impact": 55,
+      "difficulty": 28,
+      "blocked": 12
+    },
+    "reasoning": "high urgency · blocked by earlier tasks · complex task · unblocks downstream work · Foundation & Core Infrastructure · large effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "1fa3b5e1-0658-4c8b-8451-75ca3c1cb02a": {
+    "taskId": "1fa3b5e1-0658-4c8b-8451-75ca3c1cb02a",
+    "total": 52,
+    "factors": {
+      "urgency": 55,
+      "dependencies": 76,
+      "riskLevel": 55,
+      "impact": 55,
+      "difficulty": 55,
+      "blocked": 12
+    },
+    "reasoning": "blocked by earlier tasks · unblocks downstream work · Foundation & Core Infrastructure · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "b036a6ff-08f8-4c4d-aa1f-bbc8d140593a": {
+    "taskId": "b036a6ff-08f8-4c4d-aa1f-bbc8d140593a",
+    "total": 56,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 62,
+      "riskLevel": 55,
+      "impact": 55,
+      "difficulty": 28,
+      "blocked": 12
+    },
+    "reasoning": "high urgency · blocked by earlier tasks · complex task · Feature Implementation · large effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "7325d1be-73a9-4dc2-a4f4-7e4f8eb62e51": {
+    "taskId": "7325d1be-73a9-4dc2-a4f4-7e4f8eb62e51",
+    "total": 56,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 62,
+      "riskLevel": 55,
+      "impact": 55,
+      "difficulty": 28,
+      "blocked": 12
+    },
+    "reasoning": "high urgency · blocked by earlier tasks · complex task · Feature Implementation · large effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "62745aff-7bb3-47ee-b79a-51046a726821": {
+    "taskId": "62745aff-7bb3-47ee-b79a-51046a726821",
+    "total": 58,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 62,
+      "riskLevel": 55,
+      "impact": 55,
+      "difficulty": 55,
+      "blocked": 12
+    },
+    "reasoning": "high urgency · blocked by earlier tasks · Feature Implementation · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "d1a8b735-0c1c-4e12-8dcb-f5e38363f732": {
+    "taskId": "d1a8b735-0c1c-4e12-8dcb-f5e38363f732",
+    "total": 52,
+    "factors": {
+      "urgency": 55,
+      "dependencies": 62,
+      "riskLevel": 80,
+      "impact": 55,
+      "difficulty": 55,
+      "blocked": 12
+    },
+    "reasoning": "blocked by earlier tasks · Feature Implementation · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "3d072572-388f-4828-938f-736508202926": {
+    "taskId": "3d072572-388f-4828-938f-736508202926",
+    "total": 50,
+    "factors": {
+      "urgency": 55,
+      "dependencies": 62,
+      "riskLevel": 55,
+      "impact": 55,
+      "difficulty": 55,
+      "blocked": 12
+    },
+    "reasoning": "blocked by earlier tasks · Feature Implementation · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "35952ca0-af36-4d28-8597-c32d4a0e3d53": {
+    "taskId": "35952ca0-af36-4d28-8597-c32d4a0e3d53",
+    "total": 50,
+    "factors": {
+      "urgency": 55,
+      "dependencies": 62,
+      "riskLevel": 55,
+      "impact": 55,
+      "difficulty": 55,
+      "blocked": 12
+    },
+    "reasoning": "blocked by earlier tasks · Feature Implementation · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "5a8e1111-a76c-4816-8967-295a81a5217c": {
+    "taskId": "5a8e1111-a76c-4816-8967-295a81a5217c",
+    "total": 41,
+    "factors": {
+      "urgency": 20,
+      "dependencies": 62,
+      "riskLevel": 55,
+      "impact": 55,
+      "difficulty": 55,
+      "blocked": 12
+    },
+    "reasoning": "low urgency · blocked by earlier tasks · Feature Implementation · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "de20c821-0a13-48e0-94b4-940476f0d2a3": {
+    "taskId": "de20c821-0a13-48e0-94b4-940476f0d2a3",
+    "total": 52,
+    "factors": {
+      "urgency": 55,
+      "dependencies": 62,
+      "riskLevel": 55,
+      "impact": 55,
+      "difficulty": 80,
+      "blocked": 12
+    },
+    "reasoning": "blocked by earlier tasks · quick win · Feature Implementation · small effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "d007e359-5fb4-4d4a-80c7-80a020cbbdb2": {
+    "taskId": "d007e359-5fb4-4d4a-80c7-80a020cbbdb2",
+    "total": 62,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 48,
+      "riskLevel": 80,
+      "impact": 80,
+      "difficulty": 28,
+      "blocked": 12
+    },
+    "reasoning": "high urgency · blocked by earlier tasks · high impact · complex task · Testing & Quality Assurance · large effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "151076dc-f61d-4fe2-ace9-0d9048c3ab3a": {
+    "taskId": "151076dc-f61d-4fe2-ace9-0d9048c3ab3a",
+    "total": 59,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 48,
+      "riskLevel": 80,
+      "impact": 55,
+      "difficulty": 55,
+      "blocked": 12
+    },
+    "reasoning": "high urgency · blocked by earlier tasks · Testing & Quality Assurance · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "e63af177-e836-472e-b743-32f5ad2b7f08": {
+    "taskId": "e63af177-e836-472e-b743-32f5ad2b7f08",
+    "total": 59,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 48,
+      "riskLevel": 80,
+      "impact": 55,
+      "difficulty": 55,
+      "blocked": 12
+    },
+    "reasoning": "high urgency · blocked by earlier tasks · Testing & Quality Assurance · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "e19fcfa3-446a-43b5-bac2-e20dd6dd1c6d": {
+    "taskId": "e19fcfa3-446a-43b5-bac2-e20dd6dd1c6d",
+    "total": 48,
+    "factors": {
+      "urgency": 55,
+      "dependencies": 48,
+      "riskLevel": 55,
+      "impact": 55,
+      "difficulty": 55,
+      "blocked": 12
+    },
+    "reasoning": "blocked by earlier tasks · Testing & Quality Assurance · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "f5a535c8-cab0-48aa-98a6-09fa69f7aa4f": {
+    "taskId": "f5a535c8-cab0-48aa-98a6-09fa69f7aa4f",
+    "total": 48,
+    "factors": {
+      "urgency": 55,
+      "dependencies": 48,
+      "riskLevel": 55,
+      "impact": 55,
+      "difficulty": 55,
+      "blocked": 12
+    },
+    "reasoning": "blocked by earlier tasks · Testing & Quality Assurance · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "6fb3b3af-581d-4536-8795-ce291fea26e3": {
+    "taskId": "6fb3b3af-581d-4536-8795-ce291fea26e3",
+    "total": 62,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 48,
+      "riskLevel": 80,
+      "impact": 80,
+      "difficulty": 28,
+      "blocked": 12
+    },
+    "reasoning": "high urgency · blocked by earlier tasks · high impact · complex task · Testing & Quality Assurance · large effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "6faed5df-9687-49c3-9568-1093ffc263d0": {
+    "taskId": "6faed5df-9687-49c3-9568-1093ffc263d0",
+    "total": 54,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 34,
+      "riskLevel": 55,
+      "impact": 55,
+      "difficulty": 55,
+      "blocked": 12
+    },
+    "reasoning": "high urgency · blocked by earlier tasks · Deployment & Release · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "ec62e186-90cc-418c-93fe-813eeb387e12": {
+    "taskId": "ec62e186-90cc-418c-93fe-813eeb387e12",
+    "total": 48,
+    "factors": {
+      "urgency": 55,
+      "dependencies": 34,
+      "riskLevel": 55,
+      "impact": 55,
+      "difficulty": 80,
+      "blocked": 12
+    },
+    "reasoning": "blocked by earlier tasks · quick win · Deployment & Release · small effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "8015a377-7386-47ec-9b2d-ff3607ce9213": {
+    "taskId": "8015a377-7386-47ec-9b2d-ff3607ce9213",
+    "total": 54,
+    "factors": {
+      "urgency": 90,
+      "dependencies": 34,
+      "riskLevel": 55,
+      "impact": 55,
+      "difficulty": 55,
+      "blocked": 12
+    },
+    "reasoning": "high urgency · blocked by earlier tasks · Deployment & Release · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "53f8ed98-f0dc-47f4-9ff0-101ab69ffcd8": {
+    "taskId": "53f8ed98-f0dc-47f4-9ff0-101ab69ffcd8",
+    "total": 54,
+    "factors": {
+      "urgency": 55,
+      "dependencies": 34,
+      "riskLevel": 80,
+      "impact": 80,
+      "difficulty": 55,
+      "blocked": 12
+    },
+    "reasoning": "blocked by earlier tasks · high impact · Deployment & Release · medium effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  },
+  "41d3e460-9cd7-4f22-a9da-bd1b8dea4149": {
+    "taskId": "41d3e460-9cd7-4f22-a9da-bd1b8dea4149",
+    "total": 50,
+    "factors": {
+      "urgency": 55,
+      "dependencies": 34,
+      "riskLevel": 80,
+      "impact": 55,
+      "difficulty": 80,
+      "blocked": 12
+    },
+    "reasoning": "blocked by earlier tasks · quick win · Deployment & Release · small effort",
+    "calculatedAt": "2026-05-26T23:30:57.948Z"
+  }
+}

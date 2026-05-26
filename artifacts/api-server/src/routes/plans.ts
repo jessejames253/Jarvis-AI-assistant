@@ -10,6 +10,7 @@
 import { Router }                               from "express";
 import { listPlans, getPlan, generatePlan,
          updatePlan, convertPlanToTasks }       from "../lib/plans";
+import { recalculateAllPriorities }             from "../lib/prioritizer";
 
 const router = Router();
 
@@ -68,6 +69,7 @@ router.post("/plans/:id/convert-to-tasks", (req, res) => {
     const result = convertPlanToTasks(req.params["id"]!);
     const plan   = getPlan(req.params["id"]!)!;
     res.json({ ok: true, ...result, plan });
+    setImmediate(() => { try { recalculateAllPriorities(); } catch { /* ignore */ } });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     const status  = message.includes("not found") ? 404 : 500;

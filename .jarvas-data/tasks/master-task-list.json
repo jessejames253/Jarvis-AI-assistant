@@ -3,13 +3,15 @@
     "id": "task-001",
     "title": "Build Jarvis memory system",
     "priority": "high",
-    "status": "pending"
+    "status": "in-progress",
+    "updatedAt": "2026-05-26T23:28:30.800Z"
   },
   {
     "id": "task-002",
     "title": "Create command center dashboard",
     "priority": "high",
-    "status": "pending"
+    "status": "in-progress",
+    "updatedAt": "2026-05-26T23:30:56.866Z"
   },
   {
     "id": "task-003",
