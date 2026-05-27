@@ -98,6 +98,8 @@ EXPOSE 8080
 
 ENV NODE_ENV=production
 ENV PORT=8080
+ENV AI_INTEGRATION=anthropic
+ENV AI_INTEGRATIONS_ANTHROPIC_BASE_URL=https://api.anthropic.com
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:${PORT}/api/healthz || exit 1
