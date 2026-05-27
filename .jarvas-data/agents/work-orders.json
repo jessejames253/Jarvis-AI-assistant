@@ -1,0 +1,90 @@
+[
+  {
+    "id": "c3dc93fb-8ac2-403a-902d-ee660379a7f5",
+    "collaborationPlanId": "2026-05-27T00:16:41.965Z",
+    "agentId": "architect",
+    "agentName": "Architect Agent",
+    "agentColor": "hsl(264 80% 68%)",
+    "agentEmoji": "🏛️",
+    "title": "[Architect Agent] Build a real-time notification system: design the data …",
+    "objective": "Design the notification data model (e.g., Notification schema, delivery states, user associations), define REST/WebSocket API contracts, and specify the frontend hook interface and module structure.",
+    "inputs": [
+      "Goal: real-time notification system requirements"
+    ],
+    "expectedOutput": "A complete architecture document including: Notification data model (fields, types, relationships), API contract (endpoints, payloads, WebSocket event schemas), and frontend hook interface definition.",
+    "dependencies": [],
+    "dependencyNames": [],
+    "riskLevel": "high",
+    "status": "ready",
+    "createdAt": "2026-05-27T01:41:38.033Z"
+  },
+  {
+    "id": "a4a5cc73-e690-4ac8-8bcd-74faa78f9c22",
+    "collaborationPlanId": "2026-05-27T00:16:41.965Z",
+    "agentId": "coder",
+    "agentName": "Coder Agent",
+    "agentColor": "hsl(150 70% 55%)",
+    "agentEmoji": "⚡",
+    "title": "[Coder Agent] Build a real-time notification system: design the data …",
+    "objective": "Implement the backend notification API (REST + WebSocket endpoints), database models, and the frontend React/JS hook for consuming real-time notifications, following the architect's contracts exactly.",
+    "inputs": [
+      "Architecture document: data model, API contracts, WebSocket event schema, hook interface"
+    ],
+    "expectedOutput": "Working backend API (notification creation, retrieval, real-time push), database migrations, and a frontend useNotifications hook with subscription logic.",
+    "dependencies": [
+      "c3dc93fb-8ac2-403a-902d-ee660379a7f5"
+    ],
+    "dependencyNames": [
+      "Architect Agent"
+    ],
+    "riskLevel": "medium",
+    "status": "pending",
+    "createdAt": "2026-05-27T01:41:38.033Z"
+  },
+  {
+    "id": "d83bfaa6-7721-4ef1-a72f-1c7e5e27e167",
+    "collaborationPlanId": "2026-05-27T00:16:41.965Z",
+    "agentId": "tester",
+    "agentName": "Test Agent",
+    "agentColor": "hsl(38 100% 60%)",
+    "agentEmoji": "🧪",
+    "title": "[Test Agent] Build a real-time notification system: design the data …",
+    "objective": "Write unit tests for notification logic, integration tests for API endpoints, and end-to-end tests for the real-time WebSocket flow and frontend hook behavior.",
+    "inputs": [
+      "Implemented backend API, database layer, WebSocket service, and frontend hook codebase"
+    ],
+    "expectedOutput": "Full test suite covering unit, integration, and E2E scenarios with a test report confirming passing coverage thresholds and validated correctness.",
+    "dependencies": [
+      "a4a5cc73-e690-4ac8-8bcd-74faa78f9c22"
+    ],
+    "dependencyNames": [
+      "Coder Agent"
+    ],
+    "riskLevel": "medium",
+    "status": "pending",
+    "createdAt": "2026-05-27T01:41:38.033Z"
+  },
+  {
+    "id": "463c8bbd-f2cc-4110-83b1-d21ce1908ea8",
+    "collaborationPlanId": "2026-05-27T00:16:41.965Z",
+    "agentId": "deployment",
+    "agentName": "Deployment Agent",
+    "agentColor": "hsl(196 80% 58%)",
+    "agentEmoji": "🚀",
+    "title": "[Deployment Agent] Build a real-time notification system: design the data …",
+    "objective": "Configure CI/CD pipeline to run tests on each push, containerize the notification service with Docker, manage environment secrets, and deploy the validated build to production with health monitoring.",
+    "inputs": [
+      "Validated codebase with passing test suite and coverage report"
+    ],
+    "expectedOutput": "Production deployment with CI/CD pipeline configuration, Dockerfiles, environment config, and health check endpoints confirming the notification system is live.",
+    "dependencies": [
+      "d83bfaa6-7721-4ef1-a72f-1c7e5e27e167"
+    ],
+    "dependencyNames": [
+      "Test Agent"
+    ],
+    "riskLevel": "high",
+    "status": "pending",
+    "createdAt": "2026-05-27T01:41:38.033Z"
+  }
+]
