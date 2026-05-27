@@ -149,7 +149,7 @@ function checkLockfile(): { result: CheckResult; issue?: DiagnosticIssue } {
 const REQUIRED_ENV_VARS: Array<{ name: string; description: string; severity: Severity }> = [
   { name: "PORT",                                severity: "error",   description: "TCP port the API server binds to" },
   { name: "AI_INTEGRATIONS_ANTHROPIC_API_KEY",  severity: "error",   description: "Anthropic API key for Claude (all AI reasoning)" },
-  { name: "AI_INTEGRATIONS_ANTHROPIC_BASE_URL", severity: "error",   description: "Anthropic API base URL" },
+  { name: "AI_INTEGRATIONS_ANTHROPIC_BASE_URL", severity: "warning", description: "Anthropic API base URL (defaults to https://api.anthropic.com)" },
   { name: "DATABASE_URL",                        severity: "warning", description: "PostgreSQL connection string (required for conversations/memory)" },
   { name: "NODE_ENV",                            severity: "warning", description: "Runtime environment (development|production)" },
 ];
