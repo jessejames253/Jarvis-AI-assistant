@@ -46,6 +46,11 @@ import { createCheckpoint }     from "../lib/checkpoints";
 import { loadProfiles }         from "../lib/agentProfiles";
 import { createStandaloneWorkOrder } from "../lib/workOrders";
 
+// ─── Autonomy Queue v1 imports ────────────────────────────────────────────────
+import {
+  loadQueue, addQueueItems, updateQueueItem, getQueueItem,
+}                               from "../lib/autonomy/queue";
+
 const router = Router();
 
 // ─── Cycle types meta ─────────────────────────────────────────────────────────
@@ -316,6 +321,155 @@ router.post("/autonomy/suggestions/:id/dismiss", (req, res) => {
     res.json({ ok: true, suggestion: updated });
   } catch (err) {
     res.status(500).json({ ok: false, error: err instanceof Error ? err.message : "Dismiss failed" });
+  }
+});
+
+// ─── Autonomy Queue v1 ────────────────────────────────────────────────────────
+
+// GET /api/autonomy/queue
+router.get("/autonomy/queue", (_req, res) => {
+  try {
+    const items     = loadQueue();
+    const queued    = items.filter(q => q.status === "queued").length;
+    const approved  = items.filter(q => q.status === "approved").length;
+    const rejected  = items.filter(q => q.status === "rejected").length;
+    const converted = items.filter(q => q.status === "converted").length;
+    const failed    = items.filter(q => q.status === "failed").length;
+    res.json({ ok: true, items, total: items.length, queued, approved, rejected, converted, failed });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err instanceof Error ? err.message : "Load failed" });
+  }
+});
+
+// POST /api/autonomy/queue/from-suggestions
+router.post("/autonomy/queue/from-suggestions", async (_req, res) => {
+  try {
+    const suggestions = loadSuggestions().filter(s => s.status === "open");
+    if (suggestions.length === 0) {
+      res.json({ ok: true, added: [], message: "No open suggestions to queue. Run analysis first." });
+      return;
+    }
+    const checkpoint = await createCheckpoint({
+      description: `Auto-checkpoint before building autonomy queue from ${suggestions.length} open suggestions`,
+    });
+    const candidates = suggestions.map(s => ({
+      suggestionId:     s.id,
+      title:            s.suggestedWorkOrder.title,
+      recommendedAgent: s.recommendedAgent,
+      riskLevel:        s.suggestedWorkOrder.riskLevel,
+    }));
+    const added  = addQueueItems(candidates);
+    const allItems = loadQueue();
+    res.json({
+      ok: true, added, allItems,
+      total:        allItems.length,
+      newlyAdded:   added.length,
+      checkpointId: checkpoint.id,
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err instanceof Error ? err.message : "Queue build failed" });
+  }
+});
+
+// PATCH /api/autonomy/queue/:id/approve
+router.patch("/autonomy/queue/:id/approve", async (req, res) => {
+  try {
+    const item = getQueueItem(req.params.id);
+    if (!item) {
+      res.status(404).json({ ok: false, error: "Queue item not found." });
+      return;
+    }
+    if (item.status !== "queued") {
+      res.status(409).json({ ok: false, error: `Cannot approve item with status '${item.status}'.` });
+      return;
+    }
+    const checkpoint = await createCheckpoint({
+      description: `Auto-checkpoint before approving queue item: ${item.title.slice(0, 40)}`,
+    });
+    const updated = updateQueueItem(req.params.id, { status: "approved" });
+    res.json({ ok: true, item: updated, checkpointId: checkpoint.id });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err instanceof Error ? err.message : "Approve failed" });
+  }
+});
+
+// PATCH /api/autonomy/queue/:id/reject
+router.patch("/autonomy/queue/:id/reject", (req, res) => {
+  try {
+    const item = getQueueItem(req.params.id);
+    if (!item) {
+      res.status(404).json({ ok: false, error: "Queue item not found." });
+      return;
+    }
+    if (item.status !== "queued") {
+      res.status(409).json({ ok: false, error: `Cannot reject item with status '${item.status}'.` });
+      return;
+    }
+    const updated = updateQueueItem(req.params.id, { status: "rejected" });
+    res.json({ ok: true, item: updated });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err instanceof Error ? err.message : "Reject failed" });
+  }
+});
+
+// POST /api/autonomy/queue/:id/convert-to-work-order
+router.post("/autonomy/queue/:id/convert-to-work-order", async (req, res) => {
+  try {
+    const item = getQueueItem(req.params.id);
+    if (!item) {
+      res.status(404).json({ ok: false, error: "Queue item not found." });
+      return;
+    }
+    if (item.status !== "approved") {
+      res.status(409).json({ ok: false, error: `Queue item must be approved before converting. Current status: '${item.status}'.` });
+      return;
+    }
+
+    // Load the source suggestion for full work order spec
+    const suggestion = loadSuggestions().find(s => s.id === item.suggestionId);
+    if (!suggestion) {
+      updateQueueItem(req.params.id, { status: "failed" });
+      res.status(422).json({ ok: false, error: "Source suggestion not found. Cannot convert." });
+      return;
+    }
+
+    // Find matching agent profile
+    const profiles = loadProfiles();
+    const profile  = profiles.find(p =>
+      p.name.toLowerCase() === item.recommendedAgent.toLowerCase()
+    ) ?? profiles[0];
+    if (!profile) {
+      updateQueueItem(req.params.id, { status: "failed" });
+      res.status(422).json({ ok: false, error: "No agent profiles found. Register agents first." });
+      return;
+    }
+
+    const checkpoint = await createCheckpoint({
+      description: `Auto-checkpoint before converting queue item to work order: ${item.title.slice(0, 40)}`,
+    });
+
+    const wo        = suggestion.suggestedWorkOrder;
+    const workOrder = createStandaloneWorkOrder({
+      agentId:        profile.id,
+      agentName:      profile.name,
+      agentColor:     profile.color,
+      agentEmoji:     profile.emoji,
+      title:          wo.title,
+      objective:      wo.objective,
+      inputs:         wo.inputs,
+      expectedOutput: wo.expectedOutput,
+      riskLevel:      wo.riskLevel,
+      sourceLabel:    `autonomy-queue:${suggestion.category}`,
+    });
+
+    // Mark queue item converted + suggestion converted
+    const updatedItem = updateQueueItem(req.params.id, { status: "converted" });
+    updateSuggestion(suggestion.id, { status: "converted", convertedWorkOrderId: workOrder.id });
+
+    res.json({ ok: true, item: updatedItem, workOrder, checkpointId: checkpoint.id });
+  } catch (err) {
+    updateQueueItem(req.params.id, { status: "failed" });
+    res.status(500).json({ ok: false, error: err instanceof Error ? err.message : "Conversion failed" });
   }
 });
 

@@ -25,4 +25,4 @@
 - [Phase 6B restart recovery](phase6b-restart-recovery.md) — patches persist in .jarvis/ (not /tmp); restart detection via startedAt polling; Resubmit Patch button; RECOVERED badges; DELETE for rejection; 76/76 tests
 - [Phase 7A migration prep](phase7a-migration.md) — MIGRATION_PLAN.md + Dockerfile + Dockerfile.frontend + docker-compose.yml + .env.example; Replit plugins, /tmp PersistentStore, and port mapping all documented
 - [Patch approval UX](patch-approval-ux.md) — propose_code_change Jarvis tool + registerPatch() + ChatPatchProposal; real buttons in chat AND DEV Patches; 53/53 tests
-- [Improvement Loop v1](improvement-loop.md) — lib/autonomy/analyzer.ts + suggestions.ts; routes/autonomy.ts (appended); ImprovementPanel.tsx; createStandaloneWorkOrder in workOrders.ts; IMPROVE button in Chat.tsx; read-only scan → Claude → ImprovementSuggestion[]; convert → work order
+- [Improvement Loop + Queue v1](improvement-loop.md) — analyzer.ts + suggestions.ts + queue.ts; routes appended to autonomy.ts; ImprovementPanel.tsx (2-tab: SUGGESTIONS/QUEUE); IMPROVE button; staged approval flow: open→queued→approved→work-order

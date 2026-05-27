@@ -1,6 +1,6 @@
 ---
-name: Improvement Loop v1
-description: Self-improvement analysis system — scans system state, Claude generates suggestions, user converts to work orders
+name: Improvement Loop v1 + Queue v1
+description: Self-improvement analysis system with staged approval queue — scans system state, Claude generates suggestions, queue for approve/reject before work-order creation
 ---
 
 ## Architecture
@@ -21,11 +21,28 @@ description: Self-improvement analysis system — scans system state, Claude gen
 ## API endpoints (all under existing autonomyRouter)
 
 ```
-POST /api/autonomy/analyze              — scan + Claude → suggestions (auto-checkpoint)
-GET  /api/autonomy/suggestions          — load suggestions + meta
-POST /api/autonomy/suggestions/:id/convert — → createStandaloneWorkOrder (auto-checkpoint)
-POST /api/autonomy/suggestions/:id/dismiss — mark dismissed
+POST  /api/autonomy/analyze                         — scan + Claude → suggestions (auto-checkpoint)
+GET   /api/autonomy/suggestions                     — load suggestions + meta
+POST  /api/autonomy/suggestions/:id/convert         — → createStandaloneWorkOrder (auto-checkpoint)
+POST  /api/autonomy/suggestions/:id/dismiss         — mark dismissed
+GET   /api/autonomy/queue                           — load all queue items + counts
+POST  /api/autonomy/queue/from-suggestions          — batch-create queued candidates from open suggestions (auto-checkpoint, skips duplicates by suggestionId)
+PATCH /api/autonomy/queue/:id/approve               — queued → approved (auto-checkpoint)
+PATCH /api/autonomy/queue/:id/reject                — queued → rejected
+POST  /api/autonomy/queue/:id/convert-to-work-order — approved → createStandaloneWorkOrder + marks suggestion converted (auto-checkpoint)
 ```
+
+## Queue flow
+
+open suggestion → (BUILD QUEUE) → queued → (APPROVE) → approved → (CREATE WORK ORDER) → converted
+                                          → (REJECT) → rejected
+
+## ImprovementPanel.tsx — two-view design
+
+- SUGGESTIONS tab: run analysis, dismiss suggestions, BUILD QUEUE button (only visible when open suggestions exist)
+- QUEUE tab: BUILD QUEUE action, per-item APPROVE/REJECT (queued) or CREATE WORK ORDER (approved) buttons
+- `addQueueItems()` skips duplicates by suggestionId — safe to call BUILD QUEUE multiple times
+- Failed work-order conversion marks queue item `status: "failed"`, does NOT crash
 
 ## Scan signal sources
 
