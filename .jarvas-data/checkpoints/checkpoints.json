@@ -285,5 +285,130 @@
       "artifacts/api-server/src/routes/workOrderExecutionPlanning.ts"
     ],
     "status": "active"
+  },
+  {
+    "id": "457388a6-d067-47a9-b8a0-204b7e65cbfa",
+    "timestamp": "2026-05-27T02:00:33.070Z",
+    "description": "Auto-checkpoint before executing work order c3dc93fb",
+    "commitHash": "12724d1a15545675109ca296fe28c7e284fd5ea3",
+    "branch": "main",
+    "changedFiles": [
+      "jarvas-data/agents/work-order-execution-plans.json",
+      "artifacts/api-server/src/routes/index.ts",
+      "artifacts/jarvas/src/components/WorkOrdersPanel.tsx",
+      "artifacts/api-server/src/lib/workOrderExecutionEngine.ts",
+      "artifacts/api-server/src/routes/workOrderExecution.ts"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "3b385cfa-8a79-41b5-9362-51da26633255",
+    "timestamp": "2026-05-27T02:03:58.864Z",
+    "description": "Auto-checkpoint before planning execution for: Coder Agent — Implement the backend notification API (REST + WebSocket end",
+    "commitHash": "12724d1a15545675109ca296fe28c7e284fd5ea3",
+    "branch": "main",
+    "changedFiles": [
+      "jarvas-data/agents/work-order-execution-plans.json",
+      ".jarvas-data/agents/work-orders.json",
+      ".jarvas-data/checkpoints/checkpoints.json",
+      "artifacts/api-server/src/routes/index.ts",
+      "artifacts/jarvas/src/components/WorkOrdersPanel.tsx",
+      ".jarvas-data/agents/work-order-executions.json",
+      "artifacts/api-server/src/lib/workOrderExecutionEngine.ts",
+      "artifacts/api-server/src/routes/workOrderExecution.ts"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "f9c2a321-6bcb-4dbe-939d-5464f3409a96",
+    "timestamp": "2026-05-27T02:04:59.195Z",
+    "description": "Auto-checkpoint before executing work order a4a5cc73",
+    "commitHash": "12724d1a15545675109ca296fe28c7e284fd5ea3",
+    "branch": "main",
+    "changedFiles": [
+      "jarvas-data/agents/work-order-execution-plans.json",
+      ".jarvas-data/agents/work-orders.json",
+      ".jarvas-data/checkpoints/checkpoints.json",
+      "artifacts/api-server/src/routes/index.ts",
+      "artifacts/jarvas/src/components/WorkOrdersPanel.tsx",
+      ".jarvas-data/agents/work-order-executions.json",
+      "artifacts/api-server/src/lib/workOrderExecutionEngine.ts",
+      "artifacts/api-server/src/routes/workOrderExecution.ts"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "6ad04daa-eba8-4763-bb3e-6ef441112b1f",
+    "timestamp": "2026-05-27T02:07:11.349Z",
+    "description": "Auto-checkpoint before updating work order a4a5cc73 → ready",
+    "commitHash": "12724d1a15545675109ca296fe28c7e284fd5ea3",
+    "branch": "main",
+    "changedFiles": [
+      "jarvas-data/agents/work-order-execution-plans.json",
+      ".jarvas-data/agents/work-orders.json",
+      ".jarvas-data/checkpoints/checkpoints.json",
+      "artifacts/api-server/src/routes/index.ts",
+      "artifacts/jarvas/src/components/WorkOrdersPanel.tsx",
+      ".jarvas-data/agents/work-order-executions.json",
+      "artifacts/api-server/src/lib/workOrderExecutionEngine.ts",
+      "artifacts/api-server/src/routes/workOrderExecution.ts"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "38f01ab7-f07b-4736-9bd4-29de023ef884",
+    "timestamp": "2026-05-27T02:07:11.522Z",
+    "description": "Auto-checkpoint before executing work order a4a5cc73",
+    "commitHash": "12724d1a15545675109ca296fe28c7e284fd5ea3",
+    "branch": "main",
+    "changedFiles": [
+      "jarvas-data/agents/work-order-execution-plans.json",
+      ".jarvas-data/agents/work-orders.json",
+      ".jarvas-data/checkpoints/checkpoints.json",
+      "artifacts/api-server/src/routes/index.ts",
+      "artifacts/jarvas/src/components/WorkOrdersPanel.tsx",
+      ".jarvas-data/agents/work-order-executions.json",
+      "artifacts/api-server/src/lib/workOrderExecutionEngine.ts",
+      "artifacts/api-server/src/routes/workOrderExecution.ts"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "89448c89-75b1-4dac-8924-c146ff4ea2ef",
+    "timestamp": "2026-05-27T02:10:50.244Z",
+    "description": "Auto-checkpoint before updating work order a4a5cc73 → ready",
+    "commitHash": "12724d1a15545675109ca296fe28c7e284fd5ea3",
+    "branch": "main",
+    "changedFiles": [
+      "jarvas-data/agents/work-order-execution-plans.json",
+      ".jarvas-data/agents/work-orders.json",
+      ".jarvas-data/checkpoints/checkpoints.json",
+      "artifacts/api-server/src/routes/index.ts",
+      "artifacts/jarvas/src/components/WorkOrdersPanel.tsx",
+      ".jarvas-data/agents/debug-last-execution-response.txt",
+      ".jarvas-data/agents/work-order-executions.json",
+      "artifacts/api-server/src/lib/workOrderExecutionEngine.ts",
+      "artifacts/api-server/src/routes/workOrderExecution.ts"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "b54a408f-dfc6-4d65-95bc-0e8cc9c8442f",
+    "timestamp": "2026-05-27T02:10:50.419Z",
+    "description": "Auto-checkpoint before executing work order a4a5cc73",
+    "commitHash": "12724d1a15545675109ca296fe28c7e284fd5ea3",
+    "branch": "main",
+    "changedFiles": [
+      "jarvas-data/agents/work-order-execution-plans.json",
+      ".jarvas-data/agents/work-orders.json",
+      ".jarvas-data/checkpoints/checkpoints.json",
+      "artifacts/api-server/src/routes/index.ts",
+      "artifacts/jarvas/src/components/WorkOrdersPanel.tsx",
+      ".jarvas-data/agents/debug-last-execution-response.txt",
+      ".jarvas-data/agents/work-order-executions.json",
+      "artifacts/api-server/src/lib/workOrderExecutionEngine.ts",
+      "artifacts/api-server/src/routes/workOrderExecution.ts"
+    ],
+    "status": "active"
   }
 ]

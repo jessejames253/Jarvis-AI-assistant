@@ -8,168 +8,342 @@
       "agentEmoji": "🏛️",
       "role": "architect"
     },
-    "objective": "Design and document a complete real-time notification system architecture: define the Notification data model (schema, fields, types, delivery states, user associations), specify REST and WebSocket API contracts (endpoints, request/response payloads, event schemas), and define the frontend hook interface and module structure — producing a single authoritative architecture document consumable by downstream Coder, Test, and Deployment agents.",
+    "objective": "Design and document the complete architecture for a real-time notification system: define the Notification data model (schema, fields, types, delivery states, user associations), specify REST and WebSocket API contracts (endpoints, payloads, event schemas), and produce a frontend hook interface definition with module structure — all delivered as a standalone architecture document consumable by downstream Coder, Test, and Deployment agents.",
     "requiredInputs": [
-      "High-level product requirements for the real-time notification system (e.g., supported notification types, delivery channels, user roles)",
-      "Target technology stack decisions (e.g., Node.js/Python backend, PostgreSQL/MongoDB, React frontend, Socket.io/native WebSocket)",
-      "Authentication/authorization scheme (e.g., JWT, session-based) to inform user association and API security contracts",
-      "Existing user/account data model or schema (to define foreign key relationships for user associations)",
-      "Non-functional requirements: expected notification volume, retention policy, read/unread TTL"
+      "High-level requirements for the real-time notification system (notification types, delivery channels, user roles)",
+      "Target tech stack assumptions (e.g., Node.js/TypeScript backend, PostgreSQL or MongoDB, React frontend, WebSocket library such as Socket.io or native WS)",
+      "Authentication model context (e.g., JWT, session-based) to define user association strategy",
+      "Any existing data models or API conventions the new system must conform to"
     ],
     "proposedSteps": [
       {
         "stepNumber": 1,
-        "action": "Survey requirements and establish architectural constraints",
-        "detail": "Review the real-time notification system requirements input, identify notification types (system alerts, user mentions, transactional), delivery channels (in-app, email, push), and throughput expectations. Document assumptions where requirements are ambiguous.",
+        "action": "Survey project context and establish stack assumptions",
+        "detail": "Inspect the workspace for any existing schema files, package.json, tsconfig.json, or README to infer tech stack, naming conventions, and database driver in use. If none found, document explicit assumptions (TypeScript, PostgreSQL via Prisma, Socket.io, React 18).",
         "reversible": true
       },
       {
         "stepNumber": 2,
-        "action": "Design the Notification data model and define delivery state machine",
-        "detail": "Define the Notification schema with fields (id, userId, type, title, body, metadata, status, createdAt, readAt, expiresAt, channel, priority), enumerate delivery states (PENDING, DELIVERED, READ, ARCHIVED, FAILED), and specify relationships to User and optional polymorphic resource references. Produce an entity-relationship diagram description.",
+        "action": "Define the Notification data model schema",
+        "detail": "Draft the Notification entity with fields: id (UUID), userId (FK), type (enum: SYSTEM | ALERT | MESSAGE | PROMO), title, body, metadata (JSONB), status (enum: PENDING | DELIVERED | READ | FAILED), channel (enum: IN_APP | EMAIL | PUSH), createdAt, updatedAt, readAt (nullable), expiresAt (nullable). Define relationships to User and NotificationPreference tables.",
         "reversible": true
       },
       {
         "stepNumber": 3,
-        "action": "Specify REST API contract for notification CRUD and preferences",
-        "detail": "Define OpenAPI-style contracts for endpoints: GET /notifications, GET /notifications/:id, PATCH /notifications/:id (mark read), DELETE /notifications/:id, POST /notifications (admin/service create), GET /notifications/preferences, PUT /notifications/preferences. Include request params, headers, response payloads, HTTP status codes, and error schemas.",
+        "action": "Specify delivery state machine and NotificationPreference model",
+        "detail": "Document the delivery state transitions (PENDING → DELIVERED → READ, PENDING → FAILED with retry policy) and define the NotificationPreference schema (userId, channel, enabled, quietHoursStart, quietHoursEnd) to support per-user delivery configuration.",
         "reversible": true
       },
       {
         "stepNumber": 4,
-        "action": "Specify WebSocket event schema and connection lifecycle",
-        "detail": "Define WebSocket event contracts for: connection handshake (auth token), server-push events (notification:new, notification:updated, notification:deleted), client acknowledgement events (notification:read, notification:dismiss), and error/reconnection events. Specify payload shapes and channel/room scoping strategy (per-user rooms).",
+        "action": "Define REST API contract",
+        "detail": "Specify endpoints: GET /api/v1/notifications (paginated list, filters: status, type), GET /api/v1/notifications/:id, PATCH /api/v1/notifications/:id/read, PATCH /api/v1/notifications/read-all, DELETE /api/v1/notifications/:id, GET /api/v1/notifications/preferences, PUT /api/v1/notifications/preferences. Document request/response payloads, HTTP status codes, and auth header requirements for each.",
         "reversible": true
       },
       {
         "stepNumber": 5,
-        "action": "Define frontend hook interface and module structure",
-        "detail": "Specify TypeScript interfaces for useNotifications hook (returns: notifications[], unreadCount, markAsRead, dismiss, isLoading, error), useNotificationPreferences hook, and the NotificationContext provider. Define the module directory structure: /hooks, /context, /components, /types, /api, /ws.",
+        "action": "Define WebSocket event contract",
+        "detail": "Specify Socket.io or WS event schemas: client emits subscribe_notifications {userId, token}, server emits notification:new {id, type, title, body, createdAt}, notification:updated {id, status}, notification:deleted {id}. Document namespace (/notifications), authentication handshake, reconnection strategy, and room-per-user pattern.",
         "reversible": true
       },
       {
         "stepNumber": 6,
-        "action": "Produce architecture document and write output artifact",
-        "detail": "Compile all sections into a single Markdown architecture document (docs/architecture/notification-system.md) with sections: Overview, Data Model, Delivery State Machine, REST API Contract, WebSocket Contract, Frontend Module Structure, Security Considerations, and Open Questions. Ensure it is self-contained for downstream agents.",
+        "action": "Define frontend hook interface and module structure",
+        "detail": "Specify useNotifications() hook interface returning {notifications, unreadCount, isLoading, error, markAsRead(id), markAllRead, deleteNotification(id), preferences, updatePreferences(prefs)}. Define module structure: hooks/useNotifications.ts, hooks/useNotificationSocket.ts, components/NotificationBell.tsx, components/NotificationList.tsx, services/notificationApi.ts, types/notification.ts.",
         "reversible": true
       },
       {
         "stepNumber": 7,
-        "action": "Generate TypeScript type stubs for cross-agent alignment",
-        "detail": "Create src/types/notification.ts exporting Notification, NotificationStatus, NotificationType, NotificationPreferences, and WebSocket event payload interfaces. These stubs serve as a shared contract between backend Coder and frontend Coder agents and prevent type drift.",
-        "reversible": true
+        "action": "Produce and write architecture document",
+        "detail": "Compile all decisions into docs/architecture/notification-system.md with sections: Overview, Data Model (ERD description + field table), State Machine Diagram (ASCII), REST API Contract, WebSocket Contract, Frontend Module Structure, Hook Interface, Security Considerations, and Open Questions for downstream agents.",
+        "reversible": false
       }
     ],
     "filesLikelyAffected": [
       {
         "path": "docs/architecture/notification-system.md",
         "change": "create",
-        "reason": "Primary output artifact — the complete architecture document covering data model, API contracts, and frontend interfaces"
+        "reason": "Primary deliverable: the complete architecture document for downstream agents to consume"
       },
       {
-        "path": "src/types/notification.ts",
+        "path": "docs/architecture/notification-data-model.ts",
         "change": "create",
-        "reason": "Shared TypeScript type definitions for Notification schema and event payloads, used by both backend and frontend agents"
+        "reason": "TypeScript type definitions and interfaces for the Notification, NotificationPreference, and related enums — machine-readable companion to the markdown doc"
       },
       {
-        "path": "docs/api/notifications-openapi.yaml",
+        "path": "docs/architecture/api-contract.yaml",
         "change": "create",
-        "reason": "OpenAPI 3.0 specification for the REST notification endpoints, consumable by the Coder agent for implementation and the Test agent for contract testing"
+        "reason": "OpenAPI 3.0 YAML spec for all REST endpoints, enabling downstream Coder and Test agents to generate stubs and mocks"
       },
       {
         "path": "docs/architecture/websocket-events.md",
         "change": "create",
-        "reason": "Detailed WebSocket event catalog with payload schemas, lifecycle diagrams, and room scoping strategy"
+        "reason": "Dedicated WebSocket event schema documentation including payload examples and connection lifecycle"
       },
       {
-        "path": "src/hooks/useNotifications.ts",
+        "path": "docs/architecture/frontend-module-structure.md",
         "change": "create",
-        "reason": "Frontend hook interface stub defining the useNotifications API surface (TypeScript interface only, no implementation) for the frontend Coder agent"
-      },
-      {
-        "path": "src/types/api.ts",
-        "change": "create",
-        "reason": "Shared API response envelope types (PaginatedResponse, ApiError, etc.) referenced by the notification contract"
+        "reason": "Describes the React module layout, hook interfaces, and service layer contracts for the frontend implementation agent"
       },
       {
         "path": "README.md",
         "change": "modify",
-        "reason": "Add a reference link to the notification system architecture document for discoverability"
+        "reason": "Add a section linking to the new architecture docs so all agents and collaborators can discover them"
       }
     ],
     "safetyChecks": [
       {
         "check": "No destructive database migrations or schema changes executed",
         "result": "pass",
-        "detail": "This is a pure design/documentation phase — no actual database migrations are written or executed. All schema definitions remain as documentation artifacts and TypeScript stubs only."
+        "detail": "This is a pure design/documentation step; no migration files are created or run, no database is touched."
       },
       {
         "check": "No hardcoded secrets or credentials in architecture documents",
         "result": "pass",
-        "detail": "Architecture documents will use placeholder values (e.g., <JWT_SECRET>, Bearer <token>) and explicitly call out that secrets must be managed via environment variables in the implementation phase."
+        "detail": "Architecture documents will use placeholder values (e.g., <JWT_SECRET>, <DB_URL>) and explicitly instruct downstream agents to source secrets from environment variables."
       },
       {
-        "check": "Downstream agent contracts are sufficiently specific to prevent ambiguity",
+        "check": "Type safety verified in TypeScript interface definitions",
         "result": "warn",
-        "detail": "Without confirmed technology stack choices as inputs, some contracts (e.g., WebSocket library-specific event naming, ORM schema syntax) may require assumptions that downstream Coder agents must validate before implementing. Open questions will be explicitly flagged in the document."
+        "detail": "The .ts definition file will be authored but not compiled at this stage; downstream Coder agent must validate it compiles against the actual project tsconfig. Enums and nullable fields need careful alignment with Prisma/ORM conventions."
       },
       {
-        "check": "Type safety verified for shared TypeScript interfaces",
-        "result": "warn",
-        "detail": "Since no existing codebase or tsconfig exists yet, type stubs cannot be compiled/type-checked in this phase. Downstream agents must run tsc against these stubs before implementation begins."
+        "check": "API versioning strategy is consistent",
+        "result": "pass",
+        "detail": "All REST endpoints are scoped under /api/v1/ to prevent future breaking changes and align with common industry convention."
       },
       {
-        "check": "API contract does not conflict with existing endpoints",
-        "result": "warn",
-        "detail": "Workspace shows 0 existing files, so no conflicts exist now. However, if other API routes exist in the final system, the /notifications namespace must be verified for uniqueness during the Coder agent phase."
+        "check": "Downstream agent dependency validity — no circular or missing dependencies",
+        "result": "pass",
+        "detail": "This agent has no dependencies and produces artifacts that all three downstream agents (Coder, Test, Deployment) depend on, forming a clean DAG."
       }
     ],
     "risks": [
       {
-        "description": "Technology stack assumptions embedded in the architecture become misaligned with actual implementation choices made by the Coder agent, causing rework",
+        "description": "Stack assumptions made without confirmed project context could produce an architecture that conflicts with the actual tech stack (e.g., designing for Prisma/PostgreSQL when the project uses Mongoose/MongoDB)",
         "severity": "high",
-        "mitigation": "Explicitly document all technology assumptions in the architecture doc under an 'Assumptions' section. Include a validation checklist the Coder agent must confirm before starting. Use technology-agnostic patterns where possible (e.g., describe WebSocket events abstractly, not Socket.io-specific)."
+        "mitigation": "Explicitly list all assumptions in the architecture document's 'Assumptions' section; downstream Coder agent must validate and flag any mismatches before implementation begins. Prefer database-agnostic field type descriptions with notes for both SQL and NoSQL variants."
       },
       {
-        "description": "Notification data model is too narrow (missing fields like tenantId for multi-tenancy, or actionUrl for deep-linking) causing breaking schema changes during implementation",
+        "description": "WebSocket contract may be ambiguous about authentication and reconnection behavior, causing the Coder agent to make incompatible implementation choices",
         "severity": "high",
-        "mitigation": "Design for extensibility from the start: include a generic metadata: Record<string, unknown> field, actionUrl, and tenantId placeholders. Mark optional fields clearly. Flag multi-tenancy and internationalization as open questions requiring product confirmation."
+        "mitigation": "Fully specify the authentication handshake (JWT passed as query param or in handshake auth object), reconnection backoff strategy, and what happens to queued notifications during disconnection in the WebSocket contract document."
       },
       {
-        "description": "WebSocket contract does not account for reconnection, message ordering, or at-least-once delivery semantics, leading to unreliable real-time behavior in implementation",
+        "description": "Frontend hook interface may not account for all edge cases (pagination, optimistic updates, offline support), leading to rework in the Coder agent phase",
         "severity": "medium",
-        "mitigation": "Include explicit sections on reconnection strategy (exponential backoff), message sequence numbers for ordering, and client acknowledgement patterns. Reference established patterns (e.g., Socket.io acknowledgements, STOMP protocol) as implementation guides."
+        "mitigation": "Include explicit notes on pagination cursor strategy, optimistic update patterns (rollback on failure), and a flag for whether offline queueing is in scope for v1 vs future iterations."
       },
       {
-        "description": "Frontend hook interface is underspecified, leading to inconsistent implementations across components and breaking changes when the Test agent validates behavior",
+        "description": "OpenAPI YAML spec may contain inconsistencies with the TypeScript type definitions, causing Test agent to generate tests against a different contract than what is implemented",
         "severity": "medium",
-        "mitigation": "Provide complete TypeScript interface definitions with JSDoc comments, specify loading/error state shapes explicitly, and include a usage example in the architecture document. Align hook return shape with React Query or SWR patterns if applicable."
+        "mitigation": "Cross-reference the OpenAPI spec and TypeScript interfaces during the document compilation step (Step 7); consider using a single source of truth approach where types are derived from the OpenAPI spec via code generation."
       }
     ],
     "validationPlan": [
       {
-        "description": "Manual review of architecture document against requirements checklist: verify all notification types, delivery states, and user association patterns are covered",
+        "description": "Manually review the Notification state machine for completeness: all PENDING → terminal state transitions are covered, no orphaned states exist",
         "type": "manual"
       },
       {
-        "description": "Lint and validate the OpenAPI YAML specification using a tool such as Spectral or swagger-cli to ensure it is syntactically correct and follows REST conventions",
+        "description": "Lint the OpenAPI YAML spec using a tool such as Spectral or swagger-cli to catch structural errors, missing required fields, and undefined $ref references",
         "type": "lint"
       },
       {
-        "description": "TypeScript compilation check on src/types/notification.ts and src/hooks/useNotifications.ts interface stubs to verify type correctness and absence of implicit any",
+        "description": "Typecheck the TypeScript interface definition file (docs/architecture/notification-data-model.ts) in isolation using tsc --noEmit to verify syntactic correctness",
         "type": "typecheck"
       },
       {
-        "description": "Peer review of WebSocket event schema by simulating a full notification lifecycle (create → deliver → read → archive) against the documented events to verify completeness",
+        "description": "Peer-review checklist: verify each REST endpoint has a documented error response (400, 401, 403, 404, 500), all WebSocket events have payload examples, and all hook return values are typed",
         "type": "manual"
       },
       {
-        "description": "Automated diff check confirming all files listed in filesLikelyAffected were created and contain required sections (data model, API contract, hook interface)",
+        "description": "Automated consistency check: parse the OpenAPI spec and the TypeScript types file to verify all response schema field names match between the two artifacts (simple script or CI lint rule)",
         "type": "automated"
       }
     ],
     "estimatedDifficulty": "high",
     "recommendation": "proceed",
-    "plannedAt": "2026-05-27T01:51:50.757Z"
+    "plannedAt": "2026-05-27T01:53:07.079Z"
+  },
+  "a4a5cc73-e690-4ac8-8bcd-74faa78f9c22": {
+    "workOrderId": "a4a5cc73-e690-4ac8-8bcd-74faa78f9c22",
+    "assignedAgent": {
+      "agentId": "coder",
+      "agentName": "Coder Agent",
+      "agentColor": "hsl(150 70% 55%)",
+      "agentEmoji": "⚡",
+      "role": "coder"
+    },
+    "objective": "Implement a notification system consisting of: (1) backend REST endpoints for creating and retrieving notifications, (2) a WebSocket endpoint for real-time push delivery, (3) database models and migration scripts for the Notification schema with delivery states, and (4) a frontend React useNotifications hook that subscribes to the WebSocket and exposes notification state/actions — all strictly conforming to the architect's defined contracts.",
+    "requiredInputs": [
+      "Completed Architect Agent output: Notification data model schema (fields, types, delivery state enum)",
+      "API contracts: REST endpoint signatures, request/response shapes, HTTP status codes",
+      "WebSocket event schema: event names, payload structures, connection/authentication protocol",
+      "useNotifications hook interface: exposed state shape, action signatures, subscription lifecycle",
+      "Database connection configuration (host, credentials, DB name) or environment variable conventions",
+      "Existing project structure to determine framework (e.g., Express/FastAPI/NestJS for backend, React version for frontend)",
+      "Authentication/authorization mechanism (e.g., JWT) for securing endpoints and WebSocket connections"
+    ],
+    "proposedSteps": [
+      {
+        "stepNumber": 1,
+        "action": "Read and internalize all architect contracts",
+        "detail": "Parse the architecture document to extract the Notification schema (id, userId, type, message, status, createdAt, readAt fields), delivery state enum (PENDING, DELIVERED, READ, FAILED), REST API contracts, WebSocket event schema (notification:new, notification:read, notification:error), and the useNotifications hook interface before writing any code.",
+        "reversible": true
+      },
+      {
+        "stepNumber": 2,
+        "action": "Create database model and migration for Notification schema",
+        "detail": "Create src/models/notification.ts (or .py/.js depending on stack) defining the Notification entity with all architect-specified fields and the DeliveryStatus enum. Generate a timestamped database migration file (e.g., migrations/20240101_create_notifications_table.ts) with up/down methods, adding indexes on userId and status columns.",
+        "reversible": false
+      },
+      {
+        "stepNumber": 3,
+        "action": "Implement the NotificationService with business logic",
+        "detail": "Create src/services/notificationService.ts implementing createNotification(), getNotificationsForUser(userId, pagination), markAsRead(notificationId, userId), and markAsDelivered() methods, each updating delivery states atomically and emitting WebSocket events on state transitions.",
+        "reversible": true
+      },
+      {
+        "stepNumber": 4,
+        "action": "Implement REST API controller and routes",
+        "detail": "Create src/controllers/notificationController.ts with handlers for POST /api/notifications (create), GET /api/notifications (list with userId filter and pagination), PATCH /api/notifications/:id/read (mark read), and wire them in src/routes/notificationRoutes.ts with authentication middleware applied to all routes.",
+        "reversible": true
+      },
+      {
+        "stepNumber": 5,
+        "action": "Implement WebSocket gateway/handler for real-time push",
+        "detail": "Create src/websockets/notificationGateway.ts that manages authenticated WebSocket connections keyed by userId, handles client subscribe/unsubscribe messages, and exposes a pushToUser(userId, event, payload) method used by NotificationService. Register the gateway in the application bootstrap.",
+        "reversible": true
+      },
+      {
+        "stepNumber": 6,
+        "action": "Implement the frontend useNotifications React hook",
+        "detail": "Create src/hooks/useNotifications.ts that on mount opens an authenticated WebSocket connection (using token from auth context), listens for notification:new and notification:read events to update local state, exposes { notifications, unreadCount, markAsRead, isConnected } per the architect's hook interface, and cleans up the connection on unmount.",
+        "reversible": true
+      },
+      {
+        "stepNumber": 7,
+        "action": "Wire everything together and run the migration",
+        "detail": "Register the notification routes and WebSocket gateway in the main application entry point (src/app.ts or main.ts), run the database migration in the development environment to verify it applies cleanly, and do a smoke test of each REST endpoint via curl/Postman and a manual WebSocket connection test.",
+        "reversible": false
+      }
+    ],
+    "filesLikelyAffected": [
+      {
+        "path": "src/models/notification.ts",
+        "change": "create",
+        "reason": "Defines the Notification entity class/interface and DeliveryStatus enum matching the architect's schema"
+      },
+      {
+        "path": "migrations/20240101000000_create_notifications_table.ts",
+        "change": "create",
+        "reason": "Database migration to create the notifications table with all required columns and indexes"
+      },
+      {
+        "path": "src/services/notificationService.ts",
+        "change": "create",
+        "reason": "Business logic layer for CRUD operations on notifications and delivery state management"
+      },
+      {
+        "path": "src/controllers/notificationController.ts",
+        "change": "create",
+        "reason": "REST endpoint handlers conforming to the architect's API contracts"
+      },
+      {
+        "path": "src/routes/notificationRoutes.ts",
+        "change": "create",
+        "reason": "Route definitions wiring HTTP methods and paths to controller handlers with auth middleware"
+      },
+      {
+        "path": "src/websockets/notificationGateway.ts",
+        "change": "create",
+        "reason": "WebSocket connection manager and event emitter for real-time notification push"
+      },
+      {
+        "path": "src/hooks/useNotifications.ts",
+        "change": "create",
+        "reason": "Frontend React hook implementing the architect's hook interface for consuming real-time notifications"
+      },
+      {
+        "path": "src/app.ts",
+        "change": "modify",
+        "reason": "Register notification routes and WebSocket gateway in the main application bootstrap"
+      }
+    ],
+    "safetyChecks": [
+      {
+        "check": "No destructive or irreversible database migration",
+        "result": "warn",
+        "detail": "The migration creates a new table (safe), but if a notifications table already exists from a prior partial implementation, running the migration without checking could fail or silently conflict. A pre-migration check for table existence should be included in the up() method."
+      },
+      {
+        "check": "No hardcoded secrets or credentials",
+        "result": "pass",
+        "detail": "DB connection strings, JWT secrets, and WebSocket auth tokens must be sourced from environment variables (process.env). No secrets will be embedded in source files; .env.example will document required vars."
+      },
+      {
+        "check": "Type safety verified across backend and frontend",
+        "result": "warn",
+        "detail": "Without seeing the architect's exact TypeScript types, there is a risk of interface drift between the backend response DTOs and the frontend hook's expected payload types. Shared type definitions should be extracted to a common types package or a shared file."
+      },
+      {
+        "check": "WebSocket authentication enforced — no unauthenticated connections accepted",
+        "result": "pass",
+        "detail": "The gateway will validate JWT on the initial connection handshake and reject connections without a valid token, preventing unauthorized subscription to other users' notification streams."
+      },
+      {
+        "check": "REST endpoints scoped to authenticated user — no IDOR vulnerability",
+        "result": "pass",
+        "detail": "All data access in the service layer will use the userId extracted from the validated JWT, never from the request body or URL params directly, preventing insecure direct object reference attacks."
+      }
+    ],
+    "risks": [
+      {
+        "description": "Architect's contracts are ambiguous or incomplete — missing fields, unclear delivery state transitions, or underspecified WebSocket event payload formats could cause misalignment with the Test Agent's expectations",
+        "severity": "high",
+        "mitigation": "Before coding, explicitly document assumptions about any gaps in the architecture document and surface them as questions. Codify all contracts as TypeScript interfaces in a shared contracts file that both backend and frontend import, making drift immediately visible at compile time."
+      },
+      {
+        "description": "WebSocket connection management at scale — the in-memory userId-to-socket map in the gateway will not work in a multi-instance deployment",
+        "severity": "medium",
+        "mitigation": "Implement the gateway with an adapter pattern (e.g., Socket.IO Redis adapter or similar pub/sub backend) so it is horizontally scalable from the start, even if only a single instance is used initially. Document this constraint clearly."
+      },
+      {
+        "description": "Frontend hook WebSocket lifecycle issues — race conditions between component mount/unmount and async connection setup could cause memory leaks or duplicate event listeners",
+        "severity": "medium",
+        "mitigation": "Use a useEffect cleanup function to close the WebSocket and remove all event listeners on unmount. Add a connection status guard to prevent state updates after unmount (using an isMounted ref or AbortController pattern)."
+      },
+      {
+        "description": "Database migration fails in the target environment due to insufficient permissions or conflicting schema from another developer's partial work",
+        "severity": "low",
+        "mitigation": "Include an idempotency guard (CREATE TABLE IF NOT EXISTS) in the migration. Test the migration against a fresh database and a pre-populated database. Document the rollback (down) method thoroughly."
+      }
+    ],
+    "validationPlan": [
+      {
+        "description": "Run TypeScript compiler (tsc --noEmit) across backend and frontend to confirm zero type errors in all new files",
+        "type": "typecheck"
+      },
+      {
+        "description": "Run ESLint with the project's ruleset on all created/modified files to enforce code style and catch common anti-patterns",
+        "type": "lint"
+      },
+      {
+        "description": "Execute the database migration against a local test database and verify the notifications table schema matches the architect's data model using a schema introspection query",
+        "type": "manual"
+      },
+      {
+        "description": "Send HTTP requests to each REST endpoint (POST /api/notifications, GET /api/notifications, PATCH /api/notifications/:id/read) with valid and invalid auth tokens to verify correct responses and status codes",
+        "type": "manual"
+      },
+      {
+        "description": "Write and run a smoke integration test that creates a notification via REST, connects a WebSocket client with a valid token, and asserts the notification:new event is received within 500ms",
+        "type": "automated"
+      }
+    ],
+    "estimatedDifficulty": "medium",
+    "recommendation": "proceed",
+    "plannedAt": "2026-05-27T02:04:47.491Z"
   }
 }

@@ -49,6 +49,7 @@ import agentProfilesRouter       from "./agentProfiles";
 import agentCollaborationRouter  from "./agentCollaboration";
 import workOrdersRouter               from "./workOrders";
 import workOrderExecutionPlanningRouter from "./workOrderExecutionPlanning";
+import workOrderExecutionRouter         from "./workOrderExecution";
 
 // Register agents (self-register on import)
 import "../agents/plannerAgent";
@@ -85,5 +86,6 @@ router.use(agentProfilesRouter);
 router.use(agentCollaborationRouter);
 router.use(workOrdersRouter);
 router.use(workOrderExecutionPlanningRouter);
+router.use(workOrderExecutionRouter);
 
 export default router;

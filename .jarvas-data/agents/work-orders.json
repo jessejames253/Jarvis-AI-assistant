@@ -15,8 +15,9 @@
     "dependencies": [],
     "dependencyNames": [],
     "riskLevel": "high",
-    "status": "ready",
-    "createdAt": "2026-05-27T01:41:38.033Z"
+    "status": "completed",
+    "createdAt": "2026-05-27T01:41:38.033Z",
+    "completedAt": "2026-05-27T02:02:21.884Z"
   },
   {
     "id": "a4a5cc73-e690-4ac8-8bcd-74faa78f9c22",
@@ -38,8 +39,9 @@
       "Architect Agent"
     ],
     "riskLevel": "medium",
-    "status": "pending",
-    "createdAt": "2026-05-27T01:41:38.033Z"
+    "status": "completed",
+    "createdAt": "2026-05-27T01:41:38.033Z",
+    "completedAt": "2026-05-27T02:12:12.630Z"
   },
   {
     "id": "d83bfaa6-7721-4ef1-a72f-1c7e5e27e167",
@@ -61,7 +63,7 @@
       "Coder Agent"
     ],
     "riskLevel": "medium",
-    "status": "pending",
+    "status": "ready",
     "createdAt": "2026-05-27T01:41:38.033Z"
   },
   {
