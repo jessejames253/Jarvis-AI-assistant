@@ -11,18 +11,11 @@
 #   docker build -f Dockerfile.frontend \
 #     --build-arg BASE_PATH=/ \
 #     -t jarvis-frontend .
-#
-# IMPORTANT: Before building for production, remove the Replit-specific plugin
-# from artifacts/jarvas/vite.config.ts:
-#   - import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal"
-#   - runtimeErrorOverlay() from the plugins array
-# The cartographer and devBanner plugins are already guarded by REPL_ID and
-# will be skipped automatically in non-Replit environments.
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── 1. Base ──────────────────────────────────────────────────────────────────
-FROM node:24-alpine AS base
-RUN corepack enable && corepack prepare pnpm@latest --activate
+FROM node:24-slim AS base
+RUN corepack enable && corepack prepare pnpm@10 --activate
 WORKDIR /workspace
 
 # ── 2. Dependencies ───────────────────────────────────────────────────────────
@@ -35,6 +28,7 @@ COPY tsconfig.base.json tsconfig.json ./
 COPY lib/api-zod/package.json                   lib/api-zod/
 COPY lib/db/package.json                        lib/db/
 COPY lib/integrations-anthropic-ai/package.json lib/integrations-anthropic-ai/
+COPY lib/api-client-react/package.json          lib/api-client-react/
 
 # Frontend manifest
 COPY artifacts/jarvas/package.json artifacts/jarvas/
@@ -72,62 +66,8 @@ RUN rm /etc/nginx/conf.d/default.conf
 # Copy built static files
 COPY --from=build /workspace/artifacts/jarvas/dist/public /usr/share/nginx/html
 
-# Inject our nginx config (written inline to avoid a separate file)
-RUN cat > /etc/nginx/conf.d/jarvis.conf << 'EOF'
-server {
-    listen 80;
-    server_name _;
-
-    root /usr/share/nginx/html;
-    index index.html;
-
-    # Gzip static assets
-    gzip on;
-    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
-    gzip_min_length 1024;
-
-    # Security headers
-    add_header X-Content-Type-Options nosniff;
-    add_header X-Frame-Options DENY;
-    add_header X-XSS-Protection "1; mode=block";
-
-    # ── API proxy — forward /api/* to the backend ──────────────────────────
-    location /api/ {
-        proxy_pass         http://api:8080;
-        proxy_http_version 1.1;
-
-        proxy_set_header Host              $host;
-        proxy_set_header X-Real-IP         $remote_addr;
-        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-
-        # SSE — critical: disable buffering so tokens stream immediately
-        proxy_buffering        off;
-        proxy_cache            off;
-        add_header             X-Accel-Buffering no;
-
-        # Long timeout for AI completions and SSE streams (10 minutes)
-        proxy_read_timeout     600s;
-        proxy_send_timeout     600s;
-        proxy_connect_timeout  10s;
-    }
-
-    # ── Frontend — SPA fallback ────────────────────────────────────────────
-    location / {
-        try_files $uri $uri/ /index.html;
-
-        # Cache-bust HTML — never cache the SPA entry point
-        location = /index.html {
-            add_header Cache-Control "no-store, no-cache, must-revalidate";
-        }
-
-        # Cache hashed assets aggressively
-        location ~* \.(js|css|woff2?|png|jpg|svg|ico)$ {
-            add_header Cache-Control "public, max-age=31536000, immutable";
-        }
-    }
-}
-EOF
+# Copy nginx site config
+COPY nginx/jarvis.conf /etc/nginx/conf.d/jarvis.conf
 
 EXPOSE 80
 

@@ -18,7 +18,7 @@
 FROM node:24-alpine AS base
 
 # Enable corepack so we can use the exact pnpm version from package.json
-RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN corepack enable && corepack prepare pnpm@10 --activate
 
 # Install git (required by the dev agent's git routes)
 RUN apk add --no-cache git
@@ -29,7 +29,7 @@ WORKDIR /workspace
 FROM base AS deps
 
 # Copy manifest files first (better layer caching)
-COPY package.json pnpm-workspace.yaml pnpm-lock.yalm ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY tsconfig.base.json tsconfig.json ./
 
 # Shared libs — manifests only
@@ -65,7 +65,7 @@ FROM node:24-alpine AS production
 # Install runtime tools
 RUN apk add --no-cache git && \
     corepack enable && \
-    corepack prepare pnpm@9 --activate
+    corepack prepare pnpm@10 --activate
 
 WORKDIR /workspace
 
