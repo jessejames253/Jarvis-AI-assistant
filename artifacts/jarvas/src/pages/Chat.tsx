@@ -35,6 +35,7 @@ import {
   Layers,
   TrendingUp,
   Map,
+  Users,
 } from "lucide-react";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
 import { useSpeechSession } from "@/hooks/useSpeechSession";
@@ -62,6 +63,7 @@ import PlansPanel          from "@/components/PlansPanel";
 import PriorityPanel       from "@/components/PriorityPanel";
 import WorkspacePanel      from "@/components/WorkspacePanel";
 import ReasonPanel         from "@/components/ReasonPanel";
+import AgentsPanel         from "@/components/AgentsPanel";
 import {
   approvePatch, rejectPatch as logRejectPatch, fetchPendingPatches,
   fetchServerStatus,
@@ -557,6 +559,7 @@ export default function Chat() {
   const [priorityPanelOpen,     setPriorityPanelOpen]     = useState(false);
   const [workspacePanelOpen,    setWorkspacePanelOpen]    = useState(false);
   const [reasonPanelOpen,       setReasonPanelOpen]       = useState(false);
+  const [agentsPanelOpen,       setAgentsPanelOpen]       = useState(false);
   const autoRoutedRef = useRef(false);
 
   // ── Patch notification bar + server status ───────────────────────────────
@@ -1481,6 +1484,21 @@ export default function Chat() {
             <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: reasonPanelOpen ? "hsl(264 80% 80%)" : "hsl(196 60% 55%)" }}>REASON</span>
           </button>
 
+          {/* Agents */}
+          <button
+            onClick={() => setAgentsPanelOpen(v => !v)}
+            title="Specialist Agents — assign the right agent to any task"
+            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
+            style={{
+              background:  agentsPanelOpen ? "hsl(185 75% 52% / 0.12)" : "transparent",
+              borderColor: agentsPanelOpen ? "hsl(185 75% 52% / 0.5)"  : "hsl(210 15% 30%)",
+            }}
+            aria-label="Open agents panel"
+          >
+            <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: agentsPanelOpen ? "hsl(185 75% 65%)" : "hsl(196 60% 55%)" }} />
+            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: agentsPanelOpen ? "hsl(185 75% 65%)" : "hsl(196 60% 55%)" }}>AGENTS</span>
+          </button>
+
           {/* Dev Agent — visible on all screen sizes */}
           <button
             onClick={() => setDevPanelOpen(true)}
@@ -1865,6 +1883,13 @@ export default function Chat() {
       <ReasonPanel
         isOpen={reasonPanelOpen}
         onClose={() => setReasonPanelOpen(false)}
+        apiBase={BASE}
+      />
+
+      {/* Agents panel */}
+      <AgentsPanel
+        isOpen={agentsPanelOpen}
+        onClose={() => setAgentsPanelOpen(false)}
         apiBase={BASE}
       />
 

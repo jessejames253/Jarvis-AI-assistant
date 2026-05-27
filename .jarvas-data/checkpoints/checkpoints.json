@@ -125,5 +125,72 @@
       "artifacts/jarvas/src/components/ReasonPanel.tsx"
     ],
     "status": "active"
+  },
+  {
+    "id": "f11c876e-2c84-45be-984d-290a8fc917ff",
+    "timestamp": "2026-05-27T00:05:39.550Z",
+    "description": "Auto-checkpoint before agent assignment: Design the data model and API contract for a new notificatio",
+    "commitHash": "0e9f2448634e36c836ff1cab9edfa7ff446daeed",
+    "branch": "main",
+    "changedFiles": [
+      "rtifacts/api-server/src/routes/index.ts",
+      "artifacts/jarvas/src/pages/Chat.tsx",
+      ".jarvas-data/agents/",
+      "artifacts/api-server/src/lib/agentProfiles.ts",
+      "artifacts/api-server/src/routes/agentProfiles.ts",
+      "artifacts/jarvas/src/components/AgentsPanel.tsx"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "3ea79fcf-528b-4b23-9bdc-da4f44d77ab0",
+    "timestamp": "2026-05-27T00:05:39.705Z",
+    "description": "Auto-checkpoint before agent assignment: Investigate and fix the crash when SSE stream closes unexpec",
+    "commitHash": "0e9f2448634e36c836ff1cab9edfa7ff446daeed",
+    "branch": "main",
+    "changedFiles": [
+      "jarvas-data/checkpoints/checkpoints.json",
+      "artifacts/api-server/src/routes/index.ts",
+      "artifacts/jarvas/src/pages/Chat.tsx",
+      ".jarvas-data/agents/",
+      "artifacts/api-server/src/lib/agentProfiles.ts",
+      "artifacts/api-server/src/routes/agentProfiles.ts",
+      "artifacts/jarvas/src/components/AgentsPanel.tsx"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "982855b4-3842-454a-adaf-c594032af009",
+    "timestamp": "2026-05-27T00:05:39.866Z",
+    "description": "Auto-checkpoint before agent assignment: Write unit tests and e2e coverage for the workspace scanner",
+    "commitHash": "0e9f2448634e36c836ff1cab9edfa7ff446daeed",
+    "branch": "main",
+    "changedFiles": [
+      "jarvas-data/checkpoints/checkpoints.json",
+      "artifacts/api-server/src/routes/index.ts",
+      "artifacts/jarvas/src/pages/Chat.tsx",
+      ".jarvas-data/agents/",
+      "artifacts/api-server/src/lib/agentProfiles.ts",
+      "artifacts/api-server/src/routes/agentProfiles.ts",
+      "artifacts/jarvas/src/components/AgentsPanel.tsx"
+    ],
+    "status": "active"
+  },
+  {
+    "id": "f82352dd-7444-4e18-81a7-30073bf20281",
+    "timestamp": "2026-05-27T00:05:40.026Z",
+    "description": "Auto-checkpoint before agent assignment: Set up the docker container and configure the production env",
+    "commitHash": "0e9f2448634e36c836ff1cab9edfa7ff446daeed",
+    "branch": "main",
+    "changedFiles": [
+      "jarvas-data/checkpoints/checkpoints.json",
+      "artifacts/api-server/src/routes/index.ts",
+      "artifacts/jarvas/src/pages/Chat.tsx",
+      ".jarvas-data/agents/",
+      "artifacts/api-server/src/lib/agentProfiles.ts",
+      "artifacts/api-server/src/routes/agentProfiles.ts",
+      "artifacts/jarvas/src/components/AgentsPanel.tsx"
+    ],
+    "status": "active"
   }
 ]

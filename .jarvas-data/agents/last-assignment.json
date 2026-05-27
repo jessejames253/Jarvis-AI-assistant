@@ -1,0 +1,33 @@
+{
+  "agentId": "deployment",
+  "agentName": "Deployment Agent",
+  "role": "deployment",
+  "confidence": 100,
+  "reason": "Deployment Agent is best suited for this task. The goal matches Deployment Agent's expertise in: production, docker, environment, config. \"docs\" changes are a preferred specialisation for this agent. Handles CI/CD, Docker, environment configuration, production releases, and infrastructure setup.",
+  "matchedKeywords": [
+    "production",
+    "docker",
+    "environment",
+    "config",
+    "container",
+    "secret",
+    "env"
+  ],
+  "alternates": [
+    {
+      "agentId": "architect",
+      "agentName": "Architect Agent",
+      "confidence": 4
+    },
+    {
+      "agentId": "memory",
+      "agentName": "Memory Agent",
+      "confidence": 4
+    }
+  ],
+  "assignedAt": "2026-05-27T00:05:40.026Z",
+  "request": {
+    "goal": "Set up the docker container and configure the production environment secrets",
+    "changeType": "docs"
+  }
+}

@@ -1,0 +1,248 @@
+[
+  {
+    "id": "architect",
+    "name": "Architect Agent",
+    "role": "architect",
+    "description": "Designs systems, defines API contracts, models data structures, and makes high-level architectural decisions. Best for planning new features before any code is written.",
+    "specialties": [
+      "System Design",
+      "API Contracts",
+      "Data Modeling",
+      "Module Structure",
+      "Interface Definitions",
+      "Architecture Decisions"
+    ],
+    "keywords": [
+      "design",
+      "architecture",
+      "structure",
+      "schema",
+      "interface",
+      "contract",
+      "system",
+      "module",
+      "model",
+      "plan",
+      "blueprint",
+      "pattern",
+      "api design",
+      "diagram",
+      "dependency",
+      "layout"
+    ],
+    "preferredChangeTypes": [
+      "feature",
+      "api",
+      "refactor"
+    ],
+    "color": "hsl(264 80% 68%)",
+    "emoji": "🏛️",
+    "createdAt": "2026-05-27T00:05:16.444Z"
+  },
+  {
+    "id": "coder",
+    "name": "Coder Agent",
+    "role": "coder",
+    "description": "Implements features, writes new code, builds components, and translates specs into working software. Best for direct implementation tasks.",
+    "specialties": [
+      "Feature Implementation",
+      "Component Building",
+      "API Development",
+      "Frontend UI",
+      "Backend Logic",
+      "Algorithm Writing"
+    ],
+    "keywords": [
+      "implement",
+      "build",
+      "create",
+      "add",
+      "code",
+      "write",
+      "feature",
+      "function",
+      "component",
+      "route",
+      "handler",
+      "hook",
+      "class",
+      "method",
+      "endpoint",
+      "integrate"
+    ],
+    "preferredChangeTypes": [
+      "feature",
+      "frontend",
+      "api",
+      "refactor"
+    ],
+    "color": "hsl(150 70% 55%)",
+    "emoji": "⚡",
+    "createdAt": "2026-05-27T00:05:16.444Z"
+  },
+  {
+    "id": "debugger",
+    "name": "Debug Agent",
+    "role": "debugger",
+    "description": "Diagnoses errors, traces bugs, fixes crashes, and investigates unexpected behavior. Best for anything broken or behaving incorrectly.",
+    "specialties": [
+      "Error Diagnosis",
+      "Stack Trace Analysis",
+      "Root Cause Finding",
+      "Regression Fixing",
+      "Performance Profiling",
+      "Log Analysis"
+    ],
+    "keywords": [
+      "bug",
+      "error",
+      "fix",
+      "crash",
+      "broken",
+      "debug",
+      "trace",
+      "failure",
+      "exception",
+      "issue",
+      "wrong",
+      "incorrect",
+      "unexpected",
+      "regression",
+      "investigate",
+      "diagnose",
+      "problem"
+    ],
+    "preferredChangeTypes": [
+      "bugfix",
+      "refactor"
+    ],
+    "color": "hsl(355 80% 65%)",
+    "emoji": "🔍",
+    "createdAt": "2026-05-27T00:05:16.444Z"
+  },
+  {
+    "id": "tester",
+    "name": "Test Agent",
+    "role": "tester",
+    "description": "Writes tests, improves coverage, validates correctness, and designs test plans. Best for any testing, QA, or validation work.",
+    "specialties": [
+      "Unit Testing",
+      "Integration Testing",
+      "E2E Testing",
+      "Test Coverage",
+      "Mock Design",
+      "Test Plan Creation",
+      "Validation Logic"
+    ],
+    "keywords": [
+      "test",
+      "spec",
+      "coverage",
+      "validate",
+      "verify",
+      "assert",
+      "mock",
+      "e2e",
+      "unit",
+      "integration",
+      "qa",
+      "quality",
+      "check",
+      "pass",
+      "fail",
+      "scenario",
+      "suite"
+    ],
+    "preferredChangeTypes": [
+      "test",
+      "bugfix",
+      "feature"
+    ],
+    "color": "hsl(38 100% 60%)",
+    "emoji": "🧪",
+    "createdAt": "2026-05-27T00:05:16.444Z"
+  },
+  {
+    "id": "deployment",
+    "name": "Deployment Agent",
+    "role": "deployment",
+    "description": "Handles CI/CD, Docker, environment configuration, production releases, and infrastructure setup. Best for anything related to shipping and running the app.",
+    "specialties": [
+      "CI/CD Pipelines",
+      "Docker / Containers",
+      "Environment Config",
+      "Production Releases",
+      "Infrastructure Setup",
+      "Secret Management",
+      "Health Monitoring"
+    ],
+    "keywords": [
+      "deploy",
+      "production",
+      "release",
+      "docker",
+      "environment",
+      "config",
+      "build",
+      "publish",
+      "ci",
+      "cd",
+      "pipeline",
+      "container",
+      "infrastructure",
+      "secret",
+      "env",
+      "server",
+      "host",
+      "staging"
+    ],
+    "preferredChangeTypes": [
+      "docs",
+      "data"
+    ],
+    "color": "hsl(196 80% 58%)",
+    "emoji": "🚀",
+    "createdAt": "2026-05-27T00:05:16.444Z"
+  },
+  {
+    "id": "memory",
+    "name": "Memory Agent",
+    "role": "memory",
+    "description": "Manages knowledge bases, session context, user preferences, and long-term memory stores. Best for anything involving recall, retention, or structured knowledge.",
+    "specialties": [
+      "Knowledge Base Management",
+      "Session Context",
+      "User Preferences",
+      "Long-Term Memory",
+      "Context Retrieval",
+      "Data Persistence",
+      "Semantic Search"
+    ],
+    "keywords": [
+      "memory",
+      "session",
+      "context",
+      "remember",
+      "store",
+      "retrieve",
+      "knowledge",
+      "cache",
+      "recall",
+      "persist",
+      "preference",
+      "history",
+      "state",
+      "kb",
+      "search",
+      "index",
+      "embedding"
+    ],
+    "preferredChangeTypes": [
+      "data",
+      "feature"
+    ],
+    "color": "hsl(280 70% 65%)",
+    "emoji": "🧠",
+    "createdAt": "2026-05-27T00:05:16.444Z"
+  }
+]
