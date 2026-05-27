@@ -36,6 +36,7 @@ import {
   TrendingUp,
   Map,
   Users,
+  Network,
 } from "lucide-react";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
 import { useSpeechSession } from "@/hooks/useSpeechSession";
@@ -64,6 +65,7 @@ import PriorityPanel       from "@/components/PriorityPanel";
 import WorkspacePanel      from "@/components/WorkspacePanel";
 import ReasonPanel         from "@/components/ReasonPanel";
 import AgentsPanel         from "@/components/AgentsPanel";
+import CollabPanel         from "@/components/CollabPanel";
 import {
   approvePatch, rejectPatch as logRejectPatch, fetchPendingPatches,
   fetchServerStatus,
@@ -560,6 +562,7 @@ export default function Chat() {
   const [workspacePanelOpen,    setWorkspacePanelOpen]    = useState(false);
   const [reasonPanelOpen,       setReasonPanelOpen]       = useState(false);
   const [agentsPanelOpen,       setAgentsPanelOpen]       = useState(false);
+  const [collabPanelOpen,       setCollabPanelOpen]       = useState(false);
   const autoRoutedRef = useRef(false);
 
   // ── Patch notification bar + server status ───────────────────────────────
@@ -1499,6 +1502,21 @@ export default function Chat() {
             <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: agentsPanelOpen ? "hsl(185 75% 65%)" : "hsl(196 60% 55%)" }}>AGENTS</span>
           </button>
 
+          {/* Collaboration */}
+          <button
+            onClick={() => setCollabPanelOpen(v => !v)}
+            title="Agent Collaboration — plan multi-agent teamwork for a goal"
+            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
+            style={{
+              background:  collabPanelOpen ? "hsl(320 70% 62% / 0.12)" : "transparent",
+              borderColor: collabPanelOpen ? "hsl(320 70% 62% / 0.5)"  : "hsl(210 15% 30%)",
+            }}
+            aria-label="Open collaboration panel"
+          >
+            <Network className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: collabPanelOpen ? "hsl(320 70% 75%)" : "hsl(196 60% 55%)" }} />
+            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: collabPanelOpen ? "hsl(320 70% 75%)" : "hsl(196 60% 55%)" }}>COLLAB</span>
+          </button>
+
           {/* Dev Agent — visible on all screen sizes */}
           <button
             onClick={() => setDevPanelOpen(true)}
@@ -1890,6 +1908,13 @@ export default function Chat() {
       <AgentsPanel
         isOpen={agentsPanelOpen}
         onClose={() => setAgentsPanelOpen(false)}
+        apiBase={BASE}
+      />
+
+      {/* Collaboration panel */}
+      <CollabPanel
+        isOpen={collabPanelOpen}
+        onClose={() => setCollabPanelOpen(false)}
         apiBase={BASE}
       />
 

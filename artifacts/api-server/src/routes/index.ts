@@ -45,7 +45,8 @@ import plansRouter         from "./plans";
 import prioritizerRouter   from "./prioritizer";
 import workspaceRouter     from "./workspace";
 import repoReasonerRouter  from "./repoReasoner";
-import agentProfilesRouter from "./agentProfiles";
+import agentProfilesRouter       from "./agentProfiles";
+import agentCollaborationRouter  from "./agentCollaboration";
 
 // Register agents (self-register on import)
 import "../agents/plannerAgent";
@@ -79,5 +80,6 @@ router.use(prioritizerRouter);
 router.use(workspaceRouter);
 router.use(repoReasonerRouter);
 router.use(agentProfilesRouter);
+router.use(agentCollaborationRouter);
 
 export default router;
