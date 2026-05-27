@@ -29,7 +29,7 @@ WORKDIR /workspace
 FROM base AS deps
 
 # Copy manifest files first (better layer caching)
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY package.json pnpm-workspace.yaml ./
 COPY tsconfig.base.json tsconfig.json ./
 
 # Shared libs — manifests only
