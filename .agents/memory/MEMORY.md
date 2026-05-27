@@ -26,3 +26,4 @@
 - [Phase 7A migration prep](phase7a-migration.md) — MIGRATION_PLAN.md + Dockerfile + Dockerfile.frontend + docker-compose.yml + .env.example; Replit plugins, /tmp PersistentStore, and port mapping all documented
 - [Patch approval UX](patch-approval-ux.md) — propose_code_change Jarvis tool + registerPatch() + ChatPatchProposal; real buttons in chat AND DEV Patches; 53/53 tests
 - [Improvement Loop + Queue v1](improvement-loop.md) — analyzer.ts + suggestions.ts + queue.ts; routes appended to autonomy.ts; ImprovementPanel.tsx (2-tab: SUGGESTIONS/QUEUE); IMPROVE button; staged approval flow: open→queued→approved→work-order
+- [Production security](production-security.md) — lib/security.ts: buildCorsOptions() + apiKeyAuth; opt-in via env vars; dev unchanged when unset; /api/healthz always exempt

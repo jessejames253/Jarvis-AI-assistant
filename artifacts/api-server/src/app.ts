@@ -9,20 +9,28 @@
  *
  * Pipeline for each request:
  *   1. pinoHttp   → logs the request (method, URL, status code)
- *   2. cors       → allows the frontend (running on a different port) to call this API
- *   3. json       → parses JSON request bodies so routes can read req.body
- *   4. urlencoded → parses form-encoded request bodies (less common, but good to have)
- *   5. /api       → hands off to the route handlers in src/routes/
+ *   2. cors       → enforces ALLOWED_ORIGINS allowlist (open in dev, locked in prod)
+ *   3. apiKeyAuth → requires Authorization: Bearer <API_KEY> when API_KEY is set
+ *   4. json       → parses JSON request bodies so routes can read req.body
+ *   5. urlencoded → parses form-encoded request bodies (less common, but good to have)
+ *   6. /api       → hands off to the route handlers in src/routes/
+ *
+ * Security behaviour:
+ *   Development (API_KEY unset, ALLOWED_ORIGINS unset) → open, same as before.
+ *   Production  (API_KEY set,   ALLOWED_ORIGINS set)   → locked down.
+ *
+ * See src/lib/security.ts for full documentation of both middleware.
  *
  * This file only configures the server — it does NOT start it.
  * Starting (calling app.listen) happens in src/index.ts.
  */
 
 import express, { type Express } from "express";
-import cors from "cors";
-import pinoHttp from "pino-http";
-import router from "./routes";
-import { logger } from "./lib/logger";
+import cors                       from "cors";
+import pinoHttp                   from "pino-http";
+import router                     from "./routes";
+import { logger }                 from "./lib/logger";
+import { buildCorsOptions, apiKeyAuth } from "./lib/security";
 
 const app: Express = express();
 
@@ -48,9 +56,18 @@ app.use(
   }),
 );
 
-// Allow cross-origin requests — without this, the browser blocks frontend → backend calls
-// because they run on different ports during development.
-app.use(cors());
+// CORS — reads ALLOWED_ORIGINS env var.
+// In development (ALLOWED_ORIGINS unset): allows all origins (existing behaviour).
+// In production (ALLOWED_ORIGINS set):    only listed origins are accepted.
+// cors() handles OPTIONS preflight internally and returns before auth middleware runs,
+// so browsers can negotiate CORS without needing credentials.
+app.use(cors(buildCorsOptions()));
+
+// API key auth — reads API_KEY env var.
+// When API_KEY is not set: no-op (development mode, existing behaviour).
+// When API_KEY is set:     all requests must include Authorization: Bearer <key>.
+// GET /api/healthz is always exempt (Docker healthchecks, uptime monitors).
+app.use(apiKeyAuth);
 
 // Parse incoming JSON bodies (e.g. { "message": "hello" }) into req.body
 app.use(express.json());
