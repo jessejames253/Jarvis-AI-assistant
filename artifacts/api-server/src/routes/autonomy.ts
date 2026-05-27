@@ -1,5 +1,5 @@
 /**
- * routes/autonomy.ts — Phase 6 autonomy REST API.
+ * routes/autonomy.ts — Phase 6 autonomy REST API + Improvement Loop v1.
  *
  * All endpoints require explicit user action — no auto-start, no scheduling.
  *
@@ -35,6 +35,16 @@ import {
 import { CYCLE_META }        from "../lib/autonomy/improvementCycle";
 import type { CycleType }    from "../lib/autonomy/improvementCycle";
 import type { BudgetConfig } from "../lib/autonomy/autonomyBudget";
+
+// ─── Improvement Loop v1 imports ──────────────────────────────────────────────
+import { runAnalysis }          from "../lib/autonomy/analyzer";
+import {
+  loadSuggestions, mergeSuggestions, updateSuggestion,
+  loadAnalysisMeta, saveAnalysisMeta,
+}                               from "../lib/autonomy/suggestions";
+import { createCheckpoint }     from "../lib/checkpoints";
+import { loadProfiles }         from "../lib/agentProfiles";
+import { createStandaloneWorkOrder } from "../lib/workOrders";
 
 const router = Router();
 
@@ -198,6 +208,115 @@ router.post("/autonomy/policy/check-files", (req, res) => {
   const { files } = req.body as { files: string[] };
   if (!Array.isArray(files)) return res.status(400).json({ error: "files must be an array" });
   return res.json(validateFiles(files));
+});
+
+// ─── Improvement Loop v1 ──────────────────────────────────────────────────────
+
+// POST /api/autonomy/analyze
+router.post("/autonomy/analyze", async (_req, res) => {
+  try {
+    const checkpoint = await createCheckpoint({
+      description: "Auto-checkpoint before autonomy self-improvement analysis",
+    });
+    const { suggestions, scanSummary } = await runAnalysis();
+    const merged = mergeSuggestions(suggestions);
+    saveAnalysisMeta({
+      ranAt:       new Date().toISOString(),
+      scanSummary,
+      count:       merged.filter(s => s.status === "open").length,
+    });
+    res.json({
+      ok:           true,
+      suggestions:  merged,
+      scanSummary,
+      checkpointId: checkpoint.id,
+      total:        merged.length,
+      open:         merged.filter(s => s.status === "open").length,
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err instanceof Error ? err.message : "Analysis failed" });
+  }
+});
+
+// GET /api/autonomy/suggestions
+router.get("/autonomy/suggestions", (_req, res) => {
+  try {
+    const suggestions = loadSuggestions();
+    const meta        = loadAnalysisMeta();
+    res.json({
+      ok:         true,
+      suggestions,
+      meta,
+      total:      suggestions.length,
+      open:       suggestions.filter(s => s.status === "open").length,
+      converted:  suggestions.filter(s => s.status === "converted").length,
+      dismissed:  suggestions.filter(s => s.status === "dismissed").length,
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err instanceof Error ? err.message : "Load failed" });
+  }
+});
+
+// POST /api/autonomy/suggestions/:id/convert
+router.post("/autonomy/suggestions/:id/convert", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const suggestions = loadSuggestions();
+    const suggestion  = suggestions.find(s => s.id === id);
+    if (!suggestion) {
+      res.status(404).json({ ok: false, error: `Suggestion '${id}' not found.` });
+      return;
+    }
+    if (suggestion.status === "converted") {
+      res.status(409).json({ ok: false, error: "Suggestion already converted to a work order." });
+      return;
+    }
+    const profiles = loadProfiles();
+    const profile  = profiles.find(p =>
+      p.name.toLowerCase() === suggestion.recommendedAgent.toLowerCase()
+    ) ?? profiles[0];
+    if (!profile) {
+      res.status(422).json({ ok: false, error: "No agent profiles found. Register agents first." });
+      return;
+    }
+    const checkpoint = await createCheckpoint({
+      description: `Auto-checkpoint before converting suggestion to work order: ${suggestion.title.slice(0, 40)}`,
+    });
+    const wo        = suggestion.suggestedWorkOrder;
+    const workOrder = createStandaloneWorkOrder({
+      agentId:        profile.id,
+      agentName:      profile.name,
+      agentColor:     profile.color,
+      agentEmoji:     profile.emoji,
+      title:          wo.title,
+      objective:      wo.objective,
+      inputs:         wo.inputs,
+      expectedOutput: wo.expectedOutput,
+      riskLevel:      wo.riskLevel,
+      sourceLabel:    `autonomy:${suggestion.category}`,
+    });
+    const updated = updateSuggestion(id, {
+      status:               "converted",
+      convertedWorkOrderId: workOrder.id,
+    });
+    res.json({ ok: true, workOrder, suggestion: updated, checkpointId: checkpoint.id });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err instanceof Error ? err.message : "Conversion failed" });
+  }
+});
+
+// POST /api/autonomy/suggestions/:id/dismiss
+router.post("/autonomy/suggestions/:id/dismiss", (req, res) => {
+  try {
+    const updated = updateSuggestion(req.params.id, { status: "dismissed" });
+    if (!updated) {
+      res.status(404).json({ ok: false, error: "Suggestion not found." });
+      return;
+    }
+    res.json({ ok: true, suggestion: updated });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err instanceof Error ? err.message : "Dismiss failed" });
+  }
 });
 
 export { router as autonomyRouter };

@@ -68,6 +68,7 @@ import ReasonPanel         from "@/components/ReasonPanel";
 import AgentsPanel         from "@/components/AgentsPanel";
 import CollabPanel         from "@/components/CollabPanel";
 import WorkOrdersPanel     from "@/components/WorkOrdersPanel";
+import ImprovementPanel    from "@/components/ImprovementPanel";
 import {
   approvePatch, rejectPatch as logRejectPatch, fetchPendingPatches,
   fetchServerStatus,
@@ -566,6 +567,7 @@ export default function Chat() {
   const [agentsPanelOpen,       setAgentsPanelOpen]       = useState(false);
   const [collabPanelOpen,       setCollabPanelOpen]       = useState(false);
   const [workOrdersPanelOpen,   setWorkOrdersPanelOpen]   = useState(false);
+  const [improvementPanelOpen,  setImprovementPanelOpen]  = useState(false);
   const autoRoutedRef = useRef(false);
 
   // ── Patch notification bar + server status ───────────────────────────────
@@ -1535,6 +1537,21 @@ export default function Chat() {
             <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: workOrdersPanelOpen ? "hsl(43 100% 68%)" : "hsl(196 60% 55%)" }}>ORDERS</span>
           </button>
 
+          {/* Improvement Analysis */}
+          <button
+            onClick={() => setImprovementPanelOpen(v => !v)}
+            title="Self-Improvement Analysis — scan system and generate improvement suggestions"
+            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
+            style={{
+              background:  improvementPanelOpen ? "hsl(175 75% 52% / 0.12)" : "transparent",
+              borderColor: improvementPanelOpen ? "hsl(175 75% 52% / 0.5)"  : "hsl(210 15% 30%)",
+            }}
+            aria-label="Open improvement analysis panel"
+          >
+            <Cpu className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: improvementPanelOpen ? "hsl(175 75% 65%)" : "hsl(196 60% 55%)" }} />
+            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: improvementPanelOpen ? "hsl(175 75% 65%)" : "hsl(196 60% 55%)" }}>IMPROVE</span>
+          </button>
+
           {/* Dev Agent — visible on all screen sizes */}
           <button
             onClick={() => setDevPanelOpen(true)}
@@ -1940,6 +1957,13 @@ export default function Chat() {
       <WorkOrdersPanel
         isOpen={workOrdersPanelOpen}
         onClose={() => setWorkOrdersPanelOpen(false)}
+        apiBase={BASE}
+      />
+
+      {/* Improvement analysis panel */}
+      <ImprovementPanel
+        isOpen={improvementPanelOpen}
+        onClose={() => setImprovementPanelOpen(false)}
         apiBase={BASE}
       />
 

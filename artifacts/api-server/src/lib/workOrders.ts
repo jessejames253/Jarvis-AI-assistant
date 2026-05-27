@@ -189,6 +189,42 @@ export function updateWorkOrderStatus(
   return all[index];
 }
 
+// ─── Standalone work order (from autonomy suggestions) ────────────────────────
+
+export function createStandaloneWorkOrder(params: {
+  agentId:        string;
+  agentName:      string;
+  agentColor:     string;
+  agentEmoji:     string;
+  title:          string;
+  objective:      string;
+  inputs:         string[];
+  expectedOutput: string;
+  riskLevel:      RiskLevel;
+  sourceLabel?:   string;
+}): WorkOrder {
+  const order: WorkOrder = {
+    id:                  randomUUID(),
+    collaborationPlanId: params.sourceLabel ?? "standalone",
+    agentId:             params.agentId,
+    agentName:           params.agentName,
+    agentColor:          params.agentColor,
+    agentEmoji:          params.agentEmoji,
+    title:               params.title,
+    objective:           params.objective,
+    inputs:              params.inputs,
+    expectedOutput:      params.expectedOutput,
+    dependencies:        [],
+    dependencyNames:     [],
+    riskLevel:           params.riskLevel,
+    status:              "ready",  // standalone orders are immediately ready
+    createdAt:           new Date().toISOString(),
+  };
+  const existing = loadWorkOrders();
+  saveWorkOrders([...existing, order]);
+  return order;
+}
+
 // ─── Read helpers ─────────────────────────────────────────────────────────────
 
 export function getPlanForId(planId: string): CollaborationPlan | null {
