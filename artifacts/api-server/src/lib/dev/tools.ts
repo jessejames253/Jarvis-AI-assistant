@@ -17,7 +17,9 @@ import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
-export const PROJECT_ROOT = "/home/runner/workspace";
+export const PROJECT_ROOT =
+  process.env["PROJECT_ROOT"]?.trim() ||
+  "/home/runner/workspace";
 
 const BLOCKED_PATHS = [
   ".env", ".env.local", ".env.production", ".env.development",

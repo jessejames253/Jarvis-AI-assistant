@@ -14,6 +14,7 @@ import { runDevAgent } from "../lib/dev/agent";
 import {
   applyPatch, rollbackFile, listProjectFilesRest, readProjectFileRest,
   PROJECT_ROOT, deletePatch, SERVER_STARTED_AT, RECOVERED_PATCH_COUNT,
+  pendingPatches,
 } from "../lib/dev/tools";
 import { createSnapshot } from "../lib/dev/snapshotStore";
 import { createTask, updateTask, addMessage, addPatchToTask, markPatchApplied } from "../lib/dev/taskStore";
@@ -296,10 +297,13 @@ router.post("/dev/patches", async (req, res): Promise<void> => {
   });
 });
 
-router.get("/dev/patches", async (_req, res) => {
-  const { pendingPatches } = await import("../lib/dev/tools");
-  const patches = Array.from(pendingPatches.values());
-  res.json({ ok: true, patches });
+router.get("/dev/patches", (_req, res) => {
+  try {
+    const patches = Array.from(pendingPatches.values());
+    res.json({ ok: true, patches });
+  } catch (err) {
+    res.json({ ok: true, patches: [] });
+  }
 });
 
 // ─── DELETE /dev/patches/:id ──────────────────────────────────────────────────
