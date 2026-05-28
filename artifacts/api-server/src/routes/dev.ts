@@ -322,11 +322,15 @@ router.delete("/dev/patches/:id", (req, res) => {
 // from disk. The frontend polls this to detect restarts and show banners.
 
 router.get("/dev/server-status", (_req, res) => {
-  res.json({
-    ok: true,
-    startedAt: SERVER_STARTED_AT,
-    recoveredPatchCount: RECOVERED_PATCH_COUNT,
-  });
+  try {
+    res.json({
+      ok: true,
+      startedAt: SERVER_STARTED_AT,
+      recoveredPatchCount: RECOVERED_PATCH_COUNT,
+    });
+  } catch {
+    res.json({ ok: true, startedAt: 0, recoveredPatchCount: 0 });
+  }
 });
 
 // ─── GET /dev/health ──────────────────────────────────────────────────────────
@@ -475,12 +479,12 @@ router.post("/dev/improvements/:id/apply", async (req, res): Promise<void> => {
 // Returns the result of the most recent auto-fix analysis run.
 
 router.get("/dev/autofix/latest", (_req, res) => {
-  const result = getLastAutoFixResult();
-  if (!result) {
+  try {
+    const result = getLastAutoFixResult();
+    res.json({ ok: true, result: result ?? null });
+  } catch {
     res.json({ ok: true, result: null });
-    return;
   }
-  res.json({ ok: true, result });
 });
 
 // ─── GET /dev/files ───────────────────────────────────────────────────────────
@@ -501,9 +505,13 @@ router.get("/dev/files", async (req, res) => {
 router.get("/dev/file", async (req, res) => {
   const filePath = (req.query.path as string) ?? "";
   if (!filePath) { res.status(400).json({ ok: false, error: "path is required" }); return; }
-  const result = await readProjectFileRest(filePath, 400);
-  if (!result.ok) { res.status(400).json(result); return; }
-  res.json(result);
+  try {
+    const result = await readProjectFileRest(filePath, 400);
+    if (!result.ok) { res.status(400).json(result); return; }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err) });
+  }
 });
 
 export default router;
