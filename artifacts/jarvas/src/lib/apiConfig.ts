@@ -17,8 +17,16 @@
 export function getApiBase(): string {
   const explicit: string | undefined = import.meta.env.VITE_API_BASE_URL;
   if (explicit) {
-    return explicit.endsWith("/") ? explicit : explicit + "/";
+    const base = explicit.endsWith("/") ? explicit : explicit + "/";
+    console.log("[Jarvis] API base → VITE_API_BASE_URL:", base);
+    return base;
   }
   const viteBase: string = import.meta.env.BASE_URL ?? "/";
-  return viteBase.endsWith("/") ? viteBase : viteBase + "/";
+  const base = viteBase.endsWith("/") ? viteBase : viteBase + "/";
+  console.warn(
+    "[Jarvis] VITE_API_BASE_URL not set — falling back to same-origin:",
+    base,
+    "\nChat will hang if the nginx /api proxy cannot reach the backend.",
+  );
+  return base;
 }

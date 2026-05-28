@@ -232,22 +232,44 @@ async function callChatStream(
   base: string,
   onToken: (text: string) => void,
   onDone: (data: StreamDonePayload) => void,
-  onError: () => void,
+  onError: (reason?: string) => void,
   onToolEvent?: (event: ToolSSEEvent) => void,
 ): Promise<void> {
+  const url = `${base}api/chat/stream`;
+  console.log("[Jarvis] POST →", url);
+
+  // 15 s timeout for the initial connection only.
+  // Once the stream starts reading, the timer is cleared.
+  const controller = new AbortController();
+  const connectTimer = setTimeout(() => controller.abort(), 15_000);
+
   let res: Response;
   try {
-    res = await fetch(`${base}api/chat/stream`, {
+    res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message, sessionId }),
+      signal: controller.signal,
     });
-  } catch {
-    onError();
+    clearTimeout(connectTimer);
+  } catch (err) {
+    clearTimeout(connectTimer);
+    const timedOut = controller.signal.aborted;
+    const detail = err instanceof Error ? err.message : String(err);
+    const reason = timedOut
+      ? `No response from API after 15 s — check VITE_API_BASE_URL (tried: ${url})`
+      : `Network error: ${detail} (tried: ${url})`;
+    console.error("[Jarvis] fetch failed:", reason);
+    onError(reason);
     return;
   }
 
-  if (!res.ok || !res.body) { onError(); return; }
+  if (!res.ok || !res.body) {
+    const reason = `API returned ${res.status} ${res.statusText} (${url})`;
+    console.error("[Jarvis] stream error:", reason);
+    onError(reason);
+    return;
+  }
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -274,7 +296,8 @@ async function callChatStream(
           } else if (evType === "done") {
             onDone(event as unknown as StreamDonePayload);
           } else if (evType === "error") {
-            onError();
+            const msg = typeof event.message === "string" ? event.message : "Stream error from server";
+            onError(msg);
           } else if (
             (evType === "tool_start" || evType === "tool_done" || evType === "tool_error") &&
             onToolEvent
@@ -284,8 +307,9 @@ async function callChatStream(
         } catch { /* ignore malformed SSE lines */ }
       }
     }
-  } catch {
-    onError();
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    onError(`Stream read error: ${detail}`);
   }
 }
 
@@ -823,23 +847,33 @@ export default function Chat() {
     const streamStartTime = Date.now();
     _rt.bus.emit({ type: "stream:start", sessionId, ts: Date.now() });
 
-    const handleError = () => {
-      _rt.bus.emit({ type: "stream:error", error: "SSE stream failed", ts: Date.now() });
+    const handleError = (reason?: string) => {
+      const label = reason ?? "Request failed — please try again.";
+      console.error("[Jarvis] handleError:", label);
+      _rt.bus.emit({ type: "stream:error", error: label, ts: Date.now() });
+
       if (messageCreated) {
+        // Message bubble already exists — stop streaming and fill it with the error.
         setIsStreaming(false);
         setStreamingMsgId(null);
         flushTokenBuffer(currentMsgId, true);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === currentMsgId
+              ? { ...m, content: m.content.trim() || `⚠️ ${label}` }
+              : m
+          )
+        );
       } else {
+        // No bubble yet — stop the typing indicator and add an error bubble.
         setIsTyping(false);
+        setMessages((prev) => [
+          ...prev,
+          { id: currentMsgId, role: "assistant", content: `⚠️ ${label}`, timestamp: new Date() },
+        ]);
       }
       setAgentStatus("error");
       setTimeout(() => setAgentStatus("idle"), 2500);
-      if (!messageCreated) {
-        setMessages((prev) => [
-          ...prev,
-          { id: currentMsgId, role: "assistant", content: "Something went wrong on my end. Please try again.", timestamp: new Date() },
-        ]);
-      }
     };
 
     await callChatStream(
