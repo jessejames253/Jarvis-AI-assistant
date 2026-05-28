@@ -1,3 +1,5 @@
+import { generateId } from "./uuid";
+
 /**
  * lib/speechManager.ts — Global singleton speech manager
  *
@@ -205,7 +207,7 @@ export class SpeechManager {
     if (!text.trim()) return;
 
     const item: QueueItem = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       msgId,
       text,
       priority,

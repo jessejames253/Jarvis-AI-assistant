@@ -18,6 +18,7 @@
  *   - Fatal error containment (all bridges wrapped in try/catch)
  */
 
+import { generateId } from "../uuid";
 import { EventBus } from "./eventBus";
 import { RuntimeLogger } from "./logger";
 import type {
@@ -127,7 +128,7 @@ export class JarvisRuntime {
     level: NotificationLevel = "info",
     autoDismissMs = DEFAULT_NOTIFY_MS,
   ): string {
-    const id = crypto.randomUUID();
+    const id = generateId();
     const notification: Notification = { id, message, level, ts: Date.now(), autoDismissMs };
     this._notifications = [...this._notifications, notification];
     this.bus.emit({ type: "runtime:notify", notification, ts: Date.now() });

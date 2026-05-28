@@ -39,6 +39,7 @@ import {
   Network,
   ClipboardList,
 } from "lucide-react";
+import { generateId } from "@/lib/uuid";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
 import { useSpeechSession } from "@/hooks/useSpeechSession";
 import RuntimeInspector from "@/components/RuntimeInspector";
@@ -191,13 +192,13 @@ function detectPlannerIntent(msg: string): PlannerIntentResult {
 function getOrCreateSessionId(): string {
   const existing = localStorage.getItem(SESSION_KEY);
   if (existing) return existing;
-  const id = crypto.randomUUID();
+  const id = generateId();
   localStorage.setItem(SESSION_KEY, id);
   return id;
 }
 
 function createNewSessionId(): string {
-  const id = crypto.randomUUID();
+  const id = generateId();
   localStorage.setItem(SESSION_KEY, id);
   return id;
 }
