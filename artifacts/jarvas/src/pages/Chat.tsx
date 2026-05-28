@@ -550,6 +550,10 @@ import { getApiBase } from "@/lib/apiConfig";
 const BASE = getApiBase();
 console.log("[Jarvis] Chat module loaded v2 — BASE:", BASE);
 
+const DEV_TOOLS_ENABLED =
+  import.meta.env.DEV === true ||
+  import.meta.env.VITE_ENABLE_DEV_TOOLS === "true";
+
 // Runtime singleton — no React dependency, survives re-renders
 const _rt = JarvisRuntime.getInstance();
 
@@ -610,7 +614,9 @@ export default function Chat() {
   }, [devPanelOpen]);
 
   // Poll server status every 30 s to detect restarts and recover patch records.
+  // Disabled in production — only runs when DEV_TOOLS_ENABLED.
   useEffect(() => {
+    if (!DEV_TOOLS_ENABLED) return;
     const pollStatus = async () => {
       const status = await fetchServerStatus();
       if (!status) return;
@@ -631,7 +637,9 @@ export default function Chat() {
 
   // Poll for pending patches every 15 s so the bar stays in sync without
   // requiring the DEV panel to be open.
+  // Disabled in production — only runs when DEV_TOOLS_ENABLED.
   useEffect(() => {
+    if (!DEV_TOOLS_ENABLED) return;
     const poll = async () => {
       const patches = await fetchPendingPatches();
       setPendingPatches(patches);
@@ -1588,7 +1596,8 @@ export default function Chat() {
             <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: improvementPanelOpen ? "hsl(175 75% 65%)" : "hsl(196 60% 55%)" }}>IMPROVE</span>
           </button>
 
-          {/* Dev Agent — visible on all screen sizes */}
+          {/* Dev Agent — only shown when DEV_TOOLS_ENABLED */}
+          {DEV_TOOLS_ENABLED && (
           <button
             onClick={() => setDevPanelOpen(true)}
             title="Dev Agent — inspect and edit project files"
@@ -1602,6 +1611,7 @@ export default function Chat() {
             <Code2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: devPanelOpen ? "hsl(194 100% 65%)" : "hsl(196 60% 55%)" }} />
             <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: devPanelOpen ? "hsl(194 100% 65%)" : "hsl(196 60% 55%)" }}>DEV</span>
           </button>
+          )}
 
           {/* Debug — hidden on mobile to reduce clutter */}
           <button
@@ -1745,7 +1755,8 @@ export default function Chat() {
         </div>
       </main>
 
-      {/* ── Pending patch notification bar ────────────────────────────────── */}
+      {/* ── Pending patch notification bar — dev tools only ─────────────── */}
+      {DEV_TOOLS_ENABLED && (
       <PatchNotificationBar
         patches={pendingPatches.filter(p => !dismissedIds.has(p.patchId))}
         approvingId={approvingPatchId}
@@ -1754,6 +1765,7 @@ export default function Chat() {
         onApprove={handleApprovePatch}
         onReject={handleRejectPatch}
       />
+      )}
 
       {/* ── Input bar ── */}
       <footer className="relative z-10 flex-shrink-0 border-t border-border/60 bg-background/90 backdrop-blur-sm px-3 sm:px-8 pt-3 pb-safe"
@@ -2003,8 +2015,8 @@ export default function Chat() {
         apiBase={BASE}
       />
 
-      {/* Dev Agent panel */}
-      {devPanelOpen && (
+      {/* Dev Agent panel — dev tools only */}
+      {DEV_TOOLS_ENABLED && devPanelOpen && (
         <DevAgentPanel onClose={() => setDevPanelOpen(false)} />
       )}
 
