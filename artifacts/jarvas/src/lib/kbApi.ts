@@ -8,10 +8,10 @@
  *   to save anything from any app.
  */
 
-const BASE = import.meta.env.BASE_URL;
+import { getApiBase } from "./apiConfig";
 
 function api(path: string) {
-  return `${BASE}api/${path}`;
+  return `${getApiBase()}api/${path}`;
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {

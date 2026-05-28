@@ -522,7 +522,8 @@ function MessageBubble({
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-const BASE = import.meta.env.BASE_URL;
+import { getApiBase } from "@/lib/apiConfig";
+const BASE = getApiBase();
 console.log("[Jarvis] Chat module loaded v2 — BASE:", BASE);
 
 // Runtime singleton — no React dependency, survives re-renders

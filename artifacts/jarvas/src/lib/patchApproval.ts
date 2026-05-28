@@ -12,7 +12,8 @@
  * the user clicks.
  */
 
-const BASE           = import.meta.env.BASE_URL ?? "/";
+import { getApiBase } from "./apiConfig";
+const BASE           = getApiBase();
 const APPLY_URL      = `${BASE}api/dev/apply`;
 const PATCHES_URL    = `${BASE}api/dev/patches`;
 const SERVER_STATUS_URL = `${BASE}api/dev/server-status`;

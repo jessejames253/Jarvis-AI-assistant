@@ -50,6 +50,10 @@ FROM deps AS build
 # It is baked into the static build at build time.
 ARG BASE_PATH=/
 ARG VITE_PORT=3000
+# VITE_API_BASE_URL — set this in Coolify to your backend's public URL.
+# Example: https://outstanding-okapi.syd1.coolify.app/
+# Leave blank to use the nginx /api proxy (same-origin deployment).
+ARG VITE_API_BASE_URL=""
 
 # Copy full source
 COPY lib/              lib/
@@ -60,7 +64,9 @@ COPY attached_assets/  attached_assets/
 RUN pnpm --filter @workspace/api-zod run build 2>/dev/null || true
 
 # Build the frontend — output goes to artifacts/jarvas/dist/public
-RUN PORT=${VITE_PORT} BASE_PATH=${BASE_PATH} \
+# VITE_API_BASE_URL is forwarded so getApiBase() bakes the backend URL into
+# the bundle.  Leave blank (default) to keep relative /api/* paths (nginx proxy).
+RUN PORT=${VITE_PORT} BASE_PATH=${BASE_PATH} VITE_API_BASE_URL=${VITE_API_BASE_URL} \
     pnpm --filter @workspace/jarvas run build
 
 # ── 4. Production nginx image ─────────────────────────────────────────────────

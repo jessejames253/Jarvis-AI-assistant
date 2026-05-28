@@ -12,8 +12,9 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
+import { getApiBase } from "@/lib/apiConfig";
 
-const API = (path: string) => `/api${path}`;
+const API = (path: string) => `${getApiBase()}api${path}`;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
