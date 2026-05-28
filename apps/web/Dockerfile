@@ -7,7 +7,13 @@
 #   3. build    — vite build → dist/public/
 #   4. serve    — nginx serves static files + proxies /api to the API server
 #
-# Build from the monorepo root:
+# Build context must be the MONOREPO ROOT (not apps/web).
+#
+# In Coolify set:
+#   Base Directory  →  /          (repo root)
+#   Dockerfile      →  apps/web/Dockerfile
+#
+# Manual build:
 #   docker build -f apps/web/Dockerfile \
 #     --build-arg BASE_PATH=/ \
 #     -t jarvis-web .
@@ -31,7 +37,7 @@ COPY lib/integrations-anthropic-ai/package.json lib/integrations-anthropic-ai/
 COPY lib/api-client-react/package.json          lib/api-client-react/
 
 # Frontend manifest
-COPY artifacts/jarvas/package.json artifacts/jarvas/
+COPY artifacts/jarvas/package.json     artifacts/jarvas/
 # api-server manifest (needed for workspace resolution)
 COPY artifacts/api-server/package.json artifacts/api-server/
 
@@ -46,7 +52,7 @@ ARG BASE_PATH=/
 ARG VITE_PORT=3000
 
 # Copy full source
-COPY lib/            lib/
+COPY lib/              lib/
 COPY artifacts/jarvas/ artifacts/jarvas/
 COPY attached_assets/  attached_assets/
 
@@ -60,14 +66,13 @@ RUN PORT=${VITE_PORT} BASE_PATH=${BASE_PATH} \
 # ── 4. Production nginx image ─────────────────────────────────────────────────
 FROM nginx:1.27-alpine AS production
 
-# Remove default nginx config
 RUN rm /etc/nginx/conf.d/default.conf
 
-# Copy built static files
 COPY --from=build /workspace/artifacts/jarvas/dist/public /usr/share/nginx/html
 
-# Copy nginx site config
-COPY nginx/jarvis.conf /etc/nginx/conf.d/jarvis.conf
+# nginx config lives alongside this Dockerfile in apps/web/nginx/
+# Build context must be repo root: path is relative to that root
+COPY apps/web/nginx/jarvis.conf /etc/nginx/conf.d/jarvis.conf
 
 EXPOSE 80
 
