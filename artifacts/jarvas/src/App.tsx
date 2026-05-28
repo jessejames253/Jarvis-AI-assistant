@@ -1,25 +1,4 @@
-/**
- * App.tsx — Root component for the Jarvis web app
- *
- * This file sets up the global "wiring" that wraps every page in the app:
- *
- *  - QueryClientProvider  Gives every component access to server data fetching
- *                         (via TanStack Query). Think of it as a global cache
- *                         for API responses.
- *
- *  - TooltipProvider      Makes tooltips (hover hints) available app-wide.
- *
- *  - WouterRouter         Handles URL-based navigation. When the URL is "/",
- *                         it shows the Chat page. When no URL matches, it shows
- *                         the NotFound page. (Wouter is a lightweight alternative
- *                         to React Router.)
- *
- *  - Toaster              A floating notification system for showing quick
- *                         success/error messages anywhere in the app.
- *
- * To add a new page, create a file in src/pages/ and add a <Route> below.
- */
-
+import { Component, type ReactNode } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -29,15 +8,67 @@ import Dashboard from "@/pages/Dashboard";
 import KnowledgeBase from "@/pages/KnowledgeBase";
 import NotFound from "@/pages/not-found";
 
-// QueryClient is the central cache for all API data fetching in the app.
-// Created once here at the top level so it persists for the entire session.
 const queryClient = new QueryClient();
 
-// Router maps URL paths to page components.
-// "/"           → Chat page (the main interface)
-// "/dashboard"  → Task management dashboard
-// "/kb"         → Knowledge Base (notes, research, facts)
-// anything else → NotFound page (404)
+// ── Error boundary ────────────────────────────────────────────────────────────
+// Catches any uncaught render error in the entire tree.
+// Without this, a single thrown exception produces a completely blank page
+// with no indication of what failed.
+
+interface EBState { error: Error | null }
+
+class ErrorBoundary extends Component<{ children: ReactNode }, EBState> {
+  state: EBState = { error: null };
+
+  static getDerivedStateFromError(error: Error): EBState {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: { componentStack: string }) {
+    console.error("[Jarvis] Uncaught render error:", error, info.componentStack);
+  }
+
+  render() {
+    const { error } = this.state;
+    if (!error) return this.props.children;
+
+    return (
+      <div style={{
+        display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", minHeight: "100vh",
+        background: "#0a0a0f", color: "#e0e0e0", fontFamily: "monospace",
+        padding: "2rem", gap: "1rem",
+      }}>
+        <div style={{ color: "#ff4d6d", fontSize: "1.25rem", fontWeight: 700 }}>
+          Jarvis encountered a startup error
+        </div>
+        <div style={{
+          background: "#111", border: "1px solid #333", borderRadius: "8px",
+          padding: "1rem", maxWidth: "640px", width: "100%",
+          color: "#ff6b6b", fontSize: "0.85rem", whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+        }}>
+          {error.message}
+          {"\n\n"}
+          {error.stack}
+        </div>
+        <button
+          onClick={() => this.setState({ error: null })}
+          style={{
+            background: "#1a1a2e", border: "1px solid #00c8ff", color: "#00c8ff",
+            borderRadius: "6px", padding: "0.5rem 1.5rem", cursor: "pointer",
+            fontSize: "0.85rem",
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+}
+
+// ── Router ────────────────────────────────────────────────────────────────────
+
 function Router() {
   return (
     <Switch>
@@ -49,19 +80,20 @@ function Router() {
   );
 }
 
-// App is the root of the component tree.
-// Every page and component in the app is a child of this.
+// ── App ───────────────────────────────────────────────────────────────────────
+
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        {/* BASE_URL is set by Vite — it's "/" in dev and the deployment path in production */}
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
