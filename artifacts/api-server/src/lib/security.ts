@@ -42,9 +42,12 @@ import { logger }              from "./logger";
  *
  * Behaviour matrix:
  *
- *   ALLOWED_ORIGINS set   → allowlist mode (production)
- *   not set + dev         → allow all (existing dev behaviour, unchanged)
- *   not set + production  → block all origins (safe default, logs a warning)
+ *   ALLOWED_ORIGINS set   → allowlist mode: only listed origins accepted
+ *   not set (any env)     → allow all origins with a warning
+ *
+ * Jarvis is a self-hosted personal tool — blocking all origins when
+ * ALLOWED_ORIGINS is absent makes the deployment broken-by-default.
+ * Allowlist mode is opt-in: set ALLOWED_ORIGINS to restrict access.
  */
 export function buildCorsOptions(): CorsOptions {
   const raw        = process.env["ALLOWED_ORIGINS"]?.trim() ?? "";
@@ -53,17 +56,13 @@ export function buildCorsOptions(): CorsOptions {
   if (!raw) {
     if (isProduction) {
       logger.warn(
-        "ALLOWED_ORIGINS is not set in production. " +
-        "All cross-origin browser requests will be blocked. " +
-        "Set ALLOWED_ORIGINS to a comma-separated list of allowed origins " +
-        "(e.g. https://jarvis.example.com)."
+        "ALLOWED_ORIGINS is not set — allowing all origins. " +
+        "To restrict access, set ALLOWED_ORIGINS to a comma-separated " +
+        "list of allowed frontend origins (e.g. https://jarvis.example.com)."
       );
-      // Block all cross-origin requests — requests with no origin (curl,
-      // server-to-server) still pass because `origin` will be undefined.
-      return { origin: false, credentials: true };
     }
-
-    // Development: preserve existing open-CORS behaviour.
+    // Allow all origins when ALLOWED_ORIGINS is not configured.
+    // This keeps self-hosted deployments working out of the box.
     return { origin: true, credentials: true };
   }
 
