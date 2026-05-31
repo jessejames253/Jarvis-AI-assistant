@@ -274,6 +274,7 @@ async function callChatStream(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let doneEventReceived = false;
 
   try {
     while (true) {
@@ -294,8 +295,10 @@ async function callChatStream(
           if (evType === "token" && typeof event.text === "string") {
             onToken(event.text);
           } else if (evType === "done") {
+            doneEventReceived = true;
             onDone(event as unknown as StreamDonePayload);
           } else if (evType === "error") {
+            doneEventReceived = true; // treat server error as terminal
             const msg = typeof event.message === "string" ? event.message : "Stream error from server";
             onError(msg);
           } else if (
@@ -307,8 +310,15 @@ async function callChatStream(
         } catch { /* ignore malformed SSE lines */ }
       }
     }
+    // Stream closed without a done event — surface the error so the UI
+    // doesn't get stuck in the thinking state.
+    if (!doneEventReceived) {
+      console.error("[Jarvis] Stream closed without done event (URL:", url, ")");
+      onError(`Stream closed without a response (URL: ${url}) — check VITE_API_BASE_URL`);
+    }
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
+    console.error("[Jarvis] Stream read error:", detail, "URL:", url);
     onError(`Stream read error: ${detail}`);
   }
 }
@@ -788,9 +798,12 @@ export default function Chat() {
   }, [speechInput, input]);
 
   const sendMessage = useCallback(async () => {
-    console.log("[Chat] sendMessage entered — input:", JSON.stringify(input.trim()));
+    console.log("[Chat] sendMessage entered — input:", JSON.stringify(input.trim()), "isTyping:", isTyping, "isStreaming:", isStreaming);
     const text = input.trim();
-    if (!text || isTyping || isStreaming) return;
+    if (!text || isTyping || isStreaming) {
+      console.warn("[Chat] sendMessage blocked — isTyping:", isTyping, "isStreaming:", isStreaming, "text empty:", !text);
+      return;
+    }
 
     // Auto-route to planner if enabled and intent is high-confidence multi-step
     if (autoPlannerEnabled) {
@@ -884,6 +897,8 @@ export default function Chat() {
       setTimeout(() => setAgentStatus("idle"), 2500);
     };
 
+    console.log("[Chat] calling callChatStream — BASE:", BASE, "sessionId:", sessionId);
+    try {
     await callChatStream(
       text,
       sessionId,
@@ -1039,6 +1054,19 @@ export default function Chat() {
         }
       },
     );
+    } catch (err) {
+      // Unexpected throw from callChatStream — always surface an error bubble
+      // so the UI never gets stuck in thinking state.
+      const detail = err instanceof Error ? err.message : String(err);
+      console.error("[Chat] callChatStream threw unexpectedly:", detail);
+      handleError(`Unexpected error: ${detail}`);
+    } finally {
+      // Safety net: if isTyping or isStreaming is somehow still true after
+      // callChatStream returns (e.g. stream closed without done event before
+      // the fix lands), reset them so the next Send is not permanently blocked.
+      setIsTyping((v) => { if (v) console.warn("[Chat] finally: clearing stuck isTyping"); return false; });
+      setIsStreaming((v) => { if (v) console.warn("[Chat] finally: clearing stuck isStreaming"); return false; });
+    }
   }, [input, isTyping, isStreaming, sessionId, flushTokenBuffer, autoPlannerEnabled]);
 
   // ── Plan execution ──────────────────────────────────────────────────────────
