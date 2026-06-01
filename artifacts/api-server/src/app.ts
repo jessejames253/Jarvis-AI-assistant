@@ -56,6 +56,60 @@ app.use(
   }),
 );
 
+// ── Temporary CORS debug endpoint ─────────────────────────────────────────────
+// Mounted BEFORE the cors() middleware so it always responds regardless of the
+// ALLOWED_ORIGINS allowlist. Uses a hardcoded Access-Control-Allow-Origin: *
+// (no credentials) so the browser can always reach it from any origin.
+// Remove once the CORS misconfiguration is diagnosed.
+app.options("/api/debug-cors", (_req, res) => {
+  res.setHeader("Access-Control-Allow-Origin",  "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.sendStatus(204);
+});
+app.get("/api/debug-cors", (req, res) => {
+  // Always answer with wildcard so the browser can read the body.
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Cache-Control", "no-store");
+
+  const requestOrigin = req.headers["origin"] ?? "(no Origin header — direct navigation)";
+  const rawAllowed    = process.env["ALLOWED_ORIGINS"]?.trim() ?? "";
+  const allowedList   = rawAllowed
+    ? rawAllowed.split(",").map(o => o.trim()).filter(Boolean)
+    : [];
+  const originInList  = allowedList.length === 0
+    ? "N/A — allowlist is empty, open mode"
+    : allowedList.includes(requestOrigin as string)
+      ? "YES — origin is in allowlist ✓"
+      : `NO — origin not found. Allowlist entries: ${JSON.stringify(allowedList)}`;
+
+  // Simulate what the main cors() middleware would set for this origin.
+  // We call buildCorsOptions() ourselves just to read the config, not to apply it.
+  const corsMode = rawAllowed ? "allowlist" : "open (allow all)";
+
+  res.json({
+    requestOrigin,
+    corsMode,
+    rawAllowedOrigins:   rawAllowed  || "(not set)",
+    parsedAllowedOrigins: allowedList,
+    originInList,
+    nodeEnv:             process.env["NODE_ENV"] ?? "(not set)",
+    // Headers the cors() middleware would send for a matching origin:
+    expectedResponseHeaders: {
+      "Access-Control-Allow-Origin":      "reflected request origin (if in allowlist) OR * (if open)",
+      "Access-Control-Allow-Credentials": "true",
+      "Access-Control-Allow-Methods":     "GET,HEAD,PUT,PATCH,POST,DELETE (cors() default)",
+      "Access-Control-Allow-Headers":     "reflected from Access-Control-Request-Headers preflight header",
+    },
+    // What this response actually has (it's using wildcard, not the main cors() config):
+    thisEndpointCorsHeader: "Access-Control-Allow-Origin: * (hardcoded — for diagnostic use only)",
+    hint: rawAllowed && !allowedList.includes(requestOrigin as string)
+      ? `Add '${requestOrigin}' to the ALLOWED_ORIGINS env var on the backend service.`
+      : "Origin check passed — the issue is elsewhere.",
+  });
+});
+// ── End debug endpoint ──────────────────────────────────────────────────────────
+
 // CORS — reads ALLOWED_ORIGINS env var.
 // In development (ALLOWED_ORIGINS unset): allows all origins (existing behaviour).
 // In production (ALLOWED_ORIGINS set):    only listed origins are accepted.
