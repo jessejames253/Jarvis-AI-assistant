@@ -84,7 +84,11 @@ export default function SystemStatusPanel({ isOpen, onClose, apiBase }: SystemSt
     setLoading(true);
     setError(null);
     const healthzUrl = `${apiBase}api/healthz`;
-    console.log("[SystemStatus] fetching health from:", healthzUrl);
+    console.group("[SystemStatus] health check");
+    console.log("apiBase prop :", apiBase);
+    console.log("healthz URL  :", healthzUrl);
+    console.log("origin       :", window.location.origin);
+    console.groupEnd();
     try {
       // Fire all 3 requests in parallel
       const [healthRes, tasksRes, diagRes] = await Promise.allSettled([
@@ -93,11 +97,38 @@ export default function SystemStatusPanel({ isOpen, onClose, apiBase }: SystemSt
         fetch(`${apiBase}api/system/diagnostics`),
       ]);
 
+      // ── Full diagnostics on healthz result ──────────────────────────────
+      console.group("[SystemStatus] healthz result");
+      console.log("settled status:", healthRes.status);
       if (healthRes.status === "rejected") {
-        console.error("[SystemStatus] /api/healthz fetch rejected:", healthRes.reason);
-      } else if (!healthRes.value.ok) {
-        console.error("[SystemStatus] /api/healthz returned", healthRes.value.status, "from", healthzUrl);
+        const err = healthRes.reason as unknown;
+        console.error("FETCH REJECTED — full error object:", err);
+        if (err instanceof Error) {
+          console.error("  name   :", err.name);
+          console.error("  message:", err.message);
+          console.error("  stack  :", err.stack);
+        }
+      } else {
+        const res = healthRes.value;
+        console.log("HTTP status    :", res.status, res.statusText);
+        console.log("ok             :", res.ok);
+        // Log response headers relevant to CORS
+        console.log("ACAO header    :", res.headers.get("access-control-allow-origin"));
+        console.log("Content-Type   :", res.headers.get("content-type"));
+        if (!res.ok) {
+          try {
+            const body = await res.clone().text();
+            console.error("Response body  :", body);
+          } catch { /* ignore body read failure */ }
+        } else {
+          try {
+            const body = await res.clone().text();
+            console.log("Response body  :", body);
+          } catch { /* ignore */ }
+        }
       }
+      console.groupEnd();
+      // ── End diagnostics ─────────────────────────────────────────────────
 
       const apiOnline = healthRes.status === "fulfilled" && healthRes.value.ok;
 
