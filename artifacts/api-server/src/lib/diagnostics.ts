@@ -96,18 +96,31 @@ function safeReadText(filePath: string): string | null {
 
 /**
  * Returns true when running in any production-like container.
- * Covers: Replit Deployments, Coolify, Railway, Render, Fly.io, or
- * any environment that sets NODE_ENV=production.
+ * Covers: Replit Deployments, Coolify, Railway, Render, Fly.io, generic
+ * NODE_ENV=production, or any bundled deployment where the monorepo source
+ * tree is absent (the most reliable signal that deps were bundled, not installed).
  */
 function isProductionLike(): boolean {
-  return (
+  // Explicit env-var signals first
+  if (
     process.env["NODE_ENV"] === "production"      ||
     process.env["REPLIT_DEPLOYMENT"] === "1"      ||
     process.env["COOLIFY_CONTAINER_NAME"] != null ||
+    process.env["COOLIFY_APP_ID"]         != null ||
     process.env["RAILWAY_ENVIRONMENT"]    != null ||
+    process.env["RAILWAY_SERVICE_ID"]     != null ||
     process.env["RENDER_SERVICE_ID"]      != null ||
-    process.env["FLY_APP_NAME"]           != null
-  );
+    process.env["FLY_APP_NAME"]           != null ||
+    process.env["NIXPACKS_BUILD_CMD"]     != null ||
+    process.env["DOKKU_APP_NAME"]         != null
+  ) return true;
+
+  // Structural signal: if the monorepo source tree is absent we're running as
+  // a compiled bundle.  In dev the src directory always exists next to dist/.
+  if (!existsSync(path.join(PROJECT_ROOT, "artifacts", "jarvas", "src"))) return true;
+  if (!existsSync(path.join(PROJECT_ROOT, "pnpm-lock.yaml")))             return true;
+
+  return false;
 }
 
 // ─── Individual checks ────────────────────────────────────────────────────────

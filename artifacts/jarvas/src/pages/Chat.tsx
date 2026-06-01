@@ -958,6 +958,7 @@ export default function Chat() {
   const [devBuildLoading,  setDevBuildLoading]  = useState(false);
   const [devLogs,          setDevLogs]          = useState<string[]>([]);
   const [devLogsLoading,   setDevLogsLoading]   = useState(false);
+  const [actionStatus,     setActionStatus]     = useState<Record<string, "idle"|"loading"|"success"|"error">>({});
 
   useEffect(() => {
     localStorage.setItem(DEV_PANEL_KEY, String(devPanelOpen));
@@ -1130,11 +1131,21 @@ export default function Chat() {
   const loadDevLogs = useCallback(async () => {
     setDevLogsLoading(true);
     try {
-      const res  = await fetch(`${BASE}api/dev/logs`);
-      const data = await res.json() as { ok: boolean; lines?: string[] };
-      setDevLogs(data.lines ?? []);
-    } catch { setDevLogs(["Error: could not load logs from API"]); }
-    finally  { setDevLogsLoading(false); }
+      const res = await fetch(`${BASE}api/dev/logs`);
+      if (!res.ok) {
+        setDevLogs([`[UNAVAILABLE] Server returned HTTP ${res.status}. Check your hosting platform for deployment logs.`]);
+        return;
+      }
+      const data = await res.json() as { ok: boolean; lines?: string[]; note?: string; source?: string };
+      if (!data.ok || !data.lines?.length) {
+        setDevLogs([data.note ? `[INFO] ${data.note}` : "[INFO] No log lines available from this environment."]);
+        return;
+      }
+      const lines = data.note ? [`[INFO] ${data.note}`, ...data.lines] : data.lines;
+      setDevLogs(lines);
+    } catch {
+      setDevLogs(["[UNAVAILABLE] Could not reach the logs API. Check your hosting platform for deployment logs."]);
+    } finally { setDevLogsLoading(false); }
   }, [BASE]);
 
   const runAllChecks = useCallback(async () => {
@@ -1163,6 +1174,17 @@ export default function Chat() {
     a.click();
     URL.revokeObjectURL(url);
   }, [devProjectMemory, devDiagReport, devBuildResult, pendingPatches]);
+
+  const withActionFeedback = useCallback(async (key: string, fn: () => Promise<void>) => {
+    setActionStatus(s => ({ ...s, [key]: "loading" }));
+    try {
+      await fn();
+      setActionStatus(s => ({ ...s, [key]: "success" }));
+    } catch {
+      setActionStatus(s => ({ ...s, [key]: "error" }));
+    }
+    setTimeout(() => setActionStatus(s => ({ ...s, [key]: "idle" })), 2000);
+  }, []);
 
   // Auto-load project memory the first time the DEV tab is opened
   useEffect(() => {
@@ -2091,61 +2113,101 @@ export default function Chat() {
           <div className="relative z-10 flex-1 flex flex-col overflow-hidden">
 
             {/* ── Action bar (mobile-first: flex-wrap, no horizontal scroll) ── */}
-            <div className="flex-shrink-0 flex flex-wrap gap-1.5 px-4 py-2.5 border-b border-border/30">
-              {([
-                { label: "SCAN",  prompt: "Scan this project's file structure and codebase. List key components, API routes, and libraries. Highlight quality issues and improvement opportunities." },
-                { label: "FIX",   prompt: "Review the project memory and current debug context. Propose a specific, actionable code fix for the most critical issue." },
-                { label: "BUILD", prompt: "Check the TypeScript compilation status for both packages. List all errors and warnings clearly." },
-                { label: "PATCH", prompt: "Based on our conversation, create a concrete code patch for the most recently discussed fix. Queue it for review in the Patches tab." },
-              ] as const).map(({ label, prompt }) => (
-                <button
-                  key={label}
-                  onClick={() => { setDevSection("chat"); void sendDevMessage(prompt); }}
-                  disabled={devSending}
-                  className="px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
-                  style={{ background: "hsl(194 100% 55% / 0.10)", border: "1px solid hsl(194 100% 55% / 0.35)", color: "hsl(194 100% 68%)" }}
-                >
-                  {label}
-                </button>
-              ))}
-              <button
-                onClick={() => {
-                  setDevSection("chat");
-                  void sendDevMessage("Let's work on Jarvis. Review the project memory and current state, then identify the most impactful thing to build or fix next. Give me a concrete implementation plan with specific files and changes.");
-                }}
-                disabled={devSending}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
-                style={{ background: "hsl(264 80% 55% / 0.12)", border: "1px solid hsl(264 80% 55% / 0.45)", color: "hsl(264 80% 75%)" }}
-              >
-                <Bot className="w-3 h-3" />
-                WORK ON JARVIS
-              </button>
-              <button
-                onClick={() => void runAllChecks()}
-                disabled={devBuildLoading || devDiagLoading || devLogsLoading}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
-                style={{ background: "hsl(38 100% 55% / 0.12)", border: "1px solid hsl(38 100% 55% / 0.45)", color: "hsl(38 100% 70%)" }}
-              >
-                <RefreshCw className={`w-3 h-3 ${(devBuildLoading || devDiagLoading) ? "animate-spin" : ""}`} />
-                RUN ALL
-              </button>
-              <button
-                onClick={() => void exportSnapshot()}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95"
-                style={{ background: "hsl(142 60% 40% / 0.12)", border: "1px solid hsl(142 60% 40% / 0.40)", color: "hsl(142 71% 62%)" }}
-              >
-                <Download className="w-3 h-3" />
-                EXPORT
-              </button>
-              <button
-                onClick={() => { fetchPendingPatches().then(setPendingPatches).catch(() => {}); void loadDevProjectMemory(); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95"
-                style={{ background: "transparent", border: "1px solid hsl(210 15% 24%)", color: "hsl(196 30% 44%)" }}
-              >
-                <RefreshCw className="w-3 h-3" />
-                REFRESH
-              </button>
-            </div>
+            {(() => {
+              const btnIcon = (key: string) => {
+                const st = actionStatus[key];
+                if (st === "loading") return <RefreshCw className="w-3 h-3 animate-spin" />;
+                if (st === "success") return <span className="text-[10px]">✓</span>;
+                if (st === "error")   return <span className="text-[10px]">✖</span>;
+                return null;
+              };
+              const isBusy = (key: string) => actionStatus[key] === "loading";
+              return (
+                <div className="flex-shrink-0 flex flex-wrap gap-1.5 px-4 py-2.5 border-b border-border/30">
+                  {/* ── Chat-prompt actions ── */}
+                  {([
+                    { key: "SCAN",  label: "SCAN",  prompt: "Scan this project's file structure and codebase. List key components, API routes, and libraries. Highlight quality issues and improvement opportunities." },
+                    { key: "FIX",   label: "FIX",   prompt: "Review the project memory and current debug context. Propose a specific, actionable code fix for the most critical issue." },
+                    { key: "PATCH", label: "PATCH", prompt: "Based on our conversation, create a concrete code patch for the most recently discussed fix. Queue it for review in the Patches tab." },
+                  ] as const).map(({ key, label, prompt }) => (
+                    <button
+                      key={key}
+                      onClick={() => { setDevSection("chat"); void withActionFeedback(key, () => sendDevMessage(prompt)); }}
+                      disabled={devSending || isBusy(key)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
+                      style={{ background: "hsl(194 100% 55% / 0.10)", border: "1px solid hsl(194 100% 55% / 0.35)", color: actionStatus[key] === "success" ? "hsl(142 71% 62%)" : actionStatus[key] === "error" ? "hsl(355 80% 62%)" : "hsl(194 100% 68%)" }}
+                    >
+                      {btnIcon(key)}
+                      {label}
+                    </button>
+                  ))}
+
+                  {/* ── BUILD — switches to BUILD tab and runs real check ── */}
+                  <button
+                    onClick={() => { setDevSection("build"); void withActionFeedback("BUILD", () => runDevBuild(true)); }}
+                    disabled={devBuildLoading || isBusy("BUILD")}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
+                    style={{ background: "hsl(38 100% 55% / 0.12)", border: "1px solid hsl(38 100% 55% / 0.35)", color: actionStatus["BUILD"] === "success" ? "hsl(142 71% 62%)" : actionStatus["BUILD"] === "error" ? "hsl(355 80% 62%)" : "hsl(38 100% 70%)" }}
+                  >
+                    {devBuildLoading || isBusy("BUILD") ? <RefreshCw className="w-3 h-3 animate-spin" /> : btnIcon("BUILD")}
+                    BUILD
+                  </button>
+
+                  {/* ── WORK ON JARVIS ── */}
+                  <button
+                    onClick={() => { setDevSection("chat"); void withActionFeedback("WORK", () => sendDevMessage("Let's work on Jarvis. Review the project memory and current state, then identify the most impactful thing to build or fix next. Give me a concrete implementation plan with specific files and changes.")); }}
+                    disabled={devSending || isBusy("WORK")}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
+                    style={{ background: "hsl(264 80% 55% / 0.12)", border: "1px solid hsl(264 80% 55% / 0.45)", color: actionStatus["WORK"] === "success" ? "hsl(142 71% 62%)" : actionStatus["WORK"] === "error" ? "hsl(355 80% 62%)" : "hsl(264 80% 75%)" }}
+                  >
+                    {isBusy("WORK") ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Bot className="w-3 h-3" />}
+                    WORK ON JARVIS
+                  </button>
+
+                  {/* ── RUN ALL ── */}
+                  <button
+                    onClick={() => void withActionFeedback("RUN_ALL", () => runAllChecks())}
+                    disabled={devBuildLoading || devDiagLoading || devLogsLoading || isBusy("RUN_ALL")}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
+                    style={{ background: "hsl(38 100% 55% / 0.12)", border: "1px solid hsl(38 100% 55% / 0.45)", color: actionStatus["RUN_ALL"] === "success" ? "hsl(142 71% 62%)" : actionStatus["RUN_ALL"] === "error" ? "hsl(355 80% 62%)" : "hsl(38 100% 70%)" }}
+                  >
+                    {isBusy("RUN_ALL") || devBuildLoading || devDiagLoading
+                      ? <RefreshCw className="w-3 h-3 animate-spin" />
+                      : btnIcon("RUN_ALL") ?? <RefreshCw className="w-3 h-3" />}
+                    RUN ALL
+                  </button>
+
+                  {/* ── EXPORT ── */}
+                  <button
+                    onClick={() => void withActionFeedback("EXPORT", () => exportSnapshot())}
+                    disabled={isBusy("EXPORT")}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
+                    style={{ background: "hsl(142 60% 40% / 0.12)", border: "1px solid hsl(142 60% 40% / 0.40)", color: actionStatus["EXPORT"] === "success" ? "hsl(142 71% 62%)" : "hsl(142 71% 62%)" }}
+                  >
+                    {isBusy("EXPORT") ? <RefreshCw className="w-3 h-3 animate-spin" /> : btnIcon("EXPORT") ?? <Download className="w-3 h-3" />}
+                    EXPORT
+                  </button>
+
+                  {/* ── REFRESH — refreshes the currently active sub-tab ── */}
+                  <button
+                    onClick={() => void withActionFeedback("REFRESH", async () => {
+                      if      (devSection === "build")     await runDevBuild(true);
+                      else if (devSection === "diag")      await runDevDiag();
+                      else if (devSection === "logs")      await loadDevLogs();
+                      else if (devSection === "patches")   { await fetchPendingPatches().then(setPendingPatches); }
+                      else if (devSection === "checklist") await runAllChecks();
+                      else { await Promise.all([loadDevProjectMemory(), fetchPendingPatches().then(setPendingPatches).catch(() => {})]); }
+                    })}
+                    disabled={isBusy("REFRESH") || devBuildLoading || devDiagLoading || devLogsLoading}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
+                    style={{ background: "transparent", border: "1px solid hsl(210 15% 24%)", color: actionStatus["REFRESH"] === "success" ? "hsl(142 71% 62%)" : actionStatus["REFRESH"] === "error" ? "hsl(355 80% 62%)" : "hsl(196 30% 44%)" }}
+                  >
+                    {isBusy("REFRESH") ? <RefreshCw className="w-3 h-3 animate-spin" /> : btnIcon("REFRESH") ?? <RefreshCw className="w-3 h-3" />}
+                    REFRESH
+                  </button>
+                </div>
+              );
+            })()}
 
             {/* ── Sub-tab bar (mobile-first: flex-wrap) ── */}
             <div className="flex-shrink-0 flex flex-wrap gap-1 px-4 pt-2 pb-1">
