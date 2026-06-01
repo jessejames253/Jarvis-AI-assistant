@@ -29,8 +29,9 @@ import InlinePatchActions     from "./InlinePatchActions";
 import PatchActionButtons     from "./PatchActionButtons";
 import { approvePatch, rejectPatch as logRejectPatch } from "@/lib/patchApproval";
 import { parseApprovalInput } from "@/lib/approvalInput";
+import { getApiBase } from "@/lib/apiConfig";
 
-const BASE          = import.meta.env.BASE_URL;
+const BASE          = getApiBase();
 const STREAM_URL    = `${BASE}api/dev/stream`;
 const APPLY_URL     = `${BASE}api/dev/apply`;
 const ROLLBACK_URL  = `${BASE}api/dev/rollback`;

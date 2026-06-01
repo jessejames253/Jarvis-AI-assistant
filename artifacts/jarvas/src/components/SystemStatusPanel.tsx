@@ -83,13 +83,21 @@ export default function SystemStatusPanel({ isOpen, onClose, apiBase }: SystemSt
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
+    const healthzUrl = `${apiBase}api/healthz`;
+    console.log("[SystemStatus] fetching health from:", healthzUrl);
     try {
       // Fire all 3 requests in parallel
       const [healthRes, tasksRes, diagRes] = await Promise.allSettled([
-        fetch(`${apiBase}api/healthz`),
+        fetch(healthzUrl),
         fetch(`${apiBase}api/master-tasks`),
         fetch(`${apiBase}api/system/diagnostics`),
       ]);
+
+      if (healthRes.status === "rejected") {
+        console.error("[SystemStatus] /api/healthz fetch rejected:", healthRes.reason);
+      } else if (!healthRes.value.ok) {
+        console.error("[SystemStatus] /api/healthz returned", healthRes.value.status, "from", healthzUrl);
+      }
 
       const apiOnline = healthRes.status === "fulfilled" && healthRes.value.ok;
 
@@ -217,7 +225,7 @@ export default function SystemStatusPanel({ isOpen, onClose, apiBase }: SystemSt
               <StatusCard
                 label="API SERVER"
                 value={status.apiOnline ? "ONLINE" : "OFFLINE"}
-                sub={status.apiOnline ? `Uptime ${fmtUptime(status.uptimeSeconds)}` : "Cannot reach /api/healthz"}
+                sub={status.apiOnline ? `Uptime ${fmtUptime(status.uptimeSeconds)}` : `Cannot reach ${apiBase}api/healthz`}
                 color={status.apiOnline ? "hsl(150 70% 55%)" : "hsl(355 80% 65%)"}
                 Icon={status.apiOnline ? Wifi : WifiOff}
               />
