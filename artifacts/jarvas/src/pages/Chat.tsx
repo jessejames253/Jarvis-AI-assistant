@@ -889,11 +889,14 @@ export default function Chat() {
 
   const sendMessage = useCallback(async () => {
     console.log("[Chat] sendMessage entered — input:", JSON.stringify(input.trim()), "isTyping:", isTyping, "isStreaming:", isStreaming);
+    // step 1
     const text = input.trim();
+    console.log("[Chat] step 1: text extracted =", JSON.stringify(text));
     if (!text || isTyping || isStreaming) {
       console.warn("[Chat] sendMessage blocked — isTyping:", isTyping, "isStreaming:", isStreaming, "text empty:", !text);
       return;
     }
+    console.log("[Chat] step 2: guard passed");
 
     // Auto-route to planner if enabled and intent is high-confidence multi-step
     if (autoPlannerEnabled) {
@@ -906,9 +909,13 @@ export default function Chat() {
         return;
       }
     }
+    console.log("[Chat] step 3: planner check done, autoPlannerEnabled:", autoPlannerEnabled);
 
-    speech.unlock();
+    try { speech.unlock(); } catch(e) { console.warn("[Chat] step 4 THREW: speech.unlock():", e); }
+    console.log("[Chat] step 4: speech.unlock() done");
+
     responseContentRef.current = "";
+    console.log("[Chat] step 5: refs reset");
 
     const userMsg: Message = {
       id: `user-${Date.now()}`,
@@ -916,23 +923,35 @@ export default function Chat() {
       content: text,
       timestamp: new Date(),
     };
+    console.log("[Chat] step 6: userMsg created, id:", userMsg.id);
 
     setMessages((prev) => [...prev, userMsg]);
+    console.log("[Chat] step 7: setMessages done");
+
     setInput("");
+    console.log("[Chat] step 8: setInput done");
+
     setIsTyping(true);
-    setAgentStatus(inferStatus(text));
+    console.log("[Chat] step 9: setIsTyping(true) done");
+
+    try { setAgentStatus(inferStatus(text)); } catch(e) { console.warn("[Chat] step 10 THREW: setAgentStatus:", e); }
+    console.log("[Chat] step 10: setAgentStatus done");
+
     if (textareaRef.current) textareaRef.current.style.height = "auto";
+    console.log("[Chat] step 11: textarea reset done");
+
     setMemory((prev) =>
       prev ? { ...prev, messageCount: prev.messageCount + 1 } : prev,
     );
+    console.log("[Chat] step 12: setMemory done");
 
     const msgId = `assistant-${Date.now()}`;
     let messageCreated = false;
-    // Keep a stable ref to msgId for the buffer flush callbacks
     const currentMsgId = msgId;
+    console.log("[Chat] step 13: msgId =", currentMsgId);
 
-    // Accumulates tool calls during streaming (updated via setMessages)
     const pendingToolCalls = new Map<string, ToolCallInfo>();
+    console.log("[Chat] step 14: pendingToolCalls created");
 
     /** Create the assistant message in state if not yet created */
     function ensureMessageCreated(initialContent = "") {
@@ -955,9 +974,13 @@ export default function Chat() {
       ]);
       messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
     }
+    console.log("[Chat] step 15: ensureMessageCreated defined");
 
     const streamStartTime = Date.now();
-    _rt.bus.emit({ type: "stream:start", sessionId, ts: Date.now() });
+    console.log("[Chat] step 16: streamStartTime =", streamStartTime);
+
+    try { _rt.bus.emit({ type: "stream:start", sessionId, ts: Date.now() }); } catch(e) { console.warn("[Chat] step 17 THREW: _rt.bus.emit:", e); }
+    console.log("[Chat] step 17: _rt.bus.emit stream:start done");
 
     const handleError = (reason?: string) => {
       const label = reason ?? "Request failed — please try again.";
@@ -988,7 +1011,7 @@ export default function Chat() {
       setTimeout(() => setAgentStatus("idle"), 2500);
     };
 
-    console.log("[Chat] calling callChatStream — BASE:", BASE, "sessionId:", sessionId);
+    console.log("[Chat] step 18: handleError defined, about to call callChatStream — BASE:", BASE, "sessionId:", sessionId);
     try {
     await callChatStream(
       text,
