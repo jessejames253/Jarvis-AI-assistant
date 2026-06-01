@@ -955,86 +955,71 @@ export default function Chat() {
     const currentMsgId = msgId;
     console.log("[Chat] step 13: msgId =", currentMsgId);
 
-    // ── Setup block — wrapped so any throw is caught and shown on-screen ────────
-    // If something here throws (e.g. _rt.bus.emit, flushTokenBuffer), we log it,
-    // clear isTyping/isStreaming, and bail — rather than leaving the UI stuck.
-    let pendingToolCalls = new Map<string, ToolCallInfo>();
-    let streamStartTime = Date.now();
+    // ── Single try/catch wraps EVERYTHING after step 13 ──────────────────────
+    // The catch writes directly to setDebugLogs (bypasses console interceptor)
+    // and clears isTyping/isStreaming so the UI never gets permanently stuck.
+    try {
+      console.log("[Chat] step 14: inside try — setting up");
 
-    const handleError = (reason?: string) => {
-      const label = reason ?? "Request failed — please try again.";
-      console.error("[Chat] handleError:", label);
-      try { _rt.bus.emit({ type: "stream:error", error: label, ts: Date.now() }); } catch { /* ignore bus errors */ }
+      const pendingToolCalls = new Map<string, ToolCallInfo>();
+      console.log("[Chat] step 15: pendingToolCalls ok");
 
-      if (messageCreated) {
-        setIsStreaming(false);
-        setStreamingMsgId(null);
-        try { flushTokenBuffer(currentMsgId, true); } catch { /* ignore */ }
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === currentMsgId
-              ? { ...m, content: m.content.trim() || `⚠️ ${label}` }
-              : m
-          )
-        );
-      } else {
+      const streamStartTime = Date.now();
+      console.log("[Chat] step 16: streamStartTime ok");
+
+      // _rt.bus.emit({ type: "stream:start", sessionId, ts: Date.now() });
+      // ↑ removed — suspected throw source; not required for chat to function
+      console.log("[Chat] step 17: skipped bus.emit");
+
+      const handleError = (reason?: string) => {
+        const label = reason ?? "Request failed — please try again.";
+        console.error("[Chat] handleError:", label);
+        try { _rt.bus.emit({ type: "stream:error", error: label, ts: Date.now() }); } catch { /* ignore */ }
+        if (messageCreated) {
+          setIsStreaming(false);
+          setStreamingMsgId(null);
+          try { flushTokenBuffer(currentMsgId, true); } catch { /* ignore */ }
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === currentMsgId
+                ? { ...m, content: m.content.trim() || `⚠️ ${label}` }
+                : m
+            )
+          );
+        } else {
+          setIsTyping(false);
+          setMessages((prev) => [
+            ...prev,
+            { id: currentMsgId, role: "assistant", content: `⚠️ ${label}`, timestamp: new Date() },
+          ]);
+        }
+        setAgentStatus("error");
+        setTimeout(() => setAgentStatus("idle"), 2500);
+      };
+
+      function ensureMessageCreated(initialContent = "") {
+        if (messageCreated) return;
+        messageCreated = true;
+        console.log("[Chat] ensureMessageCreated — setIsTyping(false) setIsStreaming(true)");
         setIsTyping(false);
+        setAgentStatus("idle");
+        setIsStreaming(true);
+        setStreamingMsgId(currentMsgId);
         setMessages((prev) => [
           ...prev,
-          { id: currentMsgId, role: "assistant", content: `⚠️ ${label}`, timestamp: new Date() },
+          {
+            id: currentMsgId,
+            role: "assistant" as const,
+            content: initialContent,
+            timestamp: new Date(),
+            toolCalls: Array.from(pendingToolCalls.values()),
+          },
         ]);
+        messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
       }
-      setAgentStatus("error");
-      setTimeout(() => setAgentStatus("idle"), 2500);
-    };
 
-    function ensureMessageCreated(initialContent = "") {
-      if (messageCreated) return;
-      messageCreated = true;
-      console.log("[Chat] ensureMessageCreated — setIsTyping(false) setIsStreaming(true) msgId:", currentMsgId);
-      setIsTyping(false);
-      setAgentStatus("idle");
-      setIsStreaming(true);
-      setStreamingMsgId(currentMsgId);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: currentMsgId,
-          role: "assistant" as const,
-          content: initialContent,
-          timestamp: new Date(),
-          toolCalls: Array.from(pendingToolCalls.values()),
-        },
-      ]);
-      messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
-    }
-
-    try {
-      console.log("[Chat] step 14: setup block entering");
-      pendingToolCalls = new Map<string, ToolCallInfo>();
-      console.log("[Chat] step 15: pendingToolCalls ok");
-      streamStartTime = Date.now();
-      console.log("[Chat] step 16: streamStartTime ok =", streamStartTime);
-      _rt.bus.emit({ type: "stream:start", sessionId, ts: Date.now() });
-      console.log("[Chat] step 17: _rt.bus.emit stream:start ok");
-    } catch (setupErr) {
-      const detail = setupErr instanceof Error ? setupErr.message : String(setupErr);
-      console.error("[Chat] SETUP BLOCK THREW (step 14-17):", detail);
-      // Clear the stuck typing indicator and bail — don't proceed to callChatStream
-      setIsTyping(false);
-      setIsStreaming(false);
-      setMessages((prev) => [
-        ...prev,
-        { id: currentMsgId, role: "assistant", content: `⚠️ Setup error: ${detail}`, timestamp: new Date() },
-      ]);
-      setAgentStatus("error");
-      setTimeout(() => setAgentStatus("idle"), 2500);
-      return;
-    }
-
-    console.log("[Chat] step 18: setup complete, about to call callChatStream — BASE:", BASE, "sessionId:", sessionId);
-    try {
-    await callChatStream(
+      console.log("[Chat] step 18: calling callChatStream — BASE:", BASE, "sessionId:", sessionId);
+      await callChatStream(
       text,
       sessionId,
       BASE,
@@ -1193,19 +1178,31 @@ export default function Chat() {
         }
       },
     );
-    } catch (err) {
-      // Unexpected throw from callChatStream — always surface an error bubble
-      // so the UI never gets stuck in thinking state.
-      const detail = err instanceof Error ? err.message : String(err);
-      console.error("[Chat] callChatStream threw unexpectedly:", detail);
-      handleError(`Unexpected error: ${detail}`);
+    } catch (outerErr) {
+      // FIRST: write directly to setDebugLogs — no console interceptor, no _rt.bus
+      const detail = outerErr instanceof Error ? outerErr.message : String(outerErr);
+      const ts = new Date().toISOString().slice(11, 23);
+      setDebugLogs(prev => [...prev, `${ts} ✖ CAUGHT after step 13: ${detail}`]);
+      // Clear stuck state immediately
+      setIsTyping(false);
+      setIsStreaming(false);
+      // Show error bubble in chat
+      setMessages(prev => [
+        ...prev,
+        { id: currentMsgId, role: "assistant" as const, content: `⚠️ Error: ${detail}`, timestamp: new Date() },
+      ]);
+      setAgentStatus("error");
+      setTimeout(() => setAgentStatus("idle"), 2500);
     } finally {
-      console.log("[Chat] finally block running — resetting isTyping/isStreaming");
-      // Safety net: if isTyping or isStreaming is somehow still true after
-      // callChatStream returns (e.g. stream closed without done event before
-      // the fix lands), reset them so the next Send is not permanently blocked.
-      setIsTyping((v) => { if (v) console.warn("[Chat] finally: clearing stuck isTyping"); return false; });
-      setIsStreaming((v) => { if (v) console.warn("[Chat] finally: clearing stuck isStreaming"); return false; });
+      // Absolute safety net — direct setDebugLogs, no console
+      setIsTyping(v => {
+        if (v) setDebugLogs(p => [...p, `${new Date().toISOString().slice(11,23)} ⚠ finally: clearing stuck isTyping`]);
+        return false;
+      });
+      setIsStreaming(v => {
+        if (v) setDebugLogs(p => [...p, `${new Date().toISOString().slice(11,23)} ⚠ finally: clearing stuck isStreaming`]);
+        return false;
+      });
     }
   }, [input, isTyping, isStreaming, sessionId, flushTokenBuffer, autoPlannerEnabled]);
 
