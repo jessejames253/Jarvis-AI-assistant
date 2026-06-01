@@ -2126,9 +2126,9 @@ export default function Chat() {
                 <div className="flex-shrink-0 flex flex-wrap gap-1.5 px-4 py-2.5 border-b border-border/30">
                   {/* ── Chat-prompt actions ── */}
                   {([
-                    { key: "SCAN",  label: "SCAN",  prompt: "Scan this project's file structure and codebase. List key components, API routes, and libraries. Highlight quality issues and improvement opportunities." },
-                    { key: "FIX",   label: "FIX",   prompt: "Review the project memory and current debug context. Propose a specific, actionable code fix for the most critical issue." },
-                    { key: "PATCH", label: "PATCH", prompt: "Based on our conversation, create a concrete code patch for the most recently discussed fix. Queue it for review in the Patches tab." },
+                    { key: "SCAN",  label: "SCAN PROJECT", prompt: "Scan this project's file structure and codebase. List key components, API routes, and libraries. Highlight quality issues and improvement opportunities." },
+                    { key: "FIX",   label: "PROPOSE FIX",  prompt: "Review the project memory and current debug context. Propose a specific, actionable code fix for the most critical issue." },
+                    { key: "PATCH", label: "CREATE PATCH", prompt: "Based on our conversation, create a concrete code patch for the most recently discussed fix. Queue it for review in the Patches tab." },
                   ] as const).map(({ key, label, prompt }) => (
                     <button
                       key={key}
@@ -2142,7 +2142,7 @@ export default function Chat() {
                     </button>
                   ))}
 
-                  {/* ── BUILD — switches to BUILD tab and runs real check ── */}
+                  {/* ── RUN BUILD — switches to BUILD tab and runs real check ── */}
                   <button
                     onClick={() => { setDevSection("build"); void withActionFeedback("BUILD", () => runDevBuild(true)); }}
                     disabled={devBuildLoading || isBusy("BUILD")}
@@ -2150,7 +2150,7 @@ export default function Chat() {
                     style={{ background: "hsl(38 100% 55% / 0.12)", border: "1px solid hsl(38 100% 55% / 0.35)", color: actionStatus["BUILD"] === "success" ? "hsl(142 71% 62%)" : actionStatus["BUILD"] === "error" ? "hsl(355 80% 62%)" : "hsl(38 100% 70%)" }}
                   >
                     {devBuildLoading || isBusy("BUILD") ? <RefreshCw className="w-3 h-3 animate-spin" /> : btnIcon("BUILD")}
-                    BUILD
+                    RUN BUILD
                   </button>
 
                   {/* ── WORK ON JARVIS ── */}
@@ -2164,7 +2164,7 @@ export default function Chat() {
                     WORK ON JARVIS
                   </button>
 
-                  {/* ── RUN ALL ── */}
+                  {/* ── RUN ALL CHECKS ── */}
                   <button
                     onClick={() => void withActionFeedback("RUN_ALL", () => runAllChecks())}
                     disabled={devBuildLoading || devDiagLoading || devLogsLoading || isBusy("RUN_ALL")}
@@ -2174,21 +2174,21 @@ export default function Chat() {
                     {isBusy("RUN_ALL") || devBuildLoading || devDiagLoading
                       ? <RefreshCw className="w-3 h-3 animate-spin" />
                       : btnIcon("RUN_ALL") ?? <RefreshCw className="w-3 h-3" />}
-                    RUN ALL
+                    RUN ALL CHECKS
                   </button>
 
-                  {/* ── EXPORT ── */}
+                  {/* ── EXPORT SNAPSHOT ── */}
                   <button
                     onClick={() => void withActionFeedback("EXPORT", () => exportSnapshot())}
                     disabled={isBusy("EXPORT")}
                     className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
-                    style={{ background: "hsl(142 60% 40% / 0.12)", border: "1px solid hsl(142 60% 40% / 0.40)", color: actionStatus["EXPORT"] === "success" ? "hsl(142 71% 62%)" : "hsl(142 71% 62%)" }}
+                    style={{ background: "hsl(142 60% 40% / 0.12)", border: "1px solid hsl(142 60% 40% / 0.40)", color: "hsl(142 71% 62%)" }}
                   >
                     {isBusy("EXPORT") ? <RefreshCw className="w-3 h-3 animate-spin" /> : btnIcon("EXPORT") ?? <Download className="w-3 h-3" />}
-                    EXPORT
+                    EXPORT SNAPSHOT
                   </button>
 
-                  {/* ── REFRESH — refreshes the currently active sub-tab ── */}
+                  {/* ── REFRESH CURRENT — refreshes the currently active sub-tab ── */}
                   <button
                     onClick={() => void withActionFeedback("REFRESH", async () => {
                       if      (devSection === "build")     await runDevBuild(true);
@@ -2203,11 +2203,15 @@ export default function Chat() {
                     style={{ background: "transparent", border: "1px solid hsl(210 15% 24%)", color: actionStatus["REFRESH"] === "success" ? "hsl(142 71% 62%)" : actionStatus["REFRESH"] === "error" ? "hsl(355 80% 62%)" : "hsl(196 30% 44%)" }}
                   >
                     {isBusy("REFRESH") ? <RefreshCw className="w-3 h-3 animate-spin" /> : btnIcon("REFRESH") ?? <RefreshCw className="w-3 h-3" />}
-                    REFRESH
+                    REFRESH CURRENT
                   </button>
                 </div>
               );
             })()}
+            {/* Helper text */}
+            <div className="flex-shrink-0 px-4 pb-1 text-[9px] font-medium tracking-widest" style={{ color: "hsl(196 20% 32%)" }}>
+              ACTIONS RUN TOOLS · TABS SHOW RESULTS
+            </div>
 
             {/* ── Sub-tab bar (mobile-first: flex-wrap) ── */}
             <div className="flex-shrink-0 flex flex-wrap gap-1 px-4 pt-2 pb-1">
