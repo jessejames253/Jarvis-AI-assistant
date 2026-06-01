@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Chat from "@/pages/Chat";
 import Dashboard from "@/pages/Dashboard";
 import KnowledgeBase from "@/pages/KnowledgeBase";
+import DebugApi from "@/pages/DebugApi";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -75,6 +76,7 @@ function Router() {
       <Route path="/" component={Chat} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/kb" component={KnowledgeBase} />
+      <Route path="/debug-api" component={DebugApi} />
       <Route component={NotFound} />
     </Switch>
   );
