@@ -11,15 +11,187 @@
 
 import path from "path";
 import fs from "fs/promises";
-import { readFileSync, writeFileSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, accessSync } from "fs";
 import { exec } from "child_process";
 import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
-export const PROJECT_ROOT =
-  process.env["PROJECT_ROOT"]?.trim() ||
-  "/home/runner/workspace";
+// ─── Project root resolver ────────────────────────────────────────────────────
+// Walks up from process.cwd() and __dirname until it finds a directory that
+// looks like the repo root (contains both "artifacts/" and "package.json").
+// Falls back to known static paths and finally process.cwd().
+
+const ROOT_MARKERS = ["artifacts", "package.json"];
+
+function isValidRoot(dir: string): boolean {
+  return ROOT_MARKERS.every(m => {
+    try { accessSync(path.join(dir, m)); return true; } catch { return false; }
+  });
+}
+
+function walkUpToRoot(start: string, maxSteps = 10): string | null {
+  let dir = start;
+  for (let i = 0; i < maxSteps; i++) {
+    if (isValidRoot(dir)) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
+
+function resolveProjectRoot(): string {
+  const envRoot = process.env["PROJECT_ROOT"]?.trim();
+  if (envRoot && isValidRoot(envRoot)) return envRoot;
+
+  const fromCwd = walkUpToRoot(process.cwd());
+  if (fromCwd) return fromCwd;
+
+  const fromDirname = walkUpToRoot(__dirname);
+  if (fromDirname) return fromDirname;
+
+  for (const known of ["/home/runner/workspace", "/workspace", "/app"]) {
+    if (isValidRoot(known)) return known;
+  }
+
+  const fallback = process.cwd();
+  console.warn(
+    `[PROJECT_ROOT] Warning — no valid root found.\n` +
+    `  cwd=${process.cwd()}\n  __dirname=${__dirname}\n  Falling back to: ${fallback}`
+  );
+  return fallback;
+}
+
+export const PROJECT_ROOT = resolveProjectRoot();
+console.log(`[PROJECT_ROOT] ${PROJECT_ROOT}  (cwd=${process.cwd()})`);
+
+// ─── ripgrep resolver ─────────────────────────────────────────────────────────
+// The rg binary lives in the Nix store and may not be on PATH for the server
+// process. We resolve it once at startup (cached) and fall back to a pure-Node
+// recursive search when rg cannot be found.
+
+let _rgPath: string | null | undefined = undefined; // undefined = not yet resolved
+
+async function findRg(): Promise<string | null> {
+  if (_rgPath !== undefined) return _rgPath;
+
+  // 1. Try PATH / well-known locations
+  const candidates = [
+    "rg",
+    "/usr/bin/rg",
+    "/usr/local/bin/rg",
+  ];
+  for (const c of candidates) {
+    try {
+      await execAsync(`"${c}" --version 2>/dev/null`, { timeout: 2000 });
+      _rgPath = c;
+      return _rgPath;
+    } catch { /* try next */ }
+  }
+
+  // 2. Ask the shell (picks up Nix-managed PATH entries)
+  try {
+    const { stdout } = await execAsync(
+      "which rg 2>/dev/null || command -v rg 2>/dev/null",
+      { timeout: 3000, shell: "/bin/sh" },
+    );
+    const p = stdout.trim();
+    if (p) { _rgPath = p; return _rgPath; }
+  } catch { /* ignore */ }
+
+  // 3. Glob in /nix/store
+  try {
+    const { stdout } = await execAsync(
+      "ls /nix/store/*/bin/rg 2>/dev/null | head -1",
+      { timeout: 4000, shell: "/bin/sh" },
+    );
+    const p = stdout.trim();
+    if (p) { _rgPath = p; return _rgPath; }
+  } catch { /* ignore */ }
+
+  _rgPath = null;
+  console.warn("[ripgrep] Not found — search will use Node.js fallback.");
+  return null;
+}
+
+// Run at startup so the first search call doesn't pay the discovery cost.
+void findRg();
+
+// ─── Node.js fallback search (used when rg is unavailable) ───────────────────
+
+const SEARCH_EXTS = new Set([".ts", ".tsx", ".js", ".jsx", ".json", ".css", ".md"]);
+
+async function nodeSearch(
+  pattern: string,
+  absDir: string,
+  fileGlob?: string,
+): Promise<string> {
+  const results: string[] = [];
+  let regex: RegExp;
+  try {
+    regex = new RegExp(pattern, "gm");
+  } catch {
+    regex = new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gm");
+  }
+
+  // Derive extension filter from glob if provided (e.g. "*.tsx" → ".tsx")
+  const extFilter = fileGlob
+    ? ("." + fileGlob.replace(/['"*]/g, "").split(".").pop())
+    : null;
+
+  async function walk(d: string, depth = 0): Promise<void> {
+    if (depth > 6 || results.length >= 60) return;
+    let entries: import("fs").Dirent[];
+    try { entries = await fs.readdir(d, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      if (results.length >= 60) break;
+      if (e.name.startsWith(".")) continue;
+      if (["node_modules", ".pnpm-store", "dist", ".git"].includes(e.name)) continue;
+      const abs = path.join(d, e.name);
+      if (e.isDirectory()) {
+        await walk(abs, depth + 1);
+      } else if (e.isFile()) {
+        const ext = path.extname(e.name).toLowerCase();
+        if (!SEARCH_EXTS.has(ext)) continue;
+        if (extFilter && ext !== extFilter) continue;
+        try {
+          const content = await fs.readFile(abs, "utf8");
+          const lines = content.split("\n");
+          let hitCount = 0;
+          for (let i = 0; i < lines.length && hitCount < 5; i++) {
+            regex.lastIndex = 0;
+            if (regex.test(lines[i])) {
+              results.push(`${path.relative(absDir, abs)}:${i + 1}: ${lines[i].trim().slice(0, 120)}`);
+              hitCount++;
+            }
+          }
+        } catch { /* unreadable — skip */ }
+      }
+    }
+  }
+
+  await walk(absDir);
+  return results.join("\n") || "No matches found.";
+}
+
+// ─── Diagnostic export ────────────────────────────────────────────────────────
+
+export async function getProjectRootDiagnostics(): Promise<{
+  projectRoot: string;
+  cwd: string;
+  dirname: string;
+  markers: Record<string, boolean>;
+  rgPath: string | null;
+  jarvisDir: string;
+}> {
+  const rgPath = await findRg();
+  const markers: Record<string, boolean> = {};
+  for (const m of ["artifacts", "package.json", "artifacts/api-server", "artifacts/jarvas", "lib", ".git"]) {
+    try { accessSync(path.join(PROJECT_ROOT, m)); markers[m] = true; } catch { markers[m] = false; }
+  }
+  return { projectRoot: PROJECT_ROOT, cwd: process.cwd(), dirname: __dirname, markers, rgPath, jarvisDir: JARVIS_DIR };
+}
 
 const BLOCKED_PATHS = [
   ".env", ".env.local", ".env.production", ".env.development",
@@ -252,15 +424,31 @@ export async function searchProjectFiles(
   const absDir = path.resolve(PROJECT_ROOT, dir || ".");
   send({ type: "dev:file_op", op: "search", pattern: params.pattern, dir: dir || "." });
 
-  const glob = params.fileGlob ? `--glob "${params.fileGlob}"` : "--glob '*.{ts,tsx,js,jsx,json,css,md}'";
-  const cmd = `cd "${absDir}" && rg --no-heading -n --max-count 5 --max-filesize 500K ${glob} "${params.pattern.replace(/"/g, '\\"')}" 2>&1 | head -60`;
+  const rgBin = await findRg();
 
-  try {
-    const { stdout } = await execAsync(cmd, { timeout: 10000 });
-    return stdout.trim() || "No matches found.";
-  } catch {
-    return "No matches found.";
+  if (rgBin) {
+    const glob = params.fileGlob
+      ? `--glob "${params.fileGlob}"`
+      : "--glob '*.{ts,tsx,js,jsx,json,css,md}'";
+    const escapedPattern = params.pattern.replace(/"/g, '\\"');
+    const cmd = `"${rgBin}" --no-heading -n --max-count 5 --max-filesize 500K ${glob} "${escapedPattern}" "${absDir}" 2>&1 | head -60`;
+
+    try {
+      const { stdout } = await execAsync(cmd, { timeout: 10000 });
+      const out = stdout.trim();
+      // rg exits 1 for "no matches" — stdout will be empty; that's fine
+      if (out && !out.includes("command not found") && !out.includes("No such file")) {
+        return out || "No matches found.";
+      }
+    } catch (err: unknown) {
+      // exit code 1 = no matches (stdout already captured above); other errors fall through
+      const stdout = (err as { stdout?: string }).stdout?.trim() ?? "";
+      if (stdout) return stdout;
+    }
   }
+
+  // Node.js fallback — no rg dependency
+  return nodeSearch(params.pattern, absDir, params.fileGlob);
 }
 
 export async function proposePatchHunk(

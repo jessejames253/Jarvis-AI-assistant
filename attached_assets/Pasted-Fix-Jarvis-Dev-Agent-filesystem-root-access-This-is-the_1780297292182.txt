@@ -1,0 +1,86 @@
+Fix Jarvis Dev Agent filesystem/root access. This is the current blocker.
+
+Problem:
+Jarvis Dev Agent can use Project Memory, but live filesystem tools cannot see the actual codebase. Scans return empty / ENOENT, so Create Patch, read_project_file, list_project_files, Run Build, and Run All Checks are unreliable.
+
+Observed symptoms:
+- Root directory scan returns empty / not mounted
+- artifacts/jarvas/src not found
+- artifacts/api-server/src not found
+- lib/ not found
+- ripgrep not installed
+- Create Patch says no codebase found
+- Project Memory shows the expected repo structure, but live file tools cannot access it
+
+Expected repo structure from Project Memory:
+- artifacts/jarvas/src/pages/Chat.tsx
+- artifacts/jarvas/src/components/DevAgentPanel.tsx
+- artifacts/jarvas/src/components/DiffViewer.tsx
+- artifacts/jarvas/src/components/MarkdownContent.tsx
+- artifacts/jarvas/src/components/MemoryPanel.tsx
+- artifacts/api-server/src/routes/dev.ts
+- artifacts/api-server/src/lib/dev/agent.ts
+- artifacts/api-server/src/lib/dev/tools.ts
+- artifacts/api-server/src/lib/dev/taskStore.ts
+- artifacts/api-server/src/lib/dev/projectMemory.ts
+- lib/db
+- lib/api-client
+- lib/integrations-anthropic-ai
+
+Focus files:
+- artifacts/api-server/src/lib/dev/tools.ts
+- artifacts/api-server/src/routes/dev.ts
+- any file defining PROJECT_ROOT, workspace root, file scanning, file reading, patch creation, or build execution
+
+Required fix:
+1. Remove any hardcoded root like:
+   /home/runner/workspace
+
+2. Add a dynamic project root resolver that tries:
+   - process.env.PROJECT_ROOT
+   - process.cwd()
+   - parent directories from __dirname
+   - known repo paths that contain package.json, artifacts/, lib/, src/, app/, or .git
+
+3. The resolver must validate the selected root by checking for expected files/folders:
+   - package.json
+   - artifacts/
+   - artifacts/api-server
+   - artifacts/jarvas
+   - lib/
+   - .git
+
+4. If no valid root is found, return a clear diagnostic error instead of failing silently. Include:
+   - process.cwd()
+   - __dirname
+   - attempted root paths
+   - which expected folders existed/missing
+   - selected root if found
+
+5. Make all Dev Agent filesystem tools use the resolved root:
+   - list_project_files("")
+   - read_project_file(path)
+   - propose_patch_hunk / patch creation
+   - build/check execution
+   - scan project
+
+6. Fix missing ripgrep:
+   - install/use ripgrep if available
+   - otherwise add a Node fs recursive fallback search/list function so Dev Agent still works without rg
+
+7. Add/repair diagnostics in the UI/API so Run All Checks reports:
+   - resolved project root
+   - cwd
+   - dirname
+   - file access status
+   - build status
+   - patch tool status
+
+8. After fixing, run validation:
+   - list_project_files("") shows the real project tree
+   - read_project_file("artifacts/api-server/src/lib/dev/tools.ts") succeeds
+   - Create Patch can queue a real patch in the Patches tab
+   - Run Build works
+   - Run All Checks works
+
+Do not refactor Chat.tsx or do UI cleanup yet. The only goal is to unblock live codebase filesystem access for Jarvis Dev.

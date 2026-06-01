@@ -14,7 +14,7 @@ import { runDevAgent } from "../lib/dev/agent";
 import {
   applyPatch, rollbackFile, listProjectFilesRest, readProjectFileRest,
   PROJECT_ROOT, deletePatch, SERVER_STARTED_AT, RECOVERED_PATCH_COUNT,
-  pendingPatches,
+  pendingPatches, getProjectRootDiagnostics,
 } from "../lib/dev/tools";
 import { createSnapshot } from "../lib/dev/snapshotStore";
 import { createTask, updateTask, addMessage, addPatchToTask, markPatchApplied } from "../lib/dev/taskStore";
@@ -484,6 +484,56 @@ router.get("/dev/autofix/latest", (_req, res) => {
     res.json({ ok: true, result: result ?? null });
   } catch {
     res.json({ ok: true, result: null });
+  }
+});
+
+// ─── GET /dev/diagnostics ─────────────────────────────────────────────────────
+// Reports resolved project root, cwd, __dirname, marker checks, ripgrep path,
+// and file-access validation so the user/agent can see exactly what the server
+// sees at runtime.
+
+router.get("/dev/diagnostics", async (_req, res): Promise<void> => {
+  try {
+    const diag = await getProjectRootDiagnostics();
+
+    // Verify we can actually list files
+    let listSample: string[] = [];
+    let listError: string | null = null;
+    try {
+      listSample = (await listProjectFilesRest("", 1)).slice(0, 20);
+    } catch (e) {
+      listError = String(e);
+    }
+
+    // Verify key source files are readable
+    const probeFiles = [
+      "artifacts/api-server/src/lib/dev/tools.ts",
+      "artifacts/jarvas/src/pages/Chat.tsx",
+    ];
+    const fileAccess: Record<string, boolean> = {};
+    for (const f of probeFiles) {
+      try {
+        const result = await readProjectFileRest(f, 1);
+        fileAccess[f] = result.ok;
+      } catch {
+        fileAccess[f] = false;
+      }
+    }
+
+    res.json({
+      ok: true,
+      projectRoot: diag.projectRoot,
+      cwd: diag.cwd,
+      dirname: diag.dirname,
+      markers: diag.markers,
+      rgPath: diag.rgPath,
+      jarvisDir: diag.jarvisDir,
+      listSample,
+      listError,
+      fileAccess,
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err) });
   }
 });
 
