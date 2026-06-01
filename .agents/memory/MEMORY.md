@@ -27,3 +27,4 @@
 - [Patch approval UX](patch-approval-ux.md) — propose_code_change Jarvis tool + registerPatch() + ChatPatchProposal; real buttons in chat AND DEV Patches; 53/53 tests
 - [Improvement Loop + Queue v1](improvement-loop.md) — analyzer.ts + suggestions.ts + queue.ts; routes appended to autonomy.ts; ImprovementPanel.tsx (2-tab: SUGGESTIONS/QUEUE); IMPROVE button; staged approval flow: open→queued→approved→work-order
 - [Production security](production-security.md) — lib/security.ts: buildCorsOptions() + apiKeyAuth; opt-in via env vars; dev unchanged when unset; /api/healthz always exempt
+- [Leave Replit hardening](leave-replit-hardening.md) — diagnostics isProductionLike() covers Coolify/Railway/Render/Fly; DevErrorBoundary isolates DEV crashes; all DEV API calls have defensive defaults; Chat.tsx DEV tab: 6 sub-tabs, flex-wrap action bar, CopyButton, ManualChecklist, LOGS, CHECKLIST

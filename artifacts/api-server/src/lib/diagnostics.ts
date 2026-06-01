@@ -92,12 +92,30 @@ function safeReadText(filePath: string): string | null {
   }
 }
 
+// ─── Production detection ─────────────────────────────────────────────────────
+
+/**
+ * Returns true when running in any production-like container.
+ * Covers: Replit Deployments, Coolify, Railway, Render, Fly.io, or
+ * any environment that sets NODE_ENV=production.
+ */
+function isProductionLike(): boolean {
+  return (
+    process.env["NODE_ENV"] === "production"      ||
+    process.env["REPLIT_DEPLOYMENT"] === "1"      ||
+    process.env["COOLIFY_CONTAINER_NAME"] != null ||
+    process.env["RAILWAY_ENVIRONMENT"]    != null ||
+    process.env["RENDER_SERVICE_ID"]      != null ||
+    process.env["FLY_APP_NAME"]           != null
+  );
+}
+
 // ─── Individual checks ────────────────────────────────────────────────────────
 
 /** 1. pnpm lockfile version compatibility check */
 function checkLockfile(): { result: CheckResult; issue?: DiagnosticIssue } {
   // In a deployed/production container the lockfile is not present (deps are bundled)
-  if (process.env["NODE_ENV"] === "production") return { result: "skip" };
+  if (isProductionLike()) return { result: "skip" };
 
   const lockPath = path.join(PROJECT_ROOT, "pnpm-lock.yaml");
 
@@ -180,7 +198,7 @@ function checkEnvVars(): Array<{ result: CheckResult; issue?: DiagnosticIssue }>
 /** 3. Build artifact presence */
 function checkBuildArtifact(): { result: CheckResult; issue?: DiagnosticIssue } {
   // In production the server IS the compiled artifact already running
-  if (process.env["NODE_ENV"] === "production") return { result: "pass" };
+  if (isProductionLike()) return { result: "pass" };
 
   const distEntry = path.join(PROJECT_ROOT, "artifacts", "api-server", "dist", "index.mjs");
 
@@ -311,7 +329,7 @@ function checkPortBinding(): { result: CheckResult; issue?: DiagnosticIssue } {
 /** 6. node_modules presence */
 function checkNodeModules(): { result: CheckResult; issue?: DiagnosticIssue } {
   // In production containers deps are already installed into the bundle; skip
-  if (process.env["NODE_ENV"] === "production") return { result: "skip" };
+  if (isProductionLike()) return { result: "skip" };
 
   const nm = path.join(PROJECT_ROOT, "node_modules");
 

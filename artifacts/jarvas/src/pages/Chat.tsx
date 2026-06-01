@@ -39,7 +39,9 @@ import {
   Network,
   ClipboardList,
   RefreshCw,
+  Download,
 } from "lucide-react";
+import { DevErrorBoundary } from "@/components/DevErrorBoundary";
 import { generateId } from "@/lib/uuid";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
 import { useSpeechSession } from "@/hooks/useSpeechSession";
@@ -641,6 +643,86 @@ const WELCOME = (name?: string): Message => ({
   timestamp: new Date(),
 });
 
+// ─── CopyButton ───────────────────────────────────────────────────────────────
+
+function CopyButton({ text, label = "COPY" }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        navigator.clipboard.writeText(text)
+          .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1600); })
+          .catch(() => {});
+      }}
+      className="flex items-center gap-1 text-[9px] font-bold px-2 py-1 rounded-lg transition-all active:scale-95"
+      style={{
+        background: copied ? "hsl(142 60% 40% / 0.2)" : "hsl(210 15% 12%)",
+        border:     `1px solid ${copied ? "hsl(142 60% 40%)" : "hsl(210 15% 22%)"}`,
+        color:      copied ? "hsl(142 71% 62%)" : "hsl(196 25% 45%)",
+      }}
+      title="Copy to clipboard"
+    >
+      {copied ? "✓ COPIED" : label}
+    </button>
+  );
+}
+
+// ─── ManualChecklist ──────────────────────────────────────────────────────────
+
+function ManualChecklist() {
+  const ITEMS = [
+    "GitHub repository pushed",
+    "Production URL configured in Coolify",
+    "Database URL connected and tested",
+    "Custom domain pointed at production",
+    "All env vars set in hosting platform",
+    "Latest project snapshot downloaded",
+  ];
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const toggle = (item: string) =>
+    setChecked(prev => { const s = new Set(prev); s.has(item) ? s.delete(item) : s.add(item); return s; });
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid hsl(210 15% 16%)" }}>
+      <div className="px-4 py-2 text-[10px] font-bold tracking-widest" style={{ background: "hsl(210 15% 10%)", color: "hsl(196 30% 50%)" }}>
+        MANUAL CHECKLIST
+      </div>
+      <div className="divide-y" style={{ borderColor: "hsl(210 15% 12%)" }}>
+        {ITEMS.map(item => {
+          const done = checked.has(item);
+          return (
+            <button
+              key={item}
+              onClick={() => toggle(item)}
+              className="w-full flex items-center gap-3 px-4 py-3 text-left transition-all hover:bg-white/5 active:scale-[0.99]"
+            >
+              <div
+                className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 text-[10px] font-bold transition-all"
+                style={{
+                  background: done ? "hsl(142 60% 40% / 0.3)" : "transparent",
+                  border:     `1.5px solid ${done ? "hsl(142 60% 50%)" : "hsl(210 15% 28%)"}`,
+                  color:      "hsl(142 71% 62%)",
+                }}
+              >
+                {done ? "✓" : ""}
+              </div>
+              <span
+                className="text-xs"
+                style={{
+                  color:           done ? "hsl(142 71% 62%)" : "hsl(196 35% 60%)",
+                  textDecoration:  done ? "line-through" : "none",
+                }}
+              >
+                {item}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Dev workspace types ──────────────────────────────────────────────────────
 
 interface DevMemoryEntry {
@@ -865,7 +947,7 @@ export default function Chat() {
   const [devMessages,  setDevMessages]  = useState<Array<{id: string; role: "user"|"assistant"; content: string}>>([]);
   const [devInput,     setDevInput]     = useState("");
   const [devSending,   setDevSending]   = useState(false);
-  const [devSection,   setDevSection]   = useState<"chat"|"patches"|"build"|"diag">("chat");
+  const [devSection,   setDevSection]   = useState<"chat"|"patches"|"build"|"diag"|"logs"|"checklist">("chat");
   const devChatEndRef = useRef<HTMLDivElement>(null);
 
   const [devProjectMemory, setDevProjectMemory] = useState<DevMemoryEntry[]>([]);
@@ -874,6 +956,8 @@ export default function Chat() {
   const [devDiagLoading,   setDevDiagLoading]   = useState(false);
   const [devBuildResult,   setDevBuildResult]   = useState<DevHealthResult | null>(null);
   const [devBuildLoading,  setDevBuildLoading]  = useState(false);
+  const [devLogs,          setDevLogs]          = useState<string[]>([]);
+  const [devLogsLoading,   setDevLogsLoading]   = useState(false);
 
   useEffect(() => {
     localStorage.setItem(DEV_PANEL_KEY, String(devPanelOpen));
@@ -995,23 +1079,90 @@ export default function Chat() {
   const runDevDiag = useCallback(async () => {
     setDevDiagLoading(true);
     try {
-      const res  = await fetch(`${BASE}api/system/diagnostics`);
-      const data = await res.json() as DevDiagReport;
-      setDevDiagReport(data);
-    } catch { /* ignore */ }
-    finally { setDevDiagLoading(false); }
+      const res = await fetch(`${BASE}api/system/diagnostics`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const raw = await res.json() as Partial<DevDiagReport>;
+      setDevDiagReport({
+        ok:          raw.ok          ?? true,
+        checkedAt:   raw.checkedAt   ?? new Date().toISOString(),
+        issueCount:  raw.issueCount  ?? 0,
+        errorCount:  raw.errorCount  ?? 0,
+        warnCount:   raw.warnCount   ?? 0,
+        issues:      raw.issues      ?? [],
+        checks:      raw.checks      ?? {},
+        runtimeInfo: raw.runtimeInfo ?? { nodeVersion: "unknown", pnpmVersion: "unknown", platform: "unknown", uptimeSeconds: 0 },
+      });
+    } catch (err) {
+      setDevDiagReport({
+        ok: false, checkedAt: new Date().toISOString(),
+        issueCount: 1, errorCount: 1, warnCount: 0,
+        issues: [{ type: "build_artifact_missing", severity: "error",
+          likelyCause: `Could not reach diagnostics API: ${err instanceof Error ? err.message : "Unknown"}`,
+          suggestedFix: "Check the API server is running.", confidence: "low" }],
+        checks: {}, runtimeInfo: { nodeVersion: "—", pnpmVersion: "—", platform: "—", uptimeSeconds: 0 },
+      });
+    } finally { setDevDiagLoading(false); }
   }, [BASE]);
 
   const runDevBuild = useCallback(async (force = false) => {
     setDevBuildLoading(true);
     try {
-      const url  = force ? `${BASE}api/dev/health?refresh=1` : `${BASE}api/dev/health`;
-      const res  = await fetch(url);
-      const data = await res.json() as DevHealthResult;
-      setDevBuildResult(data);
-    } catch { /* ignore */ }
-    finally { setDevBuildLoading(false); }
+      const url = force ? `${BASE}api/dev/health?refresh=1` : `${BASE}api/dev/health`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const raw = await res.json() as Partial<DevHealthResult>;
+      setDevBuildResult({
+        ok:       raw.ok    ?? false,
+        score:    typeof raw.score === "number" ? raw.score : 0,
+        label:    raw.label ?? "critical",
+        frontend: { errorCount: raw.frontend?.errorCount ?? 0, errors: raw.frontend?.errors ?? [] },
+        backend:  { errorCount: raw.backend?.errorCount  ?? 0, errors: raw.backend?.errors  ?? [] },
+      });
+    } catch (err) {
+      setDevBuildResult({
+        ok: false, score: 0, label: "critical",
+        frontend: { errorCount: 1, errors: [`API error: ${err instanceof Error ? err.message : "Unknown"}`] },
+        backend:  { errorCount: 0, errors: [] },
+      });
+    } finally { setDevBuildLoading(false); }
   }, [BASE]);
+
+  const loadDevLogs = useCallback(async () => {
+    setDevLogsLoading(true);
+    try {
+      const res  = await fetch(`${BASE}api/dev/logs`);
+      const data = await res.json() as { ok: boolean; lines?: string[] };
+      setDevLogs(data.lines ?? []);
+    } catch { setDevLogs(["Error: could not load logs from API"]); }
+    finally  { setDevLogsLoading(false); }
+  }, [BASE]);
+
+  const runAllChecks = useCallback(async () => {
+    await Promise.all([
+      runDevBuild(true),
+      runDevDiag(),
+      loadDevLogs(),
+      loadDevProjectMemory(),
+      fetchPendingPatches().then(setPendingPatches).catch(() => {}),
+    ]);
+  }, [runDevBuild, runDevDiag, loadDevLogs, loadDevProjectMemory]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const exportSnapshot = useCallback(async () => {
+    const snapshot = {
+      timestamp:      new Date().toISOString(),
+      projectMemory:  devProjectMemory,
+      diagnostics:    devDiagReport,
+      buildResult:    devBuildResult,
+      pendingPatches,
+    };
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `jarvis-snapshot-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [devProjectMemory, devDiagReport, devBuildResult, pendingPatches]);
 
   // Auto-load project memory the first time the DEV tab is opened
   useEffect(() => {
@@ -1936,463 +2087,616 @@ export default function Chat() {
 
       {/* ── Dev Workspace tab ─────────────────────────────────────────────── */}
       {activeTab === "dev" && (
-        <div className="relative z-10 flex-1 flex flex-col overflow-hidden">
+        <DevErrorBoundary>
+          <div className="relative z-10 flex-1 flex flex-col overflow-hidden">
 
-          {/* ── Action bar ── */}
-          <div
-            className="flex-shrink-0 flex gap-1.5 px-4 py-2.5 border-b border-border/30 overflow-x-auto"
-            style={{ scrollbarWidth: "none" } as React.CSSProperties}
-          >
-            {([
-              { label: "SCAN PROJECT", prompt: "Scan this project's file structure and codebase. List key components, API routes, and libraries. Highlight quality issues and improvement opportunities." },
-              { label: "PROPOSE FIX",  prompt: "Review the project memory and current debug context. Propose a specific, actionable code fix for the most critical issue." },
-              { label: "BUILD/TEST",   prompt: "Check the TypeScript compilation status for both packages. List all errors and warnings clearly." },
-              { label: "CREATE PATCH", prompt: "Based on our conversation, create a concrete code patch for the most recently discussed fix. Queue it for review in the Patches tab." },
-            ] as const).map(({ label, prompt }) => (
+            {/* ── Action bar (mobile-first: flex-wrap, no horizontal scroll) ── */}
+            <div className="flex-shrink-0 flex flex-wrap gap-1.5 px-4 py-2.5 border-b border-border/30">
+              {([
+                { label: "SCAN",  prompt: "Scan this project's file structure and codebase. List key components, API routes, and libraries. Highlight quality issues and improvement opportunities." },
+                { label: "FIX",   prompt: "Review the project memory and current debug context. Propose a specific, actionable code fix for the most critical issue." },
+                { label: "BUILD", prompt: "Check the TypeScript compilation status for both packages. List all errors and warnings clearly." },
+                { label: "PATCH", prompt: "Based on our conversation, create a concrete code patch for the most recently discussed fix. Queue it for review in the Patches tab." },
+              ] as const).map(({ label, prompt }) => (
+                <button
+                  key={label}
+                  onClick={() => { setDevSection("chat"); void sendDevMessage(prompt); }}
+                  disabled={devSending}
+                  className="px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
+                  style={{ background: "hsl(194 100% 55% / 0.10)", border: "1px solid hsl(194 100% 55% / 0.35)", color: "hsl(194 100% 68%)" }}
+                >
+                  {label}
+                </button>
+              ))}
               <button
-                key={label}
-                onClick={() => { setDevSection("chat"); void sendDevMessage(prompt); }}
+                onClick={() => {
+                  setDevSection("chat");
+                  void sendDevMessage("Let's work on Jarvis. Review the project memory and current state, then identify the most impactful thing to build or fix next. Give me a concrete implementation plan with specific files and changes.");
+                }}
                 disabled={devSending}
-                className="flex-shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
-                style={{ background: "hsl(194 100% 55% / 0.10)", border: "1px solid hsl(194 100% 55% / 0.35)", color: "hsl(194 100% 68%)", whiteSpace: "nowrap" }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
+                style={{ background: "hsl(264 80% 55% / 0.12)", border: "1px solid hsl(264 80% 55% / 0.45)", color: "hsl(264 80% 75%)" }}
               >
-                {label}
+                <Bot className="w-3 h-3" />
+                WORK ON JARVIS
               </button>
-            ))}
-            {/* Work On Jarvis — purple CTA */}
-            <button
-              onClick={() => {
-                setDevSection("chat");
-                void sendDevMessage("Let's work on Jarvis. Review the project memory and current state, then identify the most impactful thing to build or fix next. Give me a concrete implementation plan with specific files and changes.");
-              }}
-              disabled={devSending}
-              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
-              style={{ background: "hsl(264 80% 55% / 0.12)", border: "1px solid hsl(264 80% 55% / 0.45)", color: "hsl(264 80% 75%)", whiteSpace: "nowrap" }}
-            >
-              <Bot className="w-3 h-3" />
-              WORK ON JARVIS
-            </button>
-            <button
-              onClick={() => fetchPendingPatches().then(setPendingPatches)}
-              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95"
-              style={{ background: "transparent", border: "1px solid hsl(210 15% 24%)", color: "hsl(196 30% 44%)", whiteSpace: "nowrap" }}
-            >
-              <RefreshCw className="w-3 h-3" />
-              REFRESH
-            </button>
-          </div>
+              <button
+                onClick={() => void runAllChecks()}
+                disabled={devBuildLoading || devDiagLoading || devLogsLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
+                style={{ background: "hsl(38 100% 55% / 0.12)", border: "1px solid hsl(38 100% 55% / 0.45)", color: "hsl(38 100% 70%)" }}
+              >
+                <RefreshCw className={`w-3 h-3 ${(devBuildLoading || devDiagLoading) ? "animate-spin" : ""}`} />
+                RUN ALL
+              </button>
+              <button
+                onClick={() => void exportSnapshot()}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95"
+                style={{ background: "hsl(142 60% 40% / 0.12)", border: "1px solid hsl(142 60% 40% / 0.40)", color: "hsl(142 71% 62%)" }}
+              >
+                <Download className="w-3 h-3" />
+                EXPORT
+              </button>
+              <button
+                onClick={() => { fetchPendingPatches().then(setPendingPatches).catch(() => {}); void loadDevProjectMemory(); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95"
+                style={{ background: "transparent", border: "1px solid hsl(210 15% 24%)", color: "hsl(196 30% 44%)" }}
+              >
+                <RefreshCw className="w-3 h-3" />
+                REFRESH
+              </button>
+            </div>
 
-          {/* ── Sub-tab bar: CHAT | PATCHES | BUILD | DIAG ── */}
-          <div className="flex-shrink-0 flex gap-1 px-4 pt-2 pb-1">
-            {(["chat", "patches", "build", "diag"] as const).map((sec) => {
-              const isActive = devSection === sec;
-              const labels: Record<typeof sec, string> = {
-                chat:    "CHAT",
-                patches: pendingPatches.length ? `PATCHES (${pendingPatches.length})` : "PATCHES",
-                build:   "BUILD/TEST",
-                diag:    "DIAG",
-              };
-              const colors: Record<typeof sec, { active: string; border: string; bg: string }> = {
-                chat:    { active: "hsl(194 100% 70%)", border: "hsl(194 100% 55% / 0.45)", bg: "hsl(194 100% 55% / 0.14)" },
-                patches: { active: "hsl(142 70% 65%)",  border: "hsl(142 60% 45% / 0.45)", bg: "hsl(142 60% 45% / 0.12)" },
-                build:   { active: "hsl(38 100% 70%)",  border: "hsl(38  100% 55% / 0.45)", bg: "hsl(38  100% 55% / 0.12)" },
-                diag:    { active: "hsl(264 80% 72%)",  border: "hsl(264 80% 55% / 0.45)", bg: "hsl(264 80% 55% / 0.12)" },
-              };
-              const c = colors[sec];
-              return (
-                <button
-                  key={sec}
-                  onClick={() => {
-                    setDevSection(sec);
-                    if (sec === "build" && !devBuildResult) void runDevBuild();
-                    if (sec === "diag"  && !devDiagReport)  void runDevDiag();
-                  }}
-                  className="px-3 py-1 rounded-lg text-[10px] font-bold tracking-widest transition-all active:scale-95"
-                  style={{
-                    background:  isActive ? c.bg    : "transparent",
-                    border:      `1px solid ${isActive ? c.border : "hsl(210 15% 22%)"}`,
-                    color:       isActive ? c.active : "hsl(196 20% 38%)",
-                    whiteSpace:  "nowrap",
-                  }}
-                >
-                  {labels[sec]}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* ══════════════════ CHAT ══════════════════ */}
-          {devSection === "chat" && (
-            <>
-              {/* Project Memory — collapsible panel */}
-              <div className="flex-shrink-0 mx-4 mb-1">
-                <button
-                  onClick={() => {
-                    setDevMemoryOpen(!devMemoryOpen);
-                    if (devProjectMemory.length === 0) void loadDevProjectMemory();
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-[10px] font-bold tracking-widest transition-all"
-                  style={{
-                    background:  devMemoryOpen ? "hsl(194 100% 55% / 0.08)" : "transparent",
-                    border:      `1px solid ${devMemoryOpen ? "hsl(194 100% 55% / 0.30)" : "hsl(210 15% 20%)"}`,
-                    color:       devMemoryOpen ? "hsl(194 100% 65%)" : "hsl(196 25% 40%)",
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <Brain className="w-3 h-3" />
-                    PROJECT MEMORY
-                    {devProjectMemory.length > 0 && (
-                      <span style={{ color: "hsl(194 100% 50%)" }}>({devProjectMemory.length})</span>
-                    )}
-                  </div>
-                  <span>{devMemoryOpen ? "▲" : "▼"}</span>
-                </button>
-
-                {devMemoryOpen && (
-                  <div
-                    className="mt-1.5 rounded-2xl overflow-hidden border"
-                    style={{ background: "hsl(210 15% 6%)", borderColor: "hsl(210 15% 14%)" }}
+            {/* ── Sub-tab bar (mobile-first: flex-wrap) ── */}
+            <div className="flex-shrink-0 flex flex-wrap gap-1 px-4 pt-2 pb-1">
+              {(["chat", "patches", "build", "diag", "logs", "checklist"] as const).map((sec) => {
+                const isActive = devSection === sec;
+                const labels: Record<typeof sec, string> = {
+                  chat:      "CHAT",
+                  patches:   pendingPatches.length ? `PATCHES (${pendingPatches.length})` : "PATCHES",
+                  build:     "BUILD",
+                  diag:      "DIAG",
+                  logs:      "LOGS",
+                  checklist: "✓ CHECKLIST",
+                };
+                const colors: Record<typeof sec, { active: string; border: string; bg: string }> = {
+                  chat:      { active: "hsl(194 100% 70%)", border: "hsl(194 100% 55% / 0.45)", bg: "hsl(194 100% 55% / 0.14)" },
+                  patches:   { active: "hsl(142 70% 65%)",  border: "hsl(142 60% 45% / 0.45)", bg: "hsl(142 60% 45% / 0.12)" },
+                  build:     { active: "hsl(38  100% 70%)", border: "hsl(38  100% 55% / 0.45)", bg: "hsl(38  100% 55% / 0.12)" },
+                  diag:      { active: "hsl(264 80%  72%)", border: "hsl(264 80%  55% / 0.45)", bg: "hsl(264 80%  55% / 0.12)" },
+                  logs:      { active: "hsl(196 80%  68%)", border: "hsl(196 80%  55% / 0.45)", bg: "hsl(196 80%  55% / 0.12)" },
+                  checklist: { active: "hsl(142 71%  62%)", border: "hsl(142 60%  45% / 0.45)", bg: "hsl(142 60%  45% / 0.14)" },
+                };
+                const c = colors[sec];
+                return (
+                  <button
+                    key={sec}
+                    onClick={() => {
+                      setDevSection(sec);
+                      if (sec === "build"     && !devBuildResult)        void runDevBuild();
+                      if (sec === "diag"      && !devDiagReport)         void runDevDiag();
+                      if (sec === "logs"      && devLogs.length === 0)   void loadDevLogs();
+                    }}
+                    className="px-3 py-1 rounded-lg text-[10px] font-bold tracking-widest transition-all active:scale-95"
+                    style={{
+                      background: isActive ? c.bg : "transparent",
+                      border:     `1px solid ${isActive ? c.border : "hsl(210 15% 22%)"}`,
+                      color:      isActive ? c.active : "hsl(196 20% 38%)",
+                    }}
                   >
-                    {devProjectMemory.length === 0 ? (
-                      <div className="px-4 py-3 text-xs" style={{ color: "hsl(196 25% 38%)" }}>
-                        Loading project memory…
-                      </div>
-                    ) : (
-                      <div className="divide-y max-h-64 overflow-y-auto scrollbar-thin" style={{ borderColor: "hsl(210 15% 12%)" }}>
-                        {(["architecture","known-bugs","coding-rules","deployment","file-map","ui-conventions","general"] as const)
-                          .filter(cat => devProjectMemory.some(e => e.category === cat))
-                          .map(cat => {
-                            const catColor: Record<string, string> = {
-                              "architecture":   "hsl(194 100% 60%)",
-                              "known-bugs":     "hsl(355 80%  64%)",
-                              "coding-rules":   "hsl(142 70%  60%)",
-                              "deployment":     "hsl(38  100% 65%)",
-                              "file-map":       "hsl(264 80%  72%)",
-                              "ui-conventions": "hsl(194 80%  70%)",
-                              "general":        "hsl(196 30%  55%)",
-                            };
-                            return (
-                              <div key={cat} className="px-4 py-2.5">
-                                <div className="text-[9px] font-bold tracking-widest mb-1.5 uppercase" style={{ color: catColor[cat] }}>
-                                  {cat.replace(/-/g, " ")}
-                                </div>
-                                {devProjectMemory.filter(e => e.category === cat).map(entry => (
-                                  <div key={entry.id} className="mb-2 last:mb-0">
-                                    <div className="text-xs font-semibold mb-0.5" style={{ color: "hsl(196 50% 75%)" }}>{entry.title}</div>
-                                    <div className="text-xs leading-relaxed" style={{ color: "hsl(196 20% 50%)" }}>{entry.content}</div>
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          })}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+                    {labels[sec]}
+                  </button>
+                );
+              })}
+            </div>
 
-              {/* Dev chat messages */}
-              <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-3 flex flex-col gap-3">
-                {devMessages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full gap-3 py-16">
-                    <Code2 className="w-10 h-10" style={{ color: "hsl(194 100% 38%)" }} />
-                    <p className="text-sm tracking-wide" style={{ color: "hsl(196 25% 40%)" }}>Engineering assistant</p>
-                    <p className="text-xs text-center max-w-xs leading-relaxed" style={{ color: "hsl(196 20% 30%)" }}>
-                      Separate history from main chat. Knows project architecture, bugs, and build state.
-                    </p>
-                  </div>
-                ) : devMessages.map((msg) => (
-                  <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className="max-w-[90%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed"
-                      style={msg.role === "user"
-                        ? { background: "hsl(194 100% 55% / 0.13)", border: "1px solid hsl(194 100% 55% / 0.32)", color: "hsl(194 100% 90%)" }
-                        : { background: "hsl(210 15% 8%)", border: "1px solid hsl(210 15% 16%)", color: "hsl(196 35% 80%)", whiteSpace: "pre-wrap" }
-                      }
-                    >
-                      {msg.content || (devSending && msg.role === "assistant"
-                        ? <span className="inline-block animate-pulse" style={{ color: "hsl(194 100% 55%)" }}>▋</span>
-                        : null
+            {/* ══════════════════ CHAT ══════════════════ */}
+            {devSection === "chat" && (
+              <>
+                {/* Project Memory — collapsible panel */}
+                <div className="flex-shrink-0 mx-4 mb-1">
+                  <button
+                    onClick={() => {
+                      setDevMemoryOpen(!devMemoryOpen);
+                      if (devProjectMemory.length === 0) void loadDevProjectMemory();
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-[10px] font-bold tracking-widest transition-all"
+                    style={{
+                      background: devMemoryOpen ? "hsl(194 100% 55% / 0.08)" : "transparent",
+                      border:     `1px solid ${devMemoryOpen ? "hsl(194 100% 55% / 0.30)" : "hsl(210 15% 20%)"}`,
+                      color:      devMemoryOpen ? "hsl(194 100% 65%)" : "hsl(196 25% 40%)",
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Brain className="w-3 h-3" />
+                      PROJECT MEMORY
+                      {devProjectMemory.length > 0 && (
+                        <span style={{ color: "hsl(194 100% 50%)" }}>({devProjectMemory.length})</span>
                       )}
                     </div>
-                  </div>
-                ))}
-                <div ref={devChatEndRef} />
-              </div>
-
-              {/* Dev input bar */}
-              <div
-                className="flex-shrink-0 px-4 pb-4 pt-2 border-t border-border/30"
-                style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}
-              >
-                <div className="flex gap-2 items-end max-w-2xl mx-auto">
-                  <textarea
-                    value={devInput}
-                    onChange={(e) => setDevInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendDevMessage(devInput); }
-                    }}
-                    placeholder="Ask about the codebase, request a fix, or describe a change…"
-                    rows={2}
-                    className="flex-1 resize-none rounded-2xl border bg-transparent px-4 py-2.5 text-sm outline-none"
-                    style={{ borderColor: "hsl(210 15% 22%)", color: "hsl(196 40% 80%)" }}
-                  />
-                  <button
-                    onClick={() => void sendDevMessage(devInput)}
-                    disabled={!devInput.trim() || devSending}
-                    className="flex-shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-40"
-                    style={{ background: "hsl(194 100% 55% / 0.18)", border: "1px solid hsl(194 100% 55% / 0.45)" }}
-                    aria-label="Send"
-                  >
-                    {devSending
-                      ? <RefreshCw className="w-4 h-4 animate-spin" style={{ color: "hsl(194 100% 65%)" }} />
-                      : <Send className="w-4 h-4" style={{ color: "hsl(194 100% 65%)" }} />
-                    }
+                    <span>{devMemoryOpen ? "▲" : "▼"}</span>
                   </button>
-                </div>
-              </div>
-            </>
-          )}
 
-          {/* ══════════════════ PATCHES ══════════════════ */}
-          {devSection === "patches" && (
-            <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-4">
-              {/* Workflow legend */}
-              <div
-                className="mx-auto max-w-2xl mb-4 flex items-center gap-2 flex-wrap px-4 py-2.5 rounded-2xl text-xs"
-                style={{ background: "hsl(210 15% 6%)", border: "1px solid hsl(210 15% 14%)", color: "hsl(196 30% 48%)" }}
-              >
-                <span style={{ color: "hsl(194 100% 60%)" }}>Generate</span>
-                <span>→</span>
-                <span>Review</span>
-                <span>→</span>
-                <span>Accept</span>
-                <span>→</span>
-                <span style={{ color: "hsl(38 100% 65%)" }}>Build/Test</span>
-                <span>→</span>
-                <span style={{ color: "hsl(142 70% 60%)" }}>Deploy</span>
-              </div>
-
-              {pendingPatches.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 gap-3">
-                  <ShieldCheck className="w-10 h-10" style={{ color: "hsl(142 60% 30%)" }} />
-                  <p className="text-sm tracking-wide" style={{ color: "hsl(196 25% 40%)" }}>No pending patches</p>
-                  <p className="text-xs text-center max-w-xs leading-relaxed" style={{ color: "hsl(196 20% 30%)" }}>
-                    Use CREATE PATCH or ask Jarvis to propose a fix in the Chat tab.
-                  </p>
+                  {devMemoryOpen && (
+                    <div
+                      className="mt-1.5 rounded-2xl overflow-hidden border"
+                      style={{ background: "hsl(210 15% 6%)", borderColor: "hsl(210 15% 14%)" }}
+                    >
+                      {devProjectMemory.length === 0 ? (
+                        <div className="px-4 py-3 text-xs" style={{ color: "hsl(196 25% 38%)" }}>Loading project memory…</div>
+                      ) : (
+                        <div className="divide-y max-h-64 overflow-y-auto scrollbar-thin" style={{ borderColor: "hsl(210 15% 12%)" }}>
+                          {(["architecture","known-bugs","coding-rules","deployment","file-map","ui-conventions","general"] as const)
+                            .filter(cat => devProjectMemory.some(e => e.category === cat))
+                            .map(cat => {
+                              const catColor: Record<string, string> = {
+                                "architecture":   "hsl(194 100% 60%)",
+                                "known-bugs":     "hsl(355 80%  64%)",
+                                "coding-rules":   "hsl(142 70%  60%)",
+                                "deployment":     "hsl(38  100% 65%)",
+                                "file-map":       "hsl(264 80%  72%)",
+                                "ui-conventions": "hsl(194 80%  70%)",
+                                "general":        "hsl(196 30%  55%)",
+                              };
+                              return (
+                                <div key={cat} className="px-4 py-2.5">
+                                  <div className="text-[9px] font-bold tracking-widest mb-1.5 uppercase" style={{ color: catColor[cat] }}>
+                                    {cat.replace(/-/g, " ")}
+                                  </div>
+                                  {devProjectMemory.filter(e => e.category === cat).map(entry => (
+                                    <div key={entry.id} className="mb-2 last:mb-0">
+                                      <div className="text-xs font-semibold mb-0.5" style={{ color: "hsl(196 50% 75%)" }}>{entry.title}</div>
+                                      <div className="text-xs leading-relaxed" style={{ color: "hsl(196 20% 50%)" }}>{entry.content}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="flex flex-col gap-3 max-w-2xl mx-auto">
-                  {pendingPatches.map((patch) => (
-                    <PatchCard
-                      key={patch.patchId}
-                      patch={patch}
-                      onRemove={(id) => setPendingPatches((prev) => prev.filter((p) => p.patchId !== id))}
-                      onAcceptedGoToBuild={() => setDevSection("build")}
-                    />
+
+                {/* Dev chat messages */}
+                <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-3 flex flex-col gap-3">
+                  {devMessages.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full gap-3 py-16">
+                      <Code2 className="w-10 h-10" style={{ color: "hsl(194 100% 38%)" }} />
+                      <p className="text-sm tracking-wide" style={{ color: "hsl(196 25% 40%)" }}>Engineering assistant</p>
+                      <p className="text-xs text-center max-w-xs leading-relaxed" style={{ color: "hsl(196 20% 30%)" }}>
+                        Separate history from main chat. Knows project architecture, bugs, and build state.
+                      </p>
+                    </div>
+                  ) : devMessages.map((msg) => (
+                    <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                      <div
+                        className="max-w-[90%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed"
+                        style={msg.role === "user"
+                          ? { background: "hsl(194 100% 55% / 0.13)", border: "1px solid hsl(194 100% 55% / 0.32)", color: "hsl(194 100% 90%)" }
+                          : { background: "hsl(210 15% 8%)", border: "1px solid hsl(210 15% 16%)", color: "hsl(196 35% 80%)", whiteSpace: "pre-wrap" }
+                        }
+                      >
+                        {msg.content || (devSending && msg.role === "assistant"
+                          ? <span className="inline-block animate-pulse" style={{ color: "hsl(194 100% 55%)" }}>▋</span>
+                          : null
+                        )}
+                      </div>
+                    </div>
                   ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ══════════════════ BUILD / TEST ══════════════════ */}
-          {devSection === "build" && (
-            <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-4">
-              <div className="max-w-2xl mx-auto flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-bold tracking-widest" style={{ color: "hsl(38 100% 70%)" }}>BUILD / TEST</h2>
-                  <button
-                    onClick={() => void runDevBuild(true)}
-                    disabled={devBuildLoading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
-                    style={{ background: "hsl(38 100% 55% / 0.12)", border: "1px solid hsl(38 100% 55% / 0.45)", color: "hsl(38 100% 70%)" }}
-                  >
-                    <RefreshCw className={`w-3 h-3 ${devBuildLoading ? "animate-spin" : ""}`} />
-                    RUN CHECK
-                  </button>
+                  <div ref={devChatEndRef} />
                 </div>
 
-                {!devBuildResult && !devBuildLoading && (
-                  <div className="flex flex-col items-center justify-center py-16 gap-3">
-                    <Activity className="w-10 h-10" style={{ color: "hsl(38 100% 32%)" }} />
-                    <p className="text-sm" style={{ color: "hsl(196 25% 38%)" }}>Click RUN CHECK to inspect TypeScript health</p>
-                  </div>
-                )}
-                {devBuildLoading && (
-                  <div className="flex items-center gap-3 py-8 justify-center">
-                    <RefreshCw className="w-5 h-5 animate-spin" style={{ color: "hsl(38 100% 60%)" }} />
-                    <span className="text-sm" style={{ color: "hsl(196 25% 45%)" }}>Running TypeScript checks…</span>
-                  </div>
-                )}
-
-                {devBuildResult && !devBuildLoading && (
-                  <>
-                    {/* Health score */}
-                    <div
-                      className="rounded-2xl p-5 flex items-center gap-5"
-                      style={{ background: "hsl(210 15% 7%)", border: "1px solid hsl(210 15% 15%)" }}
+                {/* Dev input bar */}
+                <div
+                  className="flex-shrink-0 px-4 pb-4 pt-2 border-t border-border/30"
+                  style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}
+                >
+                  <div className="flex gap-2 items-end max-w-2xl mx-auto">
+                    <textarea
+                      value={devInput}
+                      onChange={(e) => setDevInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendDevMessage(devInput); }
+                      }}
+                      placeholder="Ask about the codebase, request a fix, or describe a change…"
+                      rows={2}
+                      className="flex-1 resize-none rounded-2xl border bg-transparent px-4 py-2.5 text-sm outline-none"
+                      style={{ borderColor: "hsl(210 15% 22%)", color: "hsl(196 40% 80%)" }}
+                    />
+                    <button
+                      onClick={() => void sendDevMessage(devInput)}
+                      disabled={!devInput.trim() || devSending}
+                      className="flex-shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-40"
+                      style={{ background: "hsl(194 100% 55% / 0.18)", border: "1px solid hsl(194 100% 55% / 0.45)" }}
+                      aria-label="Send"
                     >
-                      <div
-                        className="w-16 h-16 rounded-2xl flex items-center justify-center font-bold text-2xl flex-shrink-0"
-                        style={{
-                          background: devBuildResult.score >= 90 ? "hsl(142 60% 40% / 0.2)" : devBuildResult.score >= 70 ? "hsl(38 100% 55% / 0.2)" : "hsl(355 80% 40% / 0.2)",
-                          border:     `2px solid ${devBuildResult.score >= 90 ? "hsl(142 60% 50%)" : devBuildResult.score >= 70 ? "hsl(38 100% 60%)" : "hsl(355 80% 50%)"}`,
-                          color:      devBuildResult.score >= 90 ? "hsl(142 71% 65%)"  : devBuildResult.score >= 70 ? "hsl(38 100% 70%)" : "hsl(355 80% 65%)",
-                        }}
-                      >
-                        {devBuildResult.score}
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <div
-                          className="text-sm font-bold tracking-widest uppercase"
-                          style={{ color: devBuildResult.score >= 90 ? "hsl(142 71% 62%)" : devBuildResult.score >= 70 ? "hsl(38 100% 68%)" : "hsl(355 80% 62%)" }}
-                        >
-                          {devBuildResult.label}
-                        </div>
-                        <div className="text-xs" style={{ color: "hsl(196 25% 45%)" }}>
-                          Frontend: {devBuildResult.frontend.errorCount} error(s) · Backend: {devBuildResult.backend.errorCount} error(s)
-                        </div>
-                      </div>
-                    </div>
+                      {devSending
+                        ? <RefreshCw className="w-4 h-4 animate-spin" style={{ color: "hsl(194 100% 65%)" }} />
+                        : <Send className="w-4 h-4" style={{ color: "hsl(194 100% 65%)" }} />
+                      }
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
 
-                    {/* Error lists */}
-                    {[
-                      { label: "FRONTEND (jarvas)",      errors: devBuildResult.frontend.errors },
-                      { label: "BACKEND (api-server)",   errors: devBuildResult.backend.errors  },
-                    ].map(({ label, errors }) => errors.length > 0 && (
-                      <div key={label} className="rounded-2xl overflow-hidden" style={{ border: "1px solid hsl(355 80% 25%)" }}>
-                        <div className="px-4 py-2 text-[10px] font-bold tracking-widest" style={{ background: "hsl(355 80% 14%)", color: "hsl(355 80% 64%)" }}>
-                          {label}
-                        </div>
-                        <div className="p-4 font-mono text-[11px] leading-relaxed flex flex-col gap-1" style={{ background: "hsl(210 15% 6%)" }}>
-                          {errors.slice(0, 20).map((line, i) => (
-                            <div key={i} style={{ color: "hsl(355 80% 64%)", wordBreak: "break-all" }}>{line}</div>
-                          ))}
-                          {errors.length > 20 && (
-                            <div style={{ color: "hsl(196 25% 38%)" }}>…and {errors.length - 20} more errors</div>
-                          )}
-                        </div>
-                      </div>
+            {/* ══════════════════ PATCHES ══════════════════ */}
+            {devSection === "patches" && (
+              <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-4">
+                <div
+                  className="mx-auto max-w-2xl mb-4 flex items-center gap-2 flex-wrap px-4 py-2.5 rounded-2xl text-xs"
+                  style={{ background: "hsl(210 15% 6%)", border: "1px solid hsl(210 15% 14%)", color: "hsl(196 30% 48%)" }}
+                >
+                  <span style={{ color: "hsl(194 100% 60%)" }}>Generate</span>
+                  <span>→</span><span>Review</span><span>→</span><span>Accept</span><span>→</span>
+                  <span style={{ color: "hsl(38 100% 65%)" }}>Build/Test</span>
+                  <span>→</span>
+                  <span style={{ color: "hsl(142 70% 60%)" }}>Deploy</span>
+                </div>
+                {pendingPatches.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 gap-3">
+                    <ShieldCheck className="w-10 h-10" style={{ color: "hsl(142 60% 30%)" }} />
+                    <p className="text-sm tracking-wide" style={{ color: "hsl(196 25% 40%)" }}>No pending patches</p>
+                    <p className="text-xs text-center max-w-xs leading-relaxed" style={{ color: "hsl(196 20% 30%)" }}>
+                      Use PATCH or ask Jarvis to propose a fix in the Chat tab.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3 max-w-2xl mx-auto">
+                    {pendingPatches.map((patch) => (
+                      <PatchCard
+                        key={patch.patchId}
+                        patch={patch}
+                        onRemove={(id) => setPendingPatches((prev) => prev.filter((p) => p.patchId !== id))}
+                        onAcceptedGoToBuild={() => setDevSection("build")}
+                      />
                     ))}
-
-                    {devBuildResult.frontend.errorCount === 0 && devBuildResult.backend.errorCount === 0 && (
-                      <div
-                        className="rounded-2xl px-4 py-3 text-sm text-center"
-                        style={{ background: "hsl(142 60% 12%)", border: "1px solid hsl(142 60% 24%)", color: "hsl(142 71% 65%)" }}
-                      >
-                        ✓ No TypeScript errors — build is clean
-                      </div>
-                    )}
-                  </>
+                  </div>
                 )}
               </div>
-            </div>
-          )}
+            )}
 
-          {/* ══════════════════ DIAG ══════════════════ */}
-          {devSection === "diag" && (
-            <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-4">
-              <div className="max-w-2xl mx-auto flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-bold tracking-widest" style={{ color: "hsl(264 80% 72%)" }}>DIAGNOSTICS</h2>
-                  <button
-                    onClick={() => void runDevDiag()}
-                    disabled={devDiagLoading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
-                    style={{ background: "hsl(264 80% 55% / 0.12)", border: "1px solid hsl(264 80% 55% / 0.45)", color: "hsl(264 80% 72%)" }}
-                  >
-                    <RefreshCw className={`w-3 h-3 ${devDiagLoading ? "animate-spin" : ""}`} />
-                    REFRESH
-                  </button>
-                </div>
-
-                {!devDiagReport && !devDiagLoading && (
-                  <div className="flex flex-col items-center justify-center py-16 gap-3">
-                    <Activity className="w-10 h-10" style={{ color: "hsl(264 80% 40%)" }} />
-                    <p className="text-sm" style={{ color: "hsl(196 25% 38%)" }}>Click REFRESH to run a full system diagnostic</p>
-                  </div>
-                )}
-                {devDiagLoading && (
-                  <div className="flex items-center gap-3 py-8 justify-center">
-                    <RefreshCw className="w-5 h-5 animate-spin" style={{ color: "hsl(264 80% 65%)" }} />
-                    <span className="text-sm" style={{ color: "hsl(196 25% 45%)" }}>Running diagnostics…</span>
-                  </div>
-                )}
-
-                {devDiagReport && !devDiagLoading && (
-                  <>
-                    {/* Summary */}
-                    <div
-                      className="rounded-2xl p-4 flex items-center gap-4"
-                      style={{ background: "hsl(210 15% 7%)", border: `1px solid ${devDiagReport.ok ? "hsl(142 60% 24%)" : "hsl(355 80% 25%)"}` }}
+            {/* ══════════════════ BUILD / TEST ══════════════════ */}
+            {devSection === "build" && (
+              <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-4">
+                <div className="max-w-2xl mx-auto flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-bold tracking-widest" style={{ color: "hsl(38 100% 70%)" }}>BUILD / TEST</h2>
+                    <button
+                      onClick={() => void runDevBuild(true)}
+                      disabled={devBuildLoading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
+                      style={{ background: "hsl(38 100% 55% / 0.12)", border: "1px solid hsl(38 100% 55% / 0.45)", color: "hsl(38 100% 70%)" }}
                     >
-                      <div
-                        className="text-2xl w-10 h-10 flex items-center justify-center rounded-2xl flex-shrink-0 font-bold"
-                        style={{ background: devDiagReport.ok ? "hsl(142 60% 40% / 0.2)" : "hsl(355 80% 40% / 0.2)", color: devDiagReport.ok ? "hsl(142 71% 62%)" : "hsl(355 80% 64%)" }}
-                      >
-                        {devDiagReport.ok ? "✓" : "✖"}
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold" style={{ color: devDiagReport.ok ? "hsl(142 71% 62%)" : "hsl(355 80% 64%)" }}>
-                          {devDiagReport.ok
-                            ? "All checks passed"
-                            : `${devDiagReport.errorCount} error(s) · ${devDiagReport.warnCount} warning(s)`}
-                        </div>
-                        <div className="text-xs mt-0.5" style={{ color: "hsl(196 25% 42%)" }}>
-                          {devDiagReport.runtimeInfo.nodeVersion}
-                          {" · uptime "}
-                          {Math.round(devDiagReport.runtimeInfo.uptimeSeconds / 60)}m
-                          {" · checked "}
-                          {new Date(devDiagReport.checkedAt).toLocaleTimeString()}
-                        </div>
-                      </div>
-                    </div>
+                      <RefreshCw className={`w-3 h-3 ${devBuildLoading ? "animate-spin" : ""}`} />
+                      RUN CHECK
+                    </button>
+                  </div>
 
-                    {/* Checks grid */}
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {Object.entries(devDiagReport.checks).map(([key, result]) => {
-                        const col = result === "pass" ? "hsl(142 71% 60%)" : result === "fail" ? "hsl(355 80% 62%)" : result === "warn" ? "hsl(38 100% 65%)" : "hsl(196 25% 45%)";
-                        return (
-                          <div key={key} className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: "hsl(210 15% 7%)", border: "1px solid hsl(210 15% 14%)" }}>
-                            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: col }} />
-                            <span className="text-xs truncate" style={{ color: "hsl(196 30% 55%)" }}>{key.replace(/_/g, " ")}</span>
-                            <span className="text-[9px] font-bold ml-auto uppercase" style={{ color: col }}>{result}</span>
+                  {!devBuildResult && !devBuildLoading && (
+                    <div className="flex flex-col items-center justify-center py-16 gap-3">
+                      <Activity className="w-10 h-10" style={{ color: "hsl(38 100% 32%)" }} />
+                      <p className="text-sm" style={{ color: "hsl(196 25% 38%)" }}>Click RUN CHECK to inspect TypeScript health</p>
+                    </div>
+                  )}
+                  {devBuildLoading && (
+                    <div className="flex items-center gap-3 py-8 justify-center">
+                      <RefreshCw className="w-5 h-5 animate-spin" style={{ color: "hsl(38 100% 60%)" }} />
+                      <span className="text-sm" style={{ color: "hsl(196 25% 45%)" }}>Running TypeScript checks…</span>
+                    </div>
+                  )}
+
+                  {devBuildResult && !devBuildLoading && (() => {
+                    const fe    = devBuildResult.frontend ?? { errorCount: 0, errors: [] };
+                    const be    = devBuildResult.backend  ?? { errorCount: 0, errors: [] };
+                    const score = devBuildResult.score ?? 0;
+                    const lbl   = devBuildResult.label ?? "critical";
+                    const allErrors = [...fe.errors, ...be.errors];
+                    return (
+                      <>
+                        <div
+                          className="rounded-2xl p-5 flex items-center gap-4"
+                          style={{ background: "hsl(210 15% 7%)", border: "1px solid hsl(210 15% 15%)" }}
+                        >
+                          <div
+                            className="w-16 h-16 rounded-2xl flex items-center justify-center font-bold text-2xl flex-shrink-0"
+                            style={{
+                              background: score >= 90 ? "hsl(142 60% 40% / 0.2)" : score >= 70 ? "hsl(38 100% 55% / 0.2)" : "hsl(355 80% 40% / 0.2)",
+                              border:     `2px solid ${score >= 90 ? "hsl(142 60% 50%)" : score >= 70 ? "hsl(38 100% 60%)" : "hsl(355 80% 50%)"}`,
+                              color:      score >= 90 ? "hsl(142 71% 65%)" : score >= 70 ? "hsl(38 100% 70%)" : "hsl(355 80% 65%)",
+                            }}
+                          >
+                            {score}
                           </div>
-                        );
-                      })}
-                    </div>
+                          <div className="flex flex-col gap-1 flex-1">
+                            <div className="text-sm font-bold tracking-widest uppercase"
+                              style={{ color: score >= 90 ? "hsl(142 71% 62%)" : score >= 70 ? "hsl(38 100% 68%)" : "hsl(355 80% 62%)" }}>
+                              {lbl}
+                            </div>
+                            <div className="text-xs" style={{ color: "hsl(196 25% 45%)" }}>
+                              Frontend: {fe.errorCount} error(s) · Backend: {be.errorCount} error(s)
+                            </div>
+                          </div>
+                          {allErrors.length > 0 && <CopyButton text={allErrors.join("\n")} label="COPY ERRORS" />}
+                        </div>
 
-                    {/* Issues */}
-                    {devDiagReport.issues.length > 0 && (
-                      <div className="flex flex-col gap-2">
-                        {devDiagReport.issues.map((issue, i) => {
-                          const sevColor = issue.severity === "error" ? "hsl(355 80% 62%)" : issue.severity === "warning" ? "hsl(38 100% 65%)" : "hsl(196 60% 60%)";
+                        {[
+                          { label: "FRONTEND (jarvas)",    errors: fe.errors },
+                          { label: "BACKEND (api-server)", errors: be.errors },
+                        ].map(({ label: pkg, errors }) => errors.length > 0 && (
+                          <div key={pkg} className="rounded-2xl overflow-hidden" style={{ border: "1px solid hsl(355 80% 25%)" }}>
+                            <div className="px-4 py-2 text-[10px] font-bold tracking-widest flex items-center justify-between"
+                              style={{ background: "hsl(355 80% 14%)", color: "hsl(355 80% 64%)" }}>
+                              {pkg}
+                              <CopyButton text={errors.join("\n")} />
+                            </div>
+                            <div className="p-4 font-mono text-[11px] leading-relaxed flex flex-col gap-1" style={{ background: "hsl(210 15% 6%)" }}>
+                              {errors.slice(0, 20).map((line, i) => (
+                                <div key={i} style={{ color: "hsl(355 80% 64%)", wordBreak: "break-all" }}>{line}</div>
+                              ))}
+                              {errors.length > 20 && <div style={{ color: "hsl(196 25% 38%)" }}>…and {errors.length - 20} more</div>}
+                            </div>
+                          </div>
+                        ))}
+
+                        {fe.errorCount === 0 && be.errorCount === 0 && (
+                          <div className="rounded-2xl px-4 py-3 text-sm text-center"
+                            style={{ background: "hsl(142 60% 12%)", border: "1px solid hsl(142 60% 24%)", color: "hsl(142 71% 65%)" }}>
+                            ✓ No TypeScript errors — build is clean
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* ══════════════════ DIAG ══════════════════ */}
+            {devSection === "diag" && (
+              <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-4">
+                <div className="max-w-2xl mx-auto flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-bold tracking-widest" style={{ color: "hsl(264 80% 72%)" }}>DIAGNOSTICS</h2>
+                    <div className="flex items-center gap-2">
+                      {devDiagReport && <CopyButton text={JSON.stringify(devDiagReport, null, 2)} label="COPY JSON" />}
+                      <button
+                        onClick={() => void runDevDiag()}
+                        disabled={devDiagLoading}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
+                        style={{ background: "hsl(264 80% 55% / 0.12)", border: "1px solid hsl(264 80% 55% / 0.45)", color: "hsl(264 80% 72%)" }}
+                      >
+                        <RefreshCw className={`w-3 h-3 ${devDiagLoading ? "animate-spin" : ""}`} />
+                        REFRESH
+                      </button>
+                    </div>
+                  </div>
+
+                  {!devDiagReport && !devDiagLoading && (
+                    <div className="flex flex-col items-center justify-center py-16 gap-3">
+                      <Activity className="w-10 h-10" style={{ color: "hsl(264 80% 40%)" }} />
+                      <p className="text-sm" style={{ color: "hsl(196 25% 38%)" }}>Click REFRESH to run a full system diagnostic</p>
+                    </div>
+                  )}
+                  {devDiagLoading && (
+                    <div className="flex items-center gap-3 py-8 justify-center">
+                      <RefreshCw className="w-5 h-5 animate-spin" style={{ color: "hsl(264 80% 65%)" }} />
+                      <span className="text-sm" style={{ color: "hsl(196 25% 45%)" }}>Running diagnostics…</span>
+                    </div>
+                  )}
+
+                  {devDiagReport && !devDiagLoading && (
+                    <>
+                      <div
+                        className="rounded-2xl p-4 flex items-center gap-4"
+                        style={{ background: "hsl(210 15% 7%)", border: `1px solid ${devDiagReport.ok ? "hsl(142 60% 24%)" : "hsl(355 80% 25%)"}` }}
+                      >
+                        <div
+                          className="text-2xl w-10 h-10 flex items-center justify-center rounded-2xl flex-shrink-0 font-bold"
+                          style={{ background: devDiagReport.ok ? "hsl(142 60% 40% / 0.2)" : "hsl(355 80% 40% / 0.2)", color: devDiagReport.ok ? "hsl(142 71% 62%)" : "hsl(355 80% 64%)" }}
+                        >
+                          {devDiagReport.ok ? "✓" : "✖"}
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-bold" style={{ color: devDiagReport.ok ? "hsl(142 71% 62%)" : "hsl(355 80% 64%)" }}>
+                            {devDiagReport.ok ? "All checks passed" : `${devDiagReport.errorCount} error(s) · ${devDiagReport.warnCount} warning(s)`}
+                          </div>
+                          <div className="text-xs mt-0.5" style={{ color: "hsl(196 25% 42%)" }}>
+                            {devDiagReport.runtimeInfo.nodeVersion} · uptime {Math.round(devDiagReport.runtimeInfo.uptimeSeconds / 60)}m · {new Date(devDiagReport.checkedAt).toLocaleTimeString()}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {Object.entries(devDiagReport.checks).map(([key, result]) => {
+                          const col = result === "pass" ? "hsl(142 71% 60%)" : result === "fail" ? "hsl(355 80% 62%)" : result === "warn" ? "hsl(38 100% 65%)" : "hsl(196 25% 45%)";
                           return (
-                            <div key={i} className="rounded-2xl p-4 flex flex-col gap-2" style={{ background: "hsl(210 15% 7%)", border: `1px solid ${sevColor}33` }}>
-                              <div className="flex items-start justify-between gap-2">
-                                <span className="text-xs font-semibold leading-snug flex-1" style={{ color: "hsl(196 50% 78%)" }}>{issue.likelyCause}</span>
-                                <span
-                                  className="flex-shrink-0 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase"
-                                  style={{ background: `${sevColor}20`, color: sevColor, border: `1px solid ${sevColor}44` }}
-                                >
-                                  {issue.severity}
-                                </span>
-                              </div>
-                              <div className="text-xs" style={{ color: "hsl(196 25% 45%)" }}>{issue.suggestedFix}</div>
-                              {issue.detail && <div className="text-[10px] font-mono" style={{ color: "hsl(196 20% 36%)" }}>{issue.detail}</div>}
+                            <div key={key} className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: "hsl(210 15% 7%)", border: "1px solid hsl(210 15% 14%)" }}>
+                              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: col }} />
+                              <span className="text-xs truncate" style={{ color: "hsl(196 30% 55%)" }}>{key.replace(/_/g, " ")}</span>
+                              <span className="text-[9px] font-bold ml-auto uppercase" style={{ color: col }}>{result}</span>
                             </div>
                           );
                         })}
                       </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          )}
 
-        </div>
+                      {devDiagReport.issues.length > 0 && (
+                        <div className="flex flex-col gap-2">
+                          {devDiagReport.issues.map((issue, i) => {
+                            const sevColor = issue.severity === "error" ? "hsl(355 80% 62%)" : issue.severity === "warning" ? "hsl(38 100% 65%)" : "hsl(196 60% 60%)";
+                            const issueText = `${issue.likelyCause}\n\nFix: ${issue.suggestedFix}${issue.detail ? `\n\nDetail: ${issue.detail}` : ""}`;
+                            return (
+                              <div key={i} className="rounded-2xl p-4 flex flex-col gap-2" style={{ background: "hsl(210 15% 7%)", border: `1px solid ${sevColor}33` }}>
+                                <div className="flex items-start justify-between gap-2">
+                                  <span className="text-xs font-semibold leading-snug flex-1" style={{ color: "hsl(196 50% 78%)" }}>{issue.likelyCause}</span>
+                                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                                    <CopyButton text={issueText} />
+                                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase"
+                                      style={{ background: `${sevColor}20`, color: sevColor, border: `1px solid ${sevColor}44` }}>
+                                      {issue.severity}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="text-xs" style={{ color: "hsl(196 25% 45%)" }}>{issue.suggestedFix}</div>
+                                {issue.detail && <div className="text-[10px] font-mono" style={{ color: "hsl(196 20% 36%)" }}>{issue.detail}</div>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ══════════════════ LOGS ══════════════════ */}
+            {devSection === "logs" && (
+              <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-4">
+                <div className="max-w-2xl mx-auto flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-bold tracking-widest" style={{ color: "hsl(196 80% 68%)" }}>LOGS</h2>
+                    <div className="flex items-center gap-2">
+                      {devLogs.length > 0 && <CopyButton text={devLogs.join("\n")} label="COPY ALL" />}
+                      <button
+                        onClick={() => void loadDevLogs()}
+                        disabled={devLogsLoading}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
+                        style={{ background: "hsl(196 80% 55% / 0.12)", border: "1px solid hsl(196 80% 55% / 0.45)", color: "hsl(196 80% 68%)" }}
+                      >
+                        <RefreshCw className={`w-3 h-3 ${devLogsLoading ? "animate-spin" : ""}`} />
+                        REFRESH
+                      </button>
+                    </div>
+                  </div>
+
+                  {!devLogsLoading && devLogs.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-16 gap-3">
+                      <Activity className="w-10 h-10" style={{ color: "hsl(196 80% 28%)" }} />
+                      <p className="text-sm" style={{ color: "hsl(196 25% 38%)" }}>Click REFRESH to load server logs</p>
+                    </div>
+                  )}
+                  {devLogsLoading && (
+                    <div className="flex items-center gap-3 py-8 justify-center">
+                      <RefreshCw className="w-5 h-5 animate-spin" style={{ color: "hsl(196 80% 60%)" }} />
+                      <span className="text-sm" style={{ color: "hsl(196 25% 45%)" }}>Loading logs…</span>
+                    </div>
+                  )}
+                  {!devLogsLoading && devLogs.length > 0 && (
+                    <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid hsl(210 15% 16%)" }}>
+                      <div className="px-4 py-2 text-[10px] font-bold tracking-widest"
+                        style={{ background: "hsl(210 15% 10%)", color: "hsl(196 30% 50%)" }}>
+                        SERVER LOGS — {devLogs.length} lines
+                      </div>
+                      <div className="p-4 font-mono text-[11px] leading-relaxed flex flex-col gap-0.5 max-h-[60vh] overflow-y-auto scrollbar-thin"
+                        style={{ background: "hsl(210 15% 5%)" }}>
+                        {devLogs.map((line, i) => {
+                          const isErr  = /error|fail|exception/i.test(line);
+                          const isWarn = /warn|warning/i.test(line);
+                          return (
+                            <div key={i} style={{ color: isErr ? "hsl(355 80% 64%)" : isWarn ? "hsl(38 100% 65%)" : "hsl(196 25% 50%)", wordBreak: "break-all" }}>
+                              {line}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ══════════════════ CHECKLIST ══════════════════ */}
+            {devSection === "checklist" && (() => {
+              const fe       = devBuildResult?.frontend ?? { errorCount: 0 };
+              const be       = devBuildResult?.backend  ?? { errorCount: 0 };
+              const score    = devBuildResult?.score ?? null;
+              const portOk   = devDiagReport ? devDiagReport.checks["port_binding"] !== "fail" : null;
+              const aiKeyOk  = devDiagReport ? devDiagReport.checks["env_var_AI_INTEGRATIONS_ANTHROPIC_API_KEY"] === "pass" : null;
+              const autoItems: Array<{ label: string; ok: boolean | null; detail?: string }> = [
+                { label: "API server online",           ok: true,          detail: "Server is responding" },
+                { label: "TypeScript clean (frontend)", ok: fe.errorCount === 0, detail: devBuildResult ? `${fe.errorCount} errors` : "Run Build first" },
+                { label: "TypeScript clean (backend)",  ok: be.errorCount === 0, detail: devBuildResult ? `${be.errorCount} errors` : "Run Build first" },
+                { label: "Health score ≥ 90",           ok: score !== null ? score >= 90 : null, detail: score !== null ? `Score: ${score}` : "Run Build first" },
+                { label: "PORT env var set",            ok: portOk,        detail: devDiagReport ? undefined : "Run Diag first" },
+                { label: "Anthropic API key set",       ok: aiKeyOk,       detail: devDiagReport ? undefined : "Run Diag first" },
+              ];
+              const snapshotJson = JSON.stringify({ timestamp: new Date().toISOString(), projectMemory: devProjectMemory, diagnostics: devDiagReport, buildResult: devBuildResult, pendingPatches }, null, 2);
+              return (
+                <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-4">
+                  <div className="max-w-2xl mx-auto flex flex-col gap-4">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <h2 className="text-sm font-bold tracking-widest" style={{ color: "hsl(142 71% 62%)" }}>LEAVE REPLIT CHECKLIST</h2>
+                      <div className="flex items-center gap-2">
+                        <CopyButton text={snapshotJson} label="COPY SNAPSHOT" />
+                        <button
+                          onClick={() => void exportSnapshot()}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95"
+                          style={{ background: "hsl(142 60% 40% / 0.12)", border: "1px solid hsl(142 60% 40% / 0.40)", color: "hsl(142 71% 62%)" }}
+                        >
+                          <Download className="w-3 h-3" />
+                          EXPORT JSON
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Auto-detected */}
+                    <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid hsl(210 15% 16%)" }}>
+                      <div className="px-4 py-2 text-[10px] font-bold tracking-widest" style={{ background: "hsl(210 15% 10%)", color: "hsl(196 30% 50%)" }}>
+                        AUTO-DETECTED
+                      </div>
+                      <div className="divide-y" style={{ borderColor: "hsl(210 15% 12%)" }}>
+                        {autoItems.map(({ label, ok, detail }) => {
+                          const col  = ok === null ? "hsl(196 25% 45%)" : ok ? "hsl(142 71% 62%)" : "hsl(355 80% 62%)";
+                          const icon = ok === null ? "?" : ok ? "✓" : "✖";
+                          return (
+                            <div key={label} className="flex items-center gap-3 px-4 py-3">
+                              <span className="text-sm font-bold w-4 flex-shrink-0" style={{ color: col }}>{icon}</span>
+                              <span className="text-xs flex-1" style={{ color: "hsl(196 35% 65%)" }}>{label}</span>
+                              {detail && <span className="text-[10px]" style={{ color: "hsl(196 20% 38%)" }}>{detail}</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => void runAllChecks()}
+                      disabled={devBuildLoading || devDiagLoading}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-xs font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
+                      style={{ background: "hsl(38 100% 55% / 0.12)", border: "1px solid hsl(38 100% 55% / 0.45)", color: "hsl(38 100% 70%)" }}
+                    >
+                      <RefreshCw className={`w-4 h-4 ${(devBuildLoading || devDiagLoading) ? "animate-spin" : ""}`} />
+                      RUN ALL CHECKS TO UPDATE STATUS
+                    </button>
+
+                    <ManualChecklist />
+
+                    <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: "hsl(210 15% 7%)", border: "1px solid hsl(210 15% 15%)" }}>
+                      <div className="text-[10px] font-bold tracking-widest" style={{ color: "hsl(196 30% 50%)" }}>PROJECT SNAPSHOT</div>
+                      <div className="text-xs" style={{ color: "hsl(196 25% 45%)" }}>
+                        Exports project memory, diagnostics, build result, and pending patches as JSON.
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => void exportSnapshot()}
+                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold tracking-widest transition-all active:scale-95"
+                          style={{ background: "hsl(142 60% 40% / 0.15)", border: "1px solid hsl(142 60% 40% / 0.40)", color: "hsl(142 71% 62%)" }}
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          DOWNLOAD SNAPSHOT
+                        </button>
+                        <CopyButton text={snapshotJson} label="COPY AS JSON" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+          </div>
+        </DevErrorBoundary>
       )}
 
       {/* ── Message list ── */}

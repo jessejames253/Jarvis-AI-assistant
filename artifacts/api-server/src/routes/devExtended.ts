@@ -11,6 +11,7 @@
 
 import { Router } from "express";
 import fs from "fs/promises";
+import { existsSync, readFileSync } from "fs";
 import path from "path";
 import {
   getAllTasks, getTask, createTask, updateTask, deleteTask,
@@ -171,6 +172,51 @@ router.get("/dev/index", async (_req, res) => {
 router.post("/dev/index/rebuild", async (_req, res) => {
   // Trigger re-index — for now, same as GET (stateless index)
   res.json({ ok: true, message: "Index is rebuilt on every GET /dev/index" });
+});
+
+// ─── GET /dev/logs ─────────────────────────────────────────────────────────
+// Returns recent server log lines from .jarvis/server.log (if present),
+// or process info when no log file is found.
+
+router.get("/dev/logs", (req, res) => {
+  const n = Math.min(parseInt(String(req.query["n"] ?? "200"), 10) || 200, 500);
+
+  // Try .jarvis/server.log first
+  const candidates = [
+    path.join(PROJECT_ROOT, ".jarvis", "server.log"),
+    path.join(PROJECT_ROOT, ".jarvas-data", "logs", "server.log"),
+    path.join(PROJECT_ROOT, "server.log"),
+  ];
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      try {
+        const raw   = readFileSync(candidate, "utf-8");
+        const lines = raw.split("\n").filter(Boolean).slice(-n);
+        res.json({ ok: true, source: "file", file: path.basename(candidate), lines });
+        return;
+      } catch { /* try next */ }
+    }
+  }
+
+  // Fallback: expose process telemetry as structured log lines
+  const mem = process.memoryUsage();
+  res.json({
+    ok:     true,
+    source: "process",
+    note:   "No server.log file found — showing process info. Check your hosting platform for full logs.",
+    lines: [
+      `[INFO] Uptime:      ${Math.round(process.uptime())}s`,
+      `[INFO] NODE_ENV:    ${process.env["NODE_ENV"] ?? "unset"}`,
+      `[INFO] PORT:        ${process.env["PORT"] ?? "unset"}`,
+      `[INFO] Platform:    ${process.platform} ${process.arch}`,
+      `[INFO] Node:        ${process.version}`,
+      `[INFO] Memory RSS:  ${Math.round(mem.rss        / 1024 / 1024)} MB`,
+      `[INFO] Heap Used:   ${Math.round(mem.heapUsed   / 1024 / 1024)} MB`,
+      `[INFO] Heap Total:  ${Math.round(mem.heapTotal  / 1024 / 1024)} MB`,
+      `[HINT] To enable file logging, write server output to ${candidates[0]}`,
+    ],
+  });
 });
 
 export default router;
