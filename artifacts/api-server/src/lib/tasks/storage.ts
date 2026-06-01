@@ -10,8 +10,9 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
 import type { TaskStore } from "./types";
+import { resolveDataDir } from "../rootResolver";
 
-const DATA_DIR = "/home/runner/workspace/.jarvas-data/tasks";
+const DATA_DIR = resolveDataDir(".jarvas-data/tasks");
 
 async function ensureDir(): Promise<void> {
   if (!existsSync(DATA_DIR)) {

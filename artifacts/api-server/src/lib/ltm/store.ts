@@ -15,8 +15,9 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
+import { resolveDataDir } from "../rootResolver";
 
-const DATA_DIR = "/home/runner/workspace/.jarvas-data/ltm";
+const DATA_DIR = resolveDataDir(".jarvas-data/ltm");
 
 export type MemoryCategory = "personal" | "coding" | "projects" | "preferences";
 

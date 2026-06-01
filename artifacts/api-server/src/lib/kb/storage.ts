@@ -10,8 +10,9 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
 import type { KBStore } from "./types";
+import { resolveDataDir } from "../rootResolver";
 
-const DATA_DIR = "/home/runner/workspace/.jarvas-data/kb";
+const DATA_DIR = resolveDataDir(".jarvas-data/kb");
 
 async function ensureDir(): Promise<void> {
   if (!existsSync(DATA_DIR)) {

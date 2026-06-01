@@ -14,57 +14,11 @@ import fs from "fs/promises";
 import { readFileSync, writeFileSync, mkdirSync, accessSync } from "fs";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { PROJECT_ROOT, resolveDataDir } from "../rootResolver";
+
+export { PROJECT_ROOT };
 
 const execAsync = promisify(exec);
-
-// ─── Project root resolver ────────────────────────────────────────────────────
-// Walks up from process.cwd() and __dirname until it finds a directory that
-// looks like the repo root (contains both "artifacts/" and "package.json").
-// Falls back to known static paths and finally process.cwd().
-
-const ROOT_MARKERS = ["artifacts", "package.json"];
-
-function isValidRoot(dir: string): boolean {
-  return ROOT_MARKERS.every(m => {
-    try { accessSync(path.join(dir, m)); return true; } catch { return false; }
-  });
-}
-
-function walkUpToRoot(start: string, maxSteps = 10): string | null {
-  let dir = start;
-  for (let i = 0; i < maxSteps; i++) {
-    if (isValidRoot(dir)) return dir;
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return null;
-}
-
-function resolveProjectRoot(): string {
-  const envRoot = process.env["PROJECT_ROOT"]?.trim();
-  if (envRoot && isValidRoot(envRoot)) return envRoot;
-
-  const fromCwd = walkUpToRoot(process.cwd());
-  if (fromCwd) return fromCwd;
-
-  const fromDirname = walkUpToRoot(__dirname);
-  if (fromDirname) return fromDirname;
-
-  for (const known of ["/home/runner/workspace", "/workspace", "/app"]) {
-    if (isValidRoot(known)) return known;
-  }
-
-  const fallback = process.cwd();
-  console.warn(
-    `[PROJECT_ROOT] Warning — no valid root found.\n` +
-    `  cwd=${process.cwd()}\n  __dirname=${__dirname}\n  Falling back to: ${fallback}`
-  );
-  return fallback;
-}
-
-export const PROJECT_ROOT = resolveProjectRoot();
-console.log(`[PROJECT_ROOT] ${PROJECT_ROOT}  (cwd=${process.cwd()})`);
 
 // ─── ripgrep resolver ─────────────────────────────────────────────────────────
 // The rg binary lives in the Nix store and may not be on PATH for the server

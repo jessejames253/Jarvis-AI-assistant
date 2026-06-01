@@ -25,10 +25,9 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
+import { resolveDataDir } from "./rootResolver";
 
-// Where session files are stored. This path persists across server restarts
-// in the Replit environment. Files are not committed to git.
-const DATA_DIR = "/home/runner/workspace/.jarvas-data/sessions";
+const DATA_DIR = resolveDataDir(".jarvas-data/sessions");
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
