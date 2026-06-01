@@ -1,0 +1,57 @@
+Focus only on finishing Jarvis DEV so it can eventually replace Replit Agent for normal development.
+
+Goal:
+Jarvis DEV must be able to inspect the codebase, propose fixes, create patch cards, apply approved patches, run checks, and support rollback.
+
+Phase 1 — fix DEV chat end-to-end:
+1. Fix PROPOSE FIX hanging forever.
+2. Make SCAN PROJECT, PROPOSE FIX, CREATE PATCH, and WORK ON JARVIS all send real DEV assistant requests.
+3. Assistant response must appear in DEV chat.
+4. Loading state must always clear on success or failure.
+5. Add timeout handling with friendly error if request takes too long.
+
+Phase 2 — codebase scan:
+1. Add backend endpoint to list project files safely.
+2. Add backend endpoint to read selected project files safely.
+3. Exclude node_modules, dist, .git, secrets, env files, logs, and large files.
+4. DEV assistant should use this to understand the project.
+
+Phase 3 — patch generation:
+1. Add endpoint to create pending patch cards.
+2. Patch card must include:
+   - title
+   - summary
+   - files changed
+   - diff preview
+   - risk level
+   - rollback notes
+   - expected result
+3. CREATE PATCH should create a pending patch, not directly edit files.
+
+Phase 4 — approval workflow:
+1. User can Accept or Decline patch.
+2. Accept applies file changes.
+3. Decline leaves files untouched.
+4. After Accept, automatically run Build/Test.
+5. If Build/Test fails, show rollback option.
+
+Phase 5 — rollback:
+1. Store backup of changed files before applying patch.
+2. Add Rollback button after applied patch.
+3. Rollback restores previous file contents.
+4. Run Build/Test again after rollback.
+
+Phase 6 — safety:
+1. Never auto-deploy.
+2. Never modify .env or secrets.
+3. Never write outside project root.
+4. Never apply patches without approval.
+5. DEV errors must never crash main Jarvis.
+
+Verify:
+- PROPOSE FIX returns an assistant response.
+- CREATE PATCH creates a pending patch card.
+- Accept applies patch only after approval.
+- Build/Test runs after patch.
+- Rollback works.
+- TypeScript passes.

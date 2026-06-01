@@ -761,6 +761,22 @@ interface DevHealthResult {
 
 // ─── PatchCard ────────────────────────────────────────────────────────────────
 
+/** Minimal positional line diff — enough for a readable +/- preview. */
+function computeLineDiff(oldText: string, newText: string): Array<{ t: "add" | "del" | "ctx"; line: string }> {
+  const ol = oldText.split("\n");
+  const nl = newText.split("\n");
+  const out: Array<{ t: "add" | "del" | "ctx"; line: string }> = [];
+  const len = Math.max(ol.length, nl.length);
+  for (let i = 0; i < len; i++) {
+    if (ol[i] === nl[i]) { out.push({ t: "ctx", line: ol[i] ?? "" }); }
+    else {
+      if (ol[i] !== undefined) out.push({ t: "del", line: ol[i] });
+      if (nl[i] !== undefined) out.push({ t: "add", line: nl[i] });
+    }
+  }
+  return out;
+}
+
 function PatchCard({
   patch,
   onRemove,
@@ -770,8 +786,14 @@ function PatchCard({
   onRemove: (id: string) => void;
   onAcceptedGoToBuild?: () => void;
 }) {
-  const [status, setStatus] = useState<"idle" | "applying" | "done" | "error">("idle");
+  const BASE = getApiBase();
+  const [status,     setStatus]     = useState<"idle" | "applying" | "done" | "error">("idle");
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [validation, setValidation] = useState<{ passed: boolean; summary: string } | null>(null);
+  const [snapshotId, setSnapshotId] = useState<string | null>(null);
+  const [showDiff,   setShowDiff]   = useState(false);
+  const [rolling,    setRolling]    = useState(false);
+  const [rollResult, setRollResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const RISK_COLOR: Record<string, string> = {
     low:    "hsl(142 71% 55%)",
@@ -785,7 +807,8 @@ function PatchCard({
     const result = await approvePatch(patch.patchId, patch.file);
     if (result.ok) {
       setStatus("done");
-      // No auto-remove — keep visible so user can follow the Build/Test workflow step
+      setSnapshotId(result.snapshotId ?? null);
+      setValidation(result.validation ?? null);
     } else {
       setStatus("error");
       setApplyError(result.error ?? "Apply failed");
@@ -797,96 +820,200 @@ function PatchCard({
     onRemove(patch.patchId);
   };
 
+  const handleRollback = async () => {
+    if (!snapshotId) return;
+    setRolling(true);
+    try {
+      const res = await fetch(`${BASE}api/dev/snapshots/${snapshotId}/restore`, { method: "POST" });
+      const data = await res.json() as { ok: boolean; error?: string; validation?: { passed: boolean; summary: string } };
+      if (data.ok) {
+        setRollResult({ ok: true, msg: data.validation?.passed ? "Rolled back — build passing." : "Rolled back — build still failing." });
+        setValidation(data.validation ?? null);
+      } else {
+        setRollResult({ ok: false, msg: data.error ?? "Rollback failed" });
+      }
+    } catch (err) {
+      setRollResult({ ok: false, msg: String(err) });
+    } finally {
+      setRolling(false);
+    }
+  };
+
+  const hasDiff = !!(patch.oldContent !== undefined && patch.newContent !== undefined);
+  const diffLines = hasDiff ? computeLineDiff(patch.oldContent!, patch.newContent!) : [];
+  const MAX_DIFF = 60;
+  const truncated = diffLines.length > MAX_DIFF;
+
   return (
     <div
       className="rounded-2xl border flex flex-col gap-3 p-4"
       style={{ background: "hsl(210 15% 7%)", borderColor: "hsl(210 15% 16%)" }}
     >
       {/* Header row */}
-      <div className="flex items-start gap-3">
-        <p className="flex-1 text-sm font-semibold leading-snug" style={{ color: "hsl(196 80% 85%)" }}>
+      <div className="flex items-start gap-2 flex-wrap">
+        <p className="flex-1 text-sm font-semibold leading-snug min-w-0" style={{ color: "hsl(196 80% 85%)" }}>
           {patch.description}
         </p>
-        {patch.riskLevel && (
-          <span
-            className="flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border"
-            style={{
-              color: RISK_COLOR[patch.riskLevel] ?? "hsl(196 60% 60%)",
-              borderColor: `${RISK_COLOR[patch.riskLevel] ?? "hsl(196 60% 60%)"}44`,
-            }}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {patch.safeToTest && (
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "hsl(142 60% 14%)", color: "hsl(142 71% 60%)", border: "1px solid hsl(142 60% 24%)" }}>
+              SAFE
+            </span>
+          )}
+          {patch.riskLevel && (
+            <span
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full border"
+              style={{ color: RISK_COLOR[patch.riskLevel] ?? "hsl(196 60% 60%)", borderColor: `${RISK_COLOR[patch.riskLevel] ?? "hsl(196 60% 60%)"}44` }}
+            >
+              {patch.riskLevel.toUpperCase()}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* File + diff toggle */}
+      <div className="flex items-center gap-2">
+        <Code2 className="w-3 h-3 flex-shrink-0" style={{ color: "hsl(196 40% 42%)" }} />
+        <span className="text-xs font-mono truncate flex-1" style={{ color: "hsl(196 60% 58%)" }}>
+          {patch.file}
+        </span>
+        {hasDiff && (
+          <button
+            onClick={() => setShowDiff(v => !v)}
+            className="text-[10px] font-bold px-2 py-0.5 rounded-lg transition-all"
+            style={{ background: showDiff ? "hsl(194 100% 55% / 0.15)" : "transparent", border: "1px solid hsl(194 100% 55% / 0.3)", color: "hsl(194 100% 65%)" }}
           >
-            {patch.riskLevel.toUpperCase()}
-          </span>
+            {showDiff ? "HIDE DIFF" : "VIEW DIFF"}
+          </button>
         )}
       </div>
 
-      {/* File */}
-      <div className="flex items-center gap-2">
-        <Code2 className="w-3 h-3 flex-shrink-0" style={{ color: "hsl(196 40% 42%)" }} />
-        <span className="text-xs font-mono truncate" style={{ color: "hsl(196 60% 58%)" }}>
-          {patch.file}
-        </span>
-      </div>
-
-      {/* Impact notes */}
-      {(patch.uiImpact || patch.logicImpact) && (
-        <div className="text-xs space-y-0.5" style={{ color: "hsl(196 25% 50%)" }}>
-          {patch.uiImpact   && <div>UI: {patch.uiImpact}</div>}
-          {patch.logicImpact && <div>Logic: {patch.logicImpact}</div>}
+      {/* Diff preview */}
+      {showDiff && hasDiff && (
+        <div
+          className="rounded-xl overflow-auto max-h-64 text-[11px] font-mono leading-5"
+          style={{ background: "hsl(210 15% 4%)", border: "1px solid hsl(210 15% 12%)" }}
+        >
+          {(truncated ? diffLines.slice(0, MAX_DIFF) : diffLines).map((d, i) => (
+            <div
+              key={i}
+              className="px-3 whitespace-pre"
+              style={{
+                background: d.t === "add" ? "hsl(142 60% 40% / 0.12)" : d.t === "del" ? "hsl(355 80% 40% / 0.12)" : "transparent",
+                color:      d.t === "add" ? "hsl(142 71% 68%)"        : d.t === "del" ? "hsl(355 80% 68%)"        : "hsl(196 20% 42%)",
+              }}
+            >
+              {d.t === "add" ? "+ " : d.t === "del" ? "- " : "  "}{d.line}
+            </div>
+          ))}
+          {truncated && (
+            <div className="px-3 py-1 text-center" style={{ color: "hsl(196 20% 34%)" }}>
+              … {diffLines.length - MAX_DIFF} more lines
+            </div>
+          )}
         </div>
       )}
 
-      {/* Status feedback */}
+      {/* Impact notes */}
+      {(patch.uiImpact || patch.logicImpact) && patch.uiImpact !== "unknown" && (
+        <div className="text-xs space-y-0.5" style={{ color: "hsl(196 25% 50%)" }}>
+          {patch.uiImpact    && patch.uiImpact    !== "unknown" && <div>UI: {patch.uiImpact}</div>}
+          {patch.logicImpact && patch.logicImpact !== "unknown" && <div>Logic: {patch.logicImpact}</div>}
+        </div>
+      )}
+
+      {/* Rollback note */}
+      <div className="text-[10px]" style={{ color: "hsl(196 20% 30%)" }}>
+        ↺ Snapshot saved on apply — rollback available if build fails
+      </div>
+
+      {/* Apply error */}
       {status === "error" && applyError && (
-        <div
-          className="text-xs rounded-xl px-3 py-2"
-          style={{ background: "hsl(355 80% 14%)", color: "hsl(355 80% 68%)", border: "1px solid hsl(355 80% 28%)" }}
-        >
+        <div className="text-xs rounded-xl px-3 py-2" style={{ background: "hsl(355 80% 14%)", color: "hsl(355 80% 68%)", border: "1px solid hsl(355 80% 28%)" }}>
           ✖ {applyError}
         </div>
       )}
+
+      {/* Post-apply state */}
       {status === "done" && (
         <div className="flex flex-col gap-2">
-          <div
-            className="text-xs rounded-xl px-3 py-2"
-            style={{ background: "hsl(142 60% 11%)", color: "hsl(142 71% 62%)", border: "1px solid hsl(142 60% 22%)" }}
-          >
-            ✓ Applied — patch written to disk
+          {/* Validation result */}
+          {validation ? (
+            <div
+              className="text-xs rounded-xl px-3 py-2 flex items-center gap-2"
+              style={validation.passed
+                ? { background: "hsl(142 60% 11%)", color: "hsl(142 71% 62%)", border: "1px solid hsl(142 60% 22%)" }
+                : { background: "hsl(38 100% 12%)",  color: "hsl(38 100% 68%)",  border: "1px solid hsl(38 100% 28%)" }
+              }
+            >
+              <span>{validation.passed ? "✓" : "⚠"}</span>
+              <span className="flex-1">{validation.passed ? "Applied — build passing" : `Applied — build failed: ${validation.summary}`}</span>
+            </div>
+          ) : (
+            <div className="text-xs rounded-xl px-3 py-2" style={{ background: "hsl(142 60% 11%)", color: "hsl(142 71% 62%)", border: "1px solid hsl(142 60% 22%)" }}>
+              ✓ Applied
+            </div>
+          )}
+
+          {/* Rollback result */}
+          {rollResult && (
+            <div
+              className="text-xs rounded-xl px-3 py-2"
+              style={rollResult.ok
+                ? { background: "hsl(194 60% 11%)", color: "hsl(194 100% 68%)", border: "1px solid hsl(194 60% 22%)" }
+                : { background: "hsl(355 80% 14%)", color: "hsl(355 80% 68%)", border: "1px solid hsl(355 80% 28%)" }
+              }
+            >
+              {rollResult.ok ? "↺ " : "✖ "}{rollResult.msg}
+            </div>
+          )}
+
+          {/* Action row after apply */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => { onAcceptedGoToBuild?.(); }}
+              className="flex-1 py-2 rounded-xl text-xs font-bold tracking-widest transition-all active:scale-95"
+              style={{ background: "hsl(38 100% 55% / 0.12)", color: "hsl(38 100% 70%)", border: "1px solid hsl(38 100% 55% / 0.40)" }}
+            >
+              → BUILD/TEST
+            </button>
+            {snapshotId && !rollResult?.ok && (
+              <button
+                onClick={() => void handleRollback()}
+                disabled={rolling}
+                className="px-3 py-2 rounded-xl text-xs font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
+                style={{ background: "hsl(355 80% 35% / 0.12)", color: "hsl(355 80% 64%)", border: "1px solid hsl(355 80% 38% / 0.5)" }}
+              >
+                {rolling ? "…" : "↺ ROLLBACK"}
+              </button>
+            )}
+            <button
+              onClick={() => onRemove(patch.patchId)}
+              className="px-3 py-2 rounded-xl text-xs font-bold tracking-widest transition-all active:scale-95"
+              style={{ background: "transparent", color: "hsl(196 20% 36%)", border: "1px solid hsl(210 15% 18%)" }}
+            >
+              DISMISS
+            </button>
           </div>
-          <button
-            onClick={() => { onAcceptedGoToBuild?.(); onRemove(patch.patchId); }}
-            className="text-xs rounded-xl px-3 py-2 text-left font-semibold transition-all active:scale-95"
-            style={{ background: "hsl(38 100% 55% / 0.12)", color: "hsl(38 100% 70%)", border: "1px solid hsl(38 100% 55% / 0.40)" }}
-          >
-            → Go to Build/Test to verify before deploying
-          </button>
         </div>
       )}
 
-      {/* Action buttons */}
+      {/* Action buttons — pre-apply */}
       {status !== "done" && (
         <div className="flex gap-2">
           <button
-            onClick={handleAccept}
+            onClick={() => void handleAccept()}
             disabled={status === "applying"}
             className="flex-1 py-2 rounded-xl text-xs font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
-            style={{
-              background: "hsl(142 60% 35% / 0.18)",
-              border: "1px solid hsl(142 60% 38%)",
-              color: "hsl(142 71% 62%)",
-            }}
+            style={{ background: "hsl(142 60% 35% / 0.18)", border: "1px solid hsl(142 60% 38%)", color: "hsl(142 71% 62%)" }}
           >
             {status === "applying" ? "APPLYING…" : "✓  ACCEPT"}
           </button>
           <button
-            onClick={handleDecline}
+            onClick={() => void handleDecline()}
             disabled={status === "applying"}
             className="flex-1 py-2 rounded-xl text-xs font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
-            style={{
-              background: "hsl(355 80% 35% / 0.14)",
-              border: "1px solid hsl(355 80% 38% / 0.6)",
-              color: "hsl(355 80% 64%)",
-            }}
+            style={{ background: "hsl(355 80% 35% / 0.14)", border: "1px solid hsl(355 80% 38% / 0.6)", color: "hsl(355 80% 64%)" }}
           >
             ✗  DECLINE
           </button>
@@ -1038,12 +1165,17 @@ export default function Chat() {
     setDevSection("chat");
     const assistantId = `da-${Date.now()}`;
     setDevMessages(prev => [...prev, { id: assistantId, role: "assistant", content: "" }]);
-    console.log("[DEV CHAT] POSTing to /api/chat/stream, session:", `dev-${sessionId}`);
+    console.log("[DEV CHAT] POSTing to /api/dev/stream");
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90_000);
+
     try {
-      const res = await fetch(`${BASE}api/chat/stream`, {
+      const res = await fetch(`${BASE}api/dev/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed, sessionId: `dev-${sessionId}` }),
+        body: JSON.stringify({ message: trimmed }),
+        signal: controller.signal,
       });
       console.log("[DEV CHAT] response", { status: res.status, ok: res.ok, hasBody: !!res.body });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
@@ -1053,7 +1185,7 @@ export default function Chat() {
       let tokens = 0;
       for (;;) {
         const { done, value } = await reader.read();
-        if (done) { console.log("[DEV CHAT] stream done, tokens received:", tokens); break; }
+        if (done) { console.log("[DEV CHAT] stream done, tokens:", tokens); break; }
         const lines = (buf + decoder.decode(value, { stream: true })).split("\n");
         buf = lines.pop() ?? "";
         for (const line of lines) {
@@ -1061,25 +1193,71 @@ export default function Chat() {
           const raw = line.slice(6).trim();
           if (!raw || raw === "[DONE]") continue;
           try {
-            const evt = JSON.parse(raw) as { type: string; text?: string; content?: string };
-            const piece = evt.type === "token" ? (evt.text ?? evt.content ?? "") : "";
-            if (piece) {
+            const evt = JSON.parse(raw) as {
+              type: string; text?: string; response?: string; error?: string;
+              patchId?: string; file?: string; description?: string;
+              riskLevel?: "low" | "medium" | "high";
+              uiImpact?: string; logicImpact?: string;
+              safeToTest?: boolean; testCommand?: string;
+              oldContent?: string; newContent?: string;
+            };
+
+            if (evt.type === "dev:token" && evt.text) {
               tokens++;
-              setDevMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: m.content + piece } : m));
+              setDevMessages(prev => prev.map(m =>
+                m.id === assistantId ? { ...m, content: m.content + evt.text! } : m));
+
+            } else if (evt.type === "dev:done" && evt.response) {
+              // If tokens were streamed already, response is a duplicate — skip to avoid double text.
+              // If nothing was streamed yet, use the full response as the message.
+              setDevMessages(prev => prev.map(m =>
+                m.id === assistantId && !m.content ? { ...m, content: evt.response! } : m));
+
+            } else if (evt.type === "dev:patch_proposed" && evt.patchId) {
+              console.log("[DEV CHAT] patch proposed:", evt.patchId, evt.file);
+              const newPatch: PendingPatchSummary = {
+                patchId:     evt.patchId,
+                file:        evt.file ?? "",
+                description: evt.description ?? "Code change proposed by Jarvis DEV",
+                riskLevel:   evt.riskLevel,
+                uiImpact:    evt.uiImpact,
+                logicImpact: evt.logicImpact,
+                safeToTest:  evt.safeToTest,
+                testCommand: evt.testCommand,
+                oldContent:  evt.oldContent,
+                newContent:  evt.newContent,
+                createdAt:   Date.now(),
+              };
+              setPendingPatches(prev =>
+                prev.some(p => p.patchId === evt.patchId) ? prev : [...prev, newPatch]);
+              setDevMessages(prev => prev.map(m =>
+                m.id === assistantId
+                  ? { ...m, content: m.content + `\n\n📋 Patch ready in the PATCHES tab → ${evt.file}` }
+                  : m));
+
+            } else if (evt.type === "dev:error" && evt.error) {
+              console.error("[DEV CHAT] dev:error:", evt.error);
+              setDevMessages(prev => prev.map(m =>
+                m.id === assistantId && !m.content
+                  ? { ...m, content: `⚠ ${evt.error}` } : m));
             }
           } catch { /* malformed SSE line — skip */ }
         }
       }
     } catch (err) {
-      console.error("[DEV CHAT] fetch/stream error:", err);
+      const isTimeout = err instanceof Error && err.name === "AbortError";
+      const msg = isTimeout
+        ? "⚠ Request timed out after 90 s. Try a shorter or more specific request."
+        : `⚠ ${err instanceof Error ? err.message : String(err)}`;
+      console.error("[DEV CHAT] error:", err);
       setDevMessages(prev => prev.map(m =>
-        m.id === assistantId ? { ...m, content: `⚠ ${err instanceof Error ? err.message : String(err)}` } : m,
-      ));
+        m.id === assistantId ? { ...m, content: m.content || msg } : m));
     } finally {
+      clearTimeout(timeoutId);
       console.log("[DEV CHAT] finally: clearing devSending");
       setDevSending(false); devSendingRef.current = false;
     }
-  }, [BASE, sessionId]); // devSending intentionally removed — guard uses devSendingRef to avoid stale closure
+  }, [BASE]); // stable — guard uses devSendingRef; setPendingPatches/setDevMessages are stable setState fns
 
   // ── Dev workspace helpers ─────────────────────────────────────────────────
   const loadDevProjectMemory = useCallback(async () => {

@@ -37,7 +37,12 @@ export interface PendingPatchSummary {
   uiImpact?:    string;
   logicImpact?: string;
   safeToTest?:  boolean;
+  testCommand?: string;
   createdAt:    number;
+  /** Raw file content before the patch (for diff preview). */
+  oldContent?: string;
+  /** Proposed new content (for diff preview). */
+  newContent?: string;
   /** True when this patch was loaded from disk after a server restart. */
   recoveredFromRestart?: boolean;
 }
