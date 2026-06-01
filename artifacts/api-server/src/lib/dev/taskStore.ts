@@ -135,6 +135,29 @@ export function addPatchToTask(taskId: string, patch: PatchRef): void {
   saveToDisk();
 }
 
+/**
+ * Remove terminal tasks (applied / completed / cancelled / rolled_back) or all tasks.
+ * Returns the number of tasks removed. Safe to call at any time.
+ */
+export function clearTasks(filter: "terminal" | "all" = "terminal"): { cleared: number } {
+  const TERMINAL: Set<TaskStatus> = new Set(["applied", "completed", "cancelled", "rolled_back"]);
+  let count = 0;
+  if (filter === "all") {
+    count = tasks.size;
+    tasks.clear();
+  } else {
+    for (const [id, task] of tasks.entries()) {
+      if (TERMINAL.has(task.status)) {
+        tasks.delete(id);
+        count++;
+      }
+    }
+  }
+  if (count > 0) saveToDisk();
+  console.log(`[taskStore] clearTasks(${filter}) — removed ${count} task(s)`);
+  return { cleared: count };
+}
+
 export function markPatchApplied(taskId: string, patchId: string, snapshotId?: string): void {
   const task = tasks.get(taskId);
   if (!task) return;

@@ -1,0 +1,170 @@
+Do the next major Jarvis DEV completion sprint.
+
+Goal:
+Finish the backend capabilities that let Jarvis DEV become a real coding agent instead of only an advisor.
+
+Confirmed test results:
+- BUILD works.
+- RUN BUILD works.
+- RUN ALL CHECKS works.
+- CHECKLIST works.
+- EXPORT SNAPSHOT works.
+- DEV chat now responds/streams.
+- WORK ON JARVIS responds but says filesystem is unavailable.
+- SCAN PROJECT says filesystem is unavailable / workspace empty.
+- CREATE PATCH cannot create real patches because it cannot read files.
+- DIAG still false-fails lockfile, build artifact, and node_modules.
+- LOGS still returns HTTP 404.
+
+Priority 1 — safe filesystem access:
+1. Add backend endpoint:
+   GET /api/dev/files
+   Returns a safe project file tree.
+
+2. Add backend endpoint:
+   GET /api/dev/files/read?path=...
+   Reads one safe file.
+
+3. Project root detection:
+   Detect the real project root reliably in:
+   - Replit
+   - Coolify
+   - local dev
+
+   Do not assume current working directory is correct.
+   Search upward/downward for markers:
+   - package.json
+   - pnpm-workspace.yaml
+   - artifacts/jarvas
+   - artifacts/api-server
+
+   Add detected project root to diagnostics output.
+
+4. Safety rules:
+   - never read/write outside project root
+   - block .env files
+   - block secrets, keys, certificates
+   - block .git
+   - block node_modules
+   - block dist/build artifacts
+   - block logs
+   - block binary files
+   - limit file size
+   - allow only code/text files
+
+5. Wire SCAN PROJECT:
+   - It must call /api/dev/files.
+   - It must show real files from artifacts/jarvas and artifacts/api-server.
+   - It must not only use project memory.
+   - If filesystem is unavailable, show exact detected root and why scanning failed.
+
+Priority 2 — DEV assistant file tools:
+1. Give the DEV assistant safe tools to:
+   - list project files
+   - read selected files
+   - search text across safe files
+
+2. PROPOSE FIX and WORK ON JARVIS should use these tools before recommending fixes.
+
+3. They should no longer say:
+   “filesystem unavailable”
+   unless the file endpoint truly fails.
+
+Priority 3 — patch creation:
+1. Add endpoint:
+   POST /api/dev/patches/create
+
+2. It should create a pending patch card from proposed file changes.
+   It must NOT directly edit files.
+
+3. Patch card must include:
+   - title
+   - summary
+   - files changed
+   - diff preview
+   - risk level
+   - rollback notes
+   - expected result
+   - Accept button
+   - Decline button
+
+4. CREATE PATCH should create a real pending patch card when a specific fix is available.
+
+5. If no specific fix is available, it should ask for clarification but not create an empty/self-referential task.
+
+Priority 4 — patch apply + rollback:
+1. Add endpoint:
+   POST /api/dev/patches/apply
+
+2. Add endpoint:
+   POST /api/dev/patches/rollback
+
+3. Accept should:
+   - backup original files
+   - apply approved changes
+   - run Build/Test automatically
+   - show success/failure
+
+4. If Build/Test fails:
+   - show Rollback button
+   - rollback restores original files
+   - run Build/Test again after rollback
+
+5. Decline should remove the pending patch without touching files.
+
+Safety:
+- Never auto-deploy.
+- Never edit .env or secrets.
+- Never write outside project root.
+- Never apply patch without user approval.
+- DEV errors must never crash main Jarvis.
+
+Priority 5 — fix diagnostics:
+DIAG still false-fails:
+- lockfile
+- build artifact
+- node_modules
+
+Fix diagnostics so in Coolify/production/bundled deployments those are PASS or SKIP, not FAIL.
+
+Add debug info to diagnostics:
+- detected project root
+- process.cwd()
+- NODE_ENV
+- whether running bundled/production-like
+- which path each check used
+
+Priority 6 — fix logs:
+LOGS still returns:
+HTTP 404
+
+Fix /api/dev/logs route wiring.
+If real logs are unavailable in this environment, return:
+ok: true
+source: "fallback"
+lines: [...]
+message: "Logs unavailable from this environment. Check Coolify deployment logs."
+
+Do not return 404 for normal hosted environments.
+
+Priority 7 — task cleanup:
+There are queued/open tasks piling up.
+Add a DEV tool or button to:
+- clear completed/old queued tasks
+- show task status
+- prevent self-referential empty tasks
+
+Verify after implementation:
+1. SCAN PROJECT lists real files.
+2. WORK ON JARVIS no longer says filesystem unavailable.
+3. PROPOSE FIX reads real files before recommending.
+4. CREATE PATCH creates a real pending patch card.
+5. PATCHES tab shows the patch card.
+6. Accept applies patch only after approval.
+7. Build/Test runs after Accept.
+8. Rollback works if build fails.
+9. DIAG no longer false-fails lockfile/build artifact/node_modules.
+10. LOGS no longer returns HTTP 404.
+11. TypeScript passes.
+12. Frontend mobile layout still works.
+13. No auto-deploy.

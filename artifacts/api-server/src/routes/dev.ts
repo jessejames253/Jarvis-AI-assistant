@@ -10,6 +10,8 @@
  */
 
 import { Router } from "express";
+import path from "path";
+import { existsSync, readdirSync, readFileSync, statSync } from "fs";
 import { runDevAgent } from "../lib/dev/agent";
 import {
   applyPatch, rollbackFile, listProjectFilesRest, readProjectFileRest,
@@ -17,7 +19,10 @@ import {
   pendingPatches, getProjectRootDiagnostics,
 } from "../lib/dev/tools";
 import { createSnapshot } from "../lib/dev/snapshotStore";
-import { createTask, updateTask, addMessage, addPatchToTask, markPatchApplied } from "../lib/dev/taskStore";
+import {
+  createTask, updateTask, addMessage, addPatchToTask, markPatchApplied,
+  clearTasks,
+} from "../lib/dev/taskStore";
 import { runValidation } from "../lib/dev/validator";
 import { runAutoFixAnalysis, getLastAutoFixResult } from "../lib/dev/autoFixEngine";
 
@@ -532,6 +537,91 @@ router.get("/dev/diagnostics", async (_req, res): Promise<void> => {
       listError,
       fileAccess,
     });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
+// ─── GET /dev/logs ────────────────────────────────────────────────────────────
+// The frontend DEV → LOGS tab calls GET /api/dev/logs.
+// We read from .jarvas-data/logs/ if it exists; fall back to a friendly message
+// so the tab never shows HTTP 404.
+
+const DEV_LOG_DIR   = path.join(PROJECT_ROOT, ".jarvas-data", "logs");
+const LOG_MAX_LINES = 300;
+const LOG_MAX_BYTES = 40 * 1024;
+
+router.get("/dev/logs", (_req, res) => {
+  try {
+    if (!existsSync(DEV_LOG_DIR)) {
+      res.json({
+        ok:     true,
+        lines:  ["[INFO] No log directory found at .jarvas-data/logs/. Application logs are written here when available."],
+        source: "fallback",
+        note:   `Checked: ${DEV_LOG_DIR}`,
+      });
+      return;
+    }
+
+    const entries = readdirSync(DEV_LOG_DIR).filter(
+      n => (n.endsWith(".log") || n.endsWith(".txt")) && n !== ".gitkeep",
+    );
+
+    if (entries.length === 0) {
+      res.json({
+        ok:     true,
+        lines:  ["[INFO] Log directory exists but contains no log files yet."],
+        source: "fallback",
+        note:   "No .log or .txt files in .jarvas-data/logs/",
+      });
+      return;
+    }
+
+    // Sort newest-modified first then collect lines from the top 3 files
+    const sorted = entries
+      .map(n => {
+        try { return { name: n, mtime: statSync(path.join(DEV_LOG_DIR, n)).mtimeMs }; }
+        catch { return { name: n, mtime: 0 }; }
+      })
+      .sort((a, b) => b.mtime - a.mtime);
+
+    const allLines: string[] = [];
+    for (const { name } of sorted.slice(0, 3)) {
+      const full = path.join(DEV_LOG_DIR, name);
+      try {
+        const sz  = statSync(full).size;
+        const off = sz > LOG_MAX_BYTES ? sz - LOG_MAX_BYTES : 0;
+        const raw = readFileSync(full).slice(off).toString("utf8");
+        const fLines = raw.split("\n").filter(l => l.trim().length > 0).slice(-LOG_MAX_LINES);
+        allLines.push(`=== ${name} ===`);
+        allLines.push(...fLines);
+      } catch { /* skip unreadable file */ }
+    }
+
+    if (allLines.length === 0) {
+      res.json({ ok: true, lines: ["[INFO] Log files exist but are empty."], source: "fallback" });
+      return;
+    }
+
+    res.json({ ok: true, lines: allLines.slice(-LOG_MAX_LINES), source: "file" });
+  } catch (err) {
+    res.json({
+      ok:     true,
+      lines:  [`[WARN] Could not read log files: ${String(err)}. Check your hosting platform for deployment logs.`],
+      source: "fallback",
+    });
+  }
+});
+
+// ─── DELETE /dev/tasks ────────────────────────────────────────────────────────
+// Clears terminal tasks (applied/completed/cancelled/rolled_back) from the store.
+// Pass ?all=1 to clear every task regardless of status.
+
+router.delete("/dev/tasks", (req, res) => {
+  try {
+    const filter = req.query.all === "1" ? "all" : "terminal";
+    const { cleared } = clearTasks(filter);
+    res.json({ ok: true, cleared, filter });
   } catch (err) {
     res.status(500).json({ ok: false, error: String(err) });
   }

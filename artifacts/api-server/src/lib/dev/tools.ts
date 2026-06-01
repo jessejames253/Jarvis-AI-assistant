@@ -76,6 +76,17 @@ void findRg();
 
 const SEARCH_EXTS = new Set([".ts", ".tsx", ".js", ".jsx", ".json", ".css", ".md"]);
 
+/**
+ * Directory names to skip when listing project files for the agent or file browser.
+ * These are build artifacts, dependency trees, and caches that pollute the listing
+ * and push the 200-file cap before real source files are returned.
+ */
+const LISTING_SKIP_DIRS = new Set([
+  "node_modules", ".pnpm-store", "dist", "build", ".cache", ".vite",
+  "coverage", "__pycache__", ".next", "out", ".turbo", "storybook-static",
+  ".temp", "temp", "tmp", ".nyc_output",
+]);
+
 async function nodeSearch(
   pattern: string,
   absDir: string,
@@ -290,6 +301,7 @@ export async function listProjectFiles(
       const rel = path.relative(PROJECT_ROOT, path.join(d, e.name));
       if (BLOCKED_PATHS.some(b => rel.startsWith(b) || e.name === b.replace("/", ""))) continue;
       if (e.name.startsWith(".") && e.name !== ".gitignore") continue;
+      if (e.isDirectory() && LISTING_SKIP_DIRS.has(e.name)) continue;
       if (e.name.endsWith(".devbak") || e.name.includes(".devbak.")) continue;
       if (pattern && !rel.toLowerCase().includes(pattern) && e.isFile()) continue;
       if (e.isDirectory()) {
@@ -320,6 +332,7 @@ export async function listProjectFilesRest(dir = "", maxDepth = 2): Promise<stri
       const rel = path.relative(PROJECT_ROOT, path.join(d, e.name));
       if (BLOCKED_PATHS.some(b => rel.startsWith(b) || e.name === b.replace("/", ""))) continue;
       if (e.name.startsWith(".")) continue;
+      if (e.isDirectory() && LISTING_SKIP_DIRS.has(e.name)) continue;
       if (e.name.endsWith(".devbak") || e.name.includes(".devbak.")) continue;
       if (e.isDirectory()) {
         results.push(rel + "/");

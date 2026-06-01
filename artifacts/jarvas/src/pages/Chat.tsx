@@ -14,6 +14,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Send,
   Brain,
+  Trash2,
   Terminal,
   LayoutDashboard,
   BookOpen,
@@ -1994,7 +1995,7 @@ export default function Chat() {
 
                   {/* ── Chat-prompt actions ── */}
                   {([
-                    { key: "SCAN",  label: "SCAN PROJECT", prompt: "Scan this project's file structure and codebase. List key components, API routes, and libraries. Highlight quality issues and improvement opportunities." },
+                    { key: "SCAN",  label: "SCAN PROJECT", prompt: "Use list_project_files to scan the project structure, then read key source files. List main components, API routes, and libraries. Highlight quality issues and improvement opportunities. Start with artifacts/jarvas/src and artifacts/api-server/src." },
                     { key: "FIX",   label: "PROPOSE FIX",  prompt: "Review the project memory and current debug context. Propose a specific, actionable code fix for the most critical issue." },
                     { key: "PATCH", label: "CREATE PATCH", prompt: "Based on our conversation, create a concrete code patch for the most recently discussed fix. Queue it for review in the Patches tab." },
                   ] as const).map(({ key, label, prompt }) => (
@@ -2062,6 +2063,22 @@ export default function Chat() {
                         >
                           {isBusy("EXPORT") ? <RefreshCw className="w-3 h-3 animate-spin" /> : btnIcon("EXPORT") ?? <Download className="w-3 h-3" />}
                           EXPORT SNAPSHOT
+                        </button>
+                        <button
+                          onClick={() => {
+                            setToolsMenuOpen(false);
+                            void withActionFeedback("CLEARTASKS", async () => {
+                              const r = await fetch(`${BASE}api/dev/tasks`, { method: "DELETE" });
+                              const d = await r.json() as { ok: boolean; cleared: number };
+                              if (!d.ok) throw new Error("Clear failed");
+                            });
+                          }}
+                          disabled={isBusy("CLEARTASKS")}
+                          className="flex items-center gap-2 px-4 py-2.5 text-[10px] font-bold tracking-widest transition-all hover:bg-white/5 disabled:opacity-40 text-left"
+                          style={{ color: actionStatus["CLEARTASKS"] === "success" ? "hsl(142 71% 62%)" : actionStatus["CLEARTASKS"] === "error" ? "hsl(355 80% 62%)" : "hsl(355 60% 55%)" }}
+                        >
+                          {isBusy("CLEARTASKS") ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                          CLEAR OLD TASKS
                         </button>
                         <button
                           onClick={() => {

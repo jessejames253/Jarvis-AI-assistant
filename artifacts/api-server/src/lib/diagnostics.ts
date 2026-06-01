@@ -58,6 +58,14 @@ export interface DiagnosticsReport {
     arch:        string;
     uptimeSeconds: number;
   };
+  /** Low-level path/env data to help debug false-positive checks. */
+  debugInfo: {
+    projectRoot:      string;
+    cwd:              string;
+    nodeEnv:          string;
+    isProductionLike: boolean;
+    isDevServer:      boolean;
+  };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -92,7 +100,7 @@ function safeReadText(filePath: string): string | null {
   }
 }
 
-// ─── Production detection ─────────────────────────────────────────────────────
+// ─── Environment detection ────────────────────────────────────────────────────
 
 /**
  * Returns true when running in any production-like container.
@@ -121,6 +129,30 @@ function isProductionLike(): boolean {
   if (!existsSync(path.join(PROJECT_ROOT, "pnpm-lock.yaml")))             return true;
 
   return false;
+}
+
+/**
+ * Returns true when the process is running as a dev server via tsx or ts-node.
+ * In this mode TypeScript source files run directly — no compiled dist/ bundle
+ * exists and none is needed.  Checking for it would produce a false failure.
+ *
+ * Detection hierarchy (most-reliable first):
+ *   1. NODE_ENV=development (explicit)
+ *   2. __filename ends with .ts  (tsx/ts-node sets __filename to the source path)
+ *   3. process.argv[1] contains tsx or ts-node markers
+ */
+function isDevServer(): boolean {
+  if (process.env["NODE_ENV"] === "development") return true;
+  // tsx sets __filename to the .ts source file path
+  if (__filename.endsWith(".ts")) return true;
+  const argv1 = process.argv[1] ?? "";
+  return (
+    argv1.includes("/tsx") ||
+    argv1.includes("tsx/dist/") ||
+    argv1.includes("/ts-node") ||
+    argv1.includes("ts-node/dist/") ||
+    argv1.endsWith(".ts")
+  );
 }
 
 // ─── Individual checks ────────────────────────────────────────────────────────
@@ -212,6 +244,8 @@ function checkEnvVars(): Array<{ result: CheckResult; issue?: DiagnosticIssue }>
 function checkBuildArtifact(): { result: CheckResult; issue?: DiagnosticIssue } {
   // In production the server IS the compiled artifact already running
   if (isProductionLike()) return { result: "pass" };
+  // In dev (tsx/ts-node), source files run directly — no dist/ bundle is expected
+  if (isDevServer()) return { result: "skip" };
 
   const distEntry = path.join(PROJECT_ROOT, "artifacts", "api-server", "dist", "index.mjs");
 
@@ -360,21 +394,20 @@ function checkNodeModules(): { result: CheckResult; issue?: DiagnosticIssue } {
     };
   }
 
-  // Spot-check one critical package — in a pnpm workspace, packages are
-  // installed in the artifact's own node_modules (not the root).
-  const criticalPkg = path.join(
-    PROJECT_ROOT, "artifacts", "api-server", "node_modules", "express",
-  );
-  if (!existsSync(criticalPkg)) {
+  // Spot-check 'express'. In a pnpm workspace it may live in either the
+  // artifact's own node_modules OR in the hoisted workspace root.
+  const criticalPkg     = path.join(PROJECT_ROOT, "artifacts", "api-server", "node_modules", "express");
+  const rootCriticalPkg = path.join(PROJECT_ROOT, "node_modules", "express");
+  if (!existsSync(criticalPkg) && !existsSync(rootCriticalPkg)) {
     return {
       result: "warn",
       issue: {
         type:         "node_modules_missing",
         severity:     "warning",
-        likelyCause:  "Critical package 'express' is missing from artifacts/api-server/node_modules. Dependency install may be incomplete.",
+        likelyCause:  "Critical package 'express' is missing from both artifacts/api-server/node_modules and the workspace root node_modules.",
         suggestedFix: "Run `pnpm install` from the project root to complete dependency installation.",
         confidence:   "medium",
-        detail:       `Missing: ${criticalPkg}`,
+        detail:       `Checked: ${criticalPkg} and ${rootCriticalPkg}`,
       },
     };
   }
@@ -595,5 +628,12 @@ export async function runDiagnostics(): Promise<DiagnosticsReport> {
     issues,
     checks,
     runtimeInfo: getRuntimeInfo(),
+    debugInfo: {
+      projectRoot:      PROJECT_ROOT,
+      cwd:              process.cwd(),
+      nodeEnv:          process.env["NODE_ENV"] ?? "not set",
+      isProductionLike: isProductionLike(),
+      isDevServer:      isDevServer(),
+    },
   };
 }

@@ -15,19 +15,24 @@ import { getDevContext, formatContextForPrompt } from "./context";
 
 const BASE_SYSTEM = `You are Jarvis Dev Agent — an expert software engineer that inspects and proposes changes to the Jarvis project codebase. You are the main builder tool for this project.
 
+## Filesystem access — IMPORTANT
+The project filesystem IS accessible. Use list_project_files to explore and read_project_file to read source code.
+If list_project_files returns files, proceed with reading and patching.  Do NOT say "filesystem unavailable" unless a tool explicitly returns an error.
+
 ## Project architecture
 - artifacts/jarvas/              — React + Vite frontend (TypeScript, Tailwind, Wouter routing)
-- artifacts/api-server/          — Express backend (TypeScript, esbuild, no tsc at runtime)
+- artifacts/api-server/          — Express backend (TypeScript, tsx dev server, no compiled bundle in dev)
 - lib/                           — Shared workspace packages (db, api-client, integrations)
-- artifacts/jarvas/src/pages/Chat.tsx          — Main chat UI (large file, ~1450 lines)
-- artifacts/jarvas/src/components/DevAgentPanel.tsx — Dev Agent UI
-- artifacts/jarvas/src/components/DiffViewer.tsx    — Diff viewer with metadata
-- artifacts/api-server/src/routes/dev.ts            — /api/dev/* routes
-- artifacts/api-server/src/lib/dev/tools.ts         — File/build tools + patch store
-- artifacts/api-server/src/lib/dev/taskStore.ts     — Task persistence
-- artifacts/api-server/src/lib/dev/projectMemory.ts — Project memory (this context loaded from it)
+- artifacts/jarvas/src/pages/Chat.tsx                         — Main chat UI (~2800+ lines)
+- artifacts/jarvas/src/components/chat/                       — Chat sub-components (ChatPanel, ChatToolbar, ChatMessageList, ChatInput, chat.types.ts)
+- artifacts/jarvas/src/components/DevAgentPanel.tsx           — Dev Agent UI
+- artifacts/jarvas/src/components/DiffViewer.tsx              — Diff viewer with metadata
+- artifacts/api-server/src/routes/dev.ts                      — /api/dev/* routes
+- artifacts/api-server/src/lib/dev/tools.ts                   — File/build tools + patch store
+- artifacts/api-server/src/lib/dev/taskStore.ts               — Task persistence (.jarvis/tasks.json)
+- artifacts/api-server/src/lib/dev/projectMemory.ts           — Project memory
 - Styling: dark cyberpunk, hsl color tokens, no Tailwind config overrides needed
-- Patch disk store: /tmp/jarvis_pending_patches.json
+- Patch disk store: PROJECT_ROOT/.jarvis/pending_patches.json
 - Task disk store: /tmp/jarvis_tasks.json
 - Snapshot disk store: /tmp/jarvis_snapshots.json
 - Project memory disk store: /tmp/jarvis_project_memory.json
