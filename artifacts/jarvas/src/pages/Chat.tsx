@@ -654,6 +654,7 @@ export default function Chat() {
   const [activePlan, setActivePlan] = useState<FrontendPlan | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
   const [autoPlannerEnabled, setAutoPlannerEnabled] = useState(() => getAutoPlannerEnabled());
   const [devPanelOpen, setDevPanelOpen] = useState(() => getDevPanelOpen());
   const [tasksPanelOpen,  setTasksPanelOpen]  = useState(false);
@@ -817,6 +818,31 @@ export default function Chat() {
       cancelled = true;
     };
   }, [sessionId]);
+
+  // ── On-screen debug log interceptor (temporary — iPhone Safari has no DevTools) ──
+  useEffect(() => {
+    const PREFIX = /\[(CSP|Chat)\]/;
+    const MAX = 60;
+    const orig = { log: console.log, warn: console.warn, error: console.error };
+
+    function capture(level: string, args: unknown[]) {
+      const msg = args.map(a => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" ");
+      if (!PREFIX.test(msg)) return;
+      const ts = new Date().toISOString().slice(11, 23);
+      const tag = level === "log" ? "" : level === "warn" ? "⚠ " : "✖ ";
+      setDebugLogs(prev => [...prev.slice(-(MAX - 1)), `${ts} ${tag}${msg}`]);
+    }
+
+    console.log  = (...a) => { orig.log(...a);   capture("log",   a); };
+    console.warn  = (...a) => { orig.warn(...a);  capture("warn",  a); };
+    console.error = (...a) => { orig.error(...a); capture("error", a); };
+
+    return () => {
+      console.log   = orig.log;
+      console.warn  = orig.warn;
+      console.error = orig.error;
+    };
+  }, []);
 
   const toggleDebug = useCallback(() => {
     setDebugModeState((v) => {
@@ -2129,6 +2155,54 @@ export default function Chat() {
         onPreferencesSaved={handlePreferencesSaved}
         apiBase={BASE}
       />
+
+      {/* ── Temporary on-screen debug panel (iPhone Safari has no DevTools) ── */}
+      {debugLogs.length > 0 && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            maxHeight: "40vh",
+            overflowY: "auto",
+            background: "rgba(0,0,0,0.88)",
+            zIndex: 9999,
+            padding: "6px 8px",
+            fontFamily: "monospace",
+            fontSize: "10px",
+            lineHeight: "1.4",
+            color: "#a0ffa0",
+            borderTop: "1px solid #00ff0044",
+            WebkitOverflowScrolling: "touch",
+          }}
+          id="dbg-panel"
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+            <span style={{ color: "#00ff88", fontWeight: "bold" }}>
+              DEBUG LOG ({debugLogs.length})
+            </span>
+            <button
+              onClick={() => setDebugLogs([])}
+              style={{ color: "#ff6666", background: "none", border: "none", fontSize: 11, cursor: "pointer" }}
+            >
+              CLEAR
+            </button>
+          </div>
+          {debugLogs.map((line, i) => (
+            <div
+              key={i}
+              style={{
+                color: line.includes("✖") ? "#ff8888" : line.includes("⚠") ? "#ffcc44" : "#a0ffa0",
+                wordBreak: "break-all",
+                paddingBottom: 1,
+              }}
+            >
+              {line}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
