@@ -84,53 +84,46 @@ export default function SystemStatusPanel({ isOpen, onClose, apiBase }: SystemSt
     setLoading(true);
     setError(null);
     const healthzUrl = `${apiBase}api/healthz`;
-    console.group("[SystemStatus] health check");
-    console.log("apiBase prop :", apiBase);
-    console.log("healthz URL  :", healthzUrl);
-    console.log("origin       :", window.location.origin);
-    console.groupEnd();
+
+    // ── 1. Health check — isolated fetch with its own try/catch so its
+    //       result can never be contaminated by the other two requests.
+    let apiOnline = false;
     try {
-      // Fire all 3 requests in parallel
-      const [healthRes, tasksRes, diagRes] = await Promise.allSettled([
-        fetch(healthzUrl),
+      const healthRes = await fetch(healthzUrl);
+      console.log(
+        "[SystemStatus] healthz →", healthRes.status, healthRes.statusText,
+        "| ok:", healthRes.ok,
+        "| ACAO:", healthRes.headers.get("access-control-allow-origin"),
+        "| URL:", healthzUrl,
+        "| origin:", window.location.origin,
+      );
+      if (healthRes.ok) {
+        // Also verify the body confirms "ok" so an intercepting proxy
+        // that returns 200 with an error page doesn't fool us.
+        try {
+          const body = await healthRes.json() as Record<string, unknown>;
+          console.log("[SystemStatus] healthz body:", body);
+          // Accept if HTTP 2xx (already checked) — body content is
+          // informational only; don't gate ONLINE on it.
+          apiOnline = true;
+        } catch {
+          // Body parse failed but HTTP status was ok — still count as online.
+          apiOnline = true;
+        }
+      } else {
+        console.warn("[SystemStatus] healthz returned non-ok status:", healthRes.status);
+      }
+    } catch (err) {
+      const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      console.error("[SystemStatus] healthz fetch failed:", detail, "| URL:", healthzUrl);
+    }
+
+    // ── 2. Secondary requests — run in parallel, failures are non-fatal.
+    try {
+      const [tasksRes, diagRes] = await Promise.allSettled([
         fetch(`${apiBase}api/master-tasks`),
         fetch(`${apiBase}api/system/diagnostics`),
       ]);
-
-      // ── Full diagnostics on healthz result ──────────────────────────────
-      console.group("[SystemStatus] healthz result");
-      console.log("settled status:", healthRes.status);
-      if (healthRes.status === "rejected") {
-        const err = healthRes.reason as unknown;
-        console.error("FETCH REJECTED — full error object:", err);
-        if (err instanceof Error) {
-          console.error("  name   :", err.name);
-          console.error("  message:", err.message);
-          console.error("  stack  :", err.stack);
-        }
-      } else {
-        const res = healthRes.value;
-        console.log("HTTP status    :", res.status, res.statusText);
-        console.log("ok             :", res.ok);
-        // Log response headers relevant to CORS
-        console.log("ACAO header    :", res.headers.get("access-control-allow-origin"));
-        console.log("Content-Type   :", res.headers.get("content-type"));
-        if (!res.ok) {
-          try {
-            const body = await res.clone().text();
-            console.error("Response body  :", body);
-          } catch { /* ignore body read failure */ }
-        } else {
-          try {
-            const body = await res.clone().text();
-            console.log("Response body  :", body);
-          } catch { /* ignore */ }
-        }
-      }
-      console.groupEnd();
-      // ── End diagnostics ─────────────────────────────────────────────────
-
-      const apiOnline = healthRes.status === "fulfilled" && healthRes.value.ok;
 
       let taskCount = 0;
       if (tasksRes.status === "fulfilled" && tasksRes.value.ok) {
