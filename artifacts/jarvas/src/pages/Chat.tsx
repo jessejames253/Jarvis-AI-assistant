@@ -13,17 +13,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Send,
-  Search,
-  ExternalLink,
   Brain,
   Terminal,
   LayoutDashboard,
   BookOpen,
-  Mic,
-  MicOff,
-  Volume2,
-  VolumeX,
-  ListChecks,
   Code2,
   Activity,
   Gauge,
@@ -40,6 +33,8 @@ import {
   ClipboardList,
   RefreshCw,
   Download,
+  Wrench,
+  ChevronDown,
 } from "lucide-react";
 import { DevErrorBoundary } from "@/components/DevErrorBoundary";
 import { generateId } from "@/lib/uuid";
@@ -80,18 +75,14 @@ import {
 } from "@/lib/patchApproval";
 import PatchNotificationBar from "@/components/PatchNotificationBar";
 import ChatPatchProposal from "@/components/ChatPatchProposal";
+import { STATUS_CONFIG } from "@/components/chat/chat.types";
+import type { AgentStatus, Source, PatchProposalRef, Message } from "@/components/chat/chat.types";
+import { ChatPanel } from "@/components/chat/ChatPanel";
+import { ChatToolbar } from "@/components/chat/ChatToolbar";
+import { ChatMessageList } from "@/components/chat/ChatMessageList";
+import { ChatInput } from "@/components/chat/ChatInput";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type AgentStatus = "idle" | "thinking" | "researching" | "processing" | "error";
-
-const STATUS_CONFIG: Record<AgentStatus, { label: string; color: string; glow: string }> = {
-  idle:        { label: "READY",         color: "hsl(194 100% 55%)", glow: "0 0 8px rgba(0,200,255,0.5), 0 0 24px rgba(0,200,255,0.2)" },
-  thinking:    { label: "THINKING",      color: "hsl(264 80% 72%)",  glow: "0 0 12px rgba(140,80,255,0.6), 0 0 28px rgba(140,80,255,0.2)" },
-  researching: { label: "SEARCHING WEB", color: "hsl(194 100% 70%)", glow: "0 0 16px rgba(0,220,255,0.7), 0 0 36px rgba(0,220,255,0.3)" },
-  processing:  { label: "PROCESSING",    color: "hsl(38 100% 62%)",  glow: "0 0 12px rgba(255,160,0,0.55), 0 0 28px rgba(255,160,0,0.2)" },
-  error:       { label: "ERROR",         color: "hsl(355 80% 62%)",  glow: "0 0 12px rgba(255,60,60,0.55), 0 0 28px rgba(255,60,60,0.2)" },
-};
+// ─── Types — imported from src/components/chat/chat.types.ts ──────────────────
 
 function inferStatus(message: string): AgentStatus {
   if (/\b(latest|current|recent|today|news|search|find|look up|weather|stock|price|happening)\b/i.test(message))
@@ -99,35 +90,6 @@ function inferStatus(message: string): AgentStatus {
   if (/\b(code|debug|function|bug|error|script|javascript|typescript|python|react|css|html|api|fix)\b/i.test(message))
     return "processing";
   return "thinking";
-}
-
-interface Source {
-  title: string;
-  url: string;
-  description: string;
-}
-
-interface PatchProposalRef {
-  patchId:     string;
-  file:        string;
-  description: string;
-  riskLevel?:  "low" | "medium" | "high";
-}
-
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: Date;
-  sources?: Source[];
-  isSearch?: boolean;
-  isFakeSearch?: boolean;
-  debug?: DebugInfo;
-  toolCalls?: ToolCallInfo[];
-  plan?: FrontendPlan;
-  autoRouted?: boolean;
-  /** Set when Jarvis's propose_code_change tool queues a patch for approval */
-  patchProposal?: PatchProposalRef;
 }
 
 // ─── Session management ───────────────────────────────────────────────────────
@@ -399,227 +361,7 @@ async function loadSession(
   return res.json() as Promise<SessionMemory>;
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function TypingIndicator({ status }: { status: AgentStatus }) {
-  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.thinking;
-  return (
-    <div className="flex items-end gap-3 message-enter" data-testid="typing-indicator">
-      <div
-        className="w-8 h-8 rounded-full bg-primary/10 border border-primary/40 flex items-center justify-center flex-shrink-0 transition-all duration-500"
-        style={{ boxShadow: cfg.glow }}
-      >
-        <span className="font-display text-xs font-bold transition-colors duration-500" style={{ color: cfg.color }}>J</span>
-      </div>
-      <div className="bg-card border border-card-border rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-3">
-        <div className="flex items-center gap-1.5">
-          <span className="typing-dot w-1.5 h-1.5 rounded-full transition-colors duration-500" style={{ background: cfg.color }} />
-          <span className="typing-dot w-1.5 h-1.5 rounded-full transition-colors duration-500" style={{ background: cfg.color }} />
-          <span className="typing-dot w-1.5 h-1.5 rounded-full transition-colors duration-500" style={{ background: cfg.color }} />
-        </div>
-        <span className="text-xs font-display tracking-widest transition-colors duration-500" style={{ color: cfg.color, opacity: 0.65 }}>
-          {cfg.label}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function SourceCard({ source, index }: { source: Source; index: number }) {
-  const hostname = (() => {
-    try {
-      return new URL(source.url).hostname.replace("www.", "");
-    } catch {
-      return source.url;
-    }
-  })();
-  return (
-    <a
-      href={source.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      data-testid={`source-link-${index}`}
-      className="flex items-start gap-3 p-3 rounded-xl border border-primary/20 bg-primary/5 hover:border-primary/40 hover:bg-primary/10 transition-all duration-200 group"
-    >
-      <div className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
-        <span
-          className="font-display text-xs font-bold"
-          style={{ color: "hsl(194 100% 60%)" }}
-        >
-          {index + 1}
-        </span>
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-0.5">
-          <p
-            className="text-xs font-semibold truncate leading-tight"
-            style={{ color: "hsl(194 100% 75%)" }}
-          >
-            {source.title}
-          </p>
-          <ExternalLink
-            className="w-3 h-3 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-            style={{ color: "hsl(194 100% 60%)" }}
-          />
-        </div>
-        <p
-          className="text-xs mb-1 leading-snug line-clamp-2"
-          style={{ color: "hsl(196 40% 55%)" }}
-        >
-          {source.description}
-        </p>
-        <p className="text-xs font-mono" style={{ color: "hsl(194 100% 45%)" }}>
-          {hostname}
-        </p>
-      </div>
-    </a>
-  );
-}
-
-function MessageBubble({
-  message,
-  showDebug,
-  isStreaming,
-  isSpeaking,
-  onSpeak,
-  onStopSpeak,
-}: {
-  message: Message;
-  showDebug: boolean;
-  isStreaming: boolean;
-  isSpeaking: boolean;
-  onSpeak: () => void;
-  onStopSpeak: () => void;
-}) {
-  // nothing extra — patchProposal lives on message and ChatPatchProposal owns its state
-  const isUser = message.role === "user";
-  const timeStr = message.timestamp.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
-  if (isUser) {
-    return (
-      <div
-        className="flex items-end gap-3 justify-end message-enter"
-        data-testid={`message-user-${message.id}`}
-      >
-        <div className="flex flex-col items-end gap-1 max-w-[80%]">
-          {message.autoRouted && (
-            <span
-              className="text-xs font-mono px-2 py-0.5 rounded-full mb-0.5"
-              style={{ background: "hsl(270 80% 55% / 0.15)", color: "hsl(270 100% 78%)", border: "1px solid hsl(270 100% 65% / 0.3)" }}
-            >
-              ⚡ Auto-routed to Planner
-            </span>
-          )}
-          <div className="bg-primary/15 border border-primary/30 rounded-2xl rounded-br-sm px-4 py-3 glow-primary">
-            <p
-              className="text-sm leading-relaxed"
-              style={{ color: "hsl(196 100% 85%)" }}
-            >
-              {message.content}
-            </p>
-          </div>
-          <span className="text-xs text-muted-foreground px-1">{timeStr}</span>
-        </div>
-        <div className="w-8 h-8 rounded-full bg-accent/20 border border-accent/50 flex items-center justify-center flex-shrink-0">
-          <span
-            className="text-xs font-semibold font-display"
-            style={{ color: "hsl(264 80% 80%)" }}
-          >
-            U
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  const toolCalls = message.toolCalls ?? [];
-
-  return (
-    <div
-      className="flex items-start gap-3 message-enter"
-      data-testid={`message-assistant-${message.id}`}
-    >
-      <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/40 flex items-center justify-center flex-shrink-0 pulse-glow mt-0.5">
-        <span className="font-display text-primary text-xs font-bold">J</span>
-      </div>
-
-      <div className="flex flex-col gap-2 max-w-[85%] sm:max-w-[80%] min-w-0">
-        {/* Search / web badge */}
-        {message.isSearch && (
-          <div className="flex items-center gap-1.5 px-1">
-            <Search
-              className="w-3 h-3"
-              style={{ color: "hsl(194 100% 55%)" }}
-            />
-            <span
-              className="text-xs tracking-wider font-medium"
-              style={{ color: "hsl(194 100% 55%)" }}
-            >
-              {message.isFakeSearch ? "DEMO SEARCH" : "WEB SEARCH"}
-            </span>
-          </div>
-        )}
-
-        {/* Tool status chips — shown above the main bubble */}
-        {toolCalls.length > 0 && <ToolStatusBubble calls={toolCalls} />}
-
-        {/* Plan card — shown for plan messages */}
-        {message.plan && <PlanCard plan={message.plan} />}
-
-        {/* Main bubble — only rendered when there's content OR streaming */}
-        {(message.content || isStreaming) && (
-          <div className="bg-card border border-card-border rounded-2xl rounded-tl-sm px-4 py-3 min-w-0">
-            <MarkdownContent content={message.content} />
-            {isStreaming && (
-              <span className="streaming-cursor" aria-hidden="true" />
-            )}
-          </div>
-        )}
-
-        {/* Source cards */}
-        {message.sources && message.sources.length > 0 && (
-          <div
-            className="flex flex-col gap-2 px-1"
-            data-testid="search-sources"
-          >
-            {message.sources.map((s, i) => (
-              <SourceCard key={i} source={s} index={i} />
-            ))}
-          </div>
-        )}
-
-        <div className="flex items-center gap-2 px-1">
-          <span className="text-xs text-muted-foreground">{timeStr}</span>
-          {!isStreaming && message.content && (
-            <button
-              onClick={isSpeaking ? onStopSpeak : onSpeak}
-              aria-label={isSpeaking ? "Stop speaking" : "Read aloud"}
-              title={isSpeaking ? "Stop" : "Read aloud"}
-              className="flex items-center justify-center w-5 h-5 rounded opacity-40 hover:opacity-100 transition-opacity duration-150"
-              style={{ color: isSpeaking ? "hsl(355 80% 62%)" : "hsl(194 100% 55%)" }}
-            >
-              {isSpeaking
-                ? <VolumeX className="w-3.5 h-3.5" />
-                : <Volume2 className="w-3.5 h-3.5" />
-              }
-            </button>
-          )}
-        </div>
-
-        {/* Patch proposal — real Approve/Reject buttons when Jarvis proposes a code change */}
-        {message.patchProposal && (
-          <ChatPatchProposal proposal={message.patchProposal} />
-        )}
-
-        {/* Debug panel — shown only when debug mode is on */}
-        {showDebug && message.debug && <DebugPanel debug={message.debug} />}
-      </div>
-    </div>
-  );
-}
+// ─── Sub-components — moved to src/components/chat/ ──────────────────────────
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
@@ -1087,6 +829,8 @@ export default function Chat() {
   const [devLogs,          setDevLogs]          = useState<string[]>([]);
   const [devLogsLoading,   setDevLogsLoading]   = useState(false);
   const [actionStatus,     setActionStatus]     = useState<Record<string, "idle"|"loading"|"success"|"error">>({});
+  const [toolsMenuOpen,    setToolsMenuOpen]    = useState(false);
+  const toolsMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     localStorage.setItem(DEV_PANEL_KEY, String(devPanelOpen));
@@ -1376,6 +1120,17 @@ export default function Chat() {
     }
     setTimeout(() => setActionStatus(s => ({ ...s, [key]: "idle" })), 2000);
   }, []);
+
+  useEffect(() => {
+    if (!toolsMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (toolsMenuRef.current && !toolsMenuRef.current.contains(e.target as Node)) {
+        setToolsMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [toolsMenuOpen]);
 
   // Auto-load project memory the first time the DEV tab is opened
   useEffect(() => {
@@ -2093,113 +1848,19 @@ export default function Chat() {
   }, []);
 
   return (
-    <div className="flex flex-col h-[100dvh] w-full bg-background scan-overlay overflow-hidden">
-      <div className="fixed inset-0 bg-grid opacity-60 pointer-events-none" />
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-96 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-      <div className="fixed bottom-24 right-8 w-64 h-64 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
+    <ChatPanel>
 
-      {/* ── Header ── */}
-      <header className="relative z-10 flex-shrink-0 border-b border-border/60 bg-background/90 backdrop-blur-sm">
-        <div className="flex items-center justify-between px-4 sm:px-8 py-3 pt-safe">
-        <div className="flex items-center gap-2.5">
-          <div
-            className="relative w-9 h-9 rounded-xl bg-primary/10 border border-primary/40 flex items-center justify-center flex-shrink-0 transition-all duration-700"
-            style={{ boxShadow: STATUS_CONFIG[agentStatus].glow }}
-          >
-            <span
-              className="font-display font-black text-base transition-colors duration-700"
-              style={{ color: STATUS_CONFIG[agentStatus].color }}
-            >J</span>
-            <div
-              className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full animate-pulse transition-colors duration-700"
-              style={{ background: STATUS_CONFIG[agentStatus].color }}
-            />
-          </div>
-          <div>
-            <h1
-              className="font-display font-bold text-lg sm:text-2xl tracking-widest glow-primary-text leading-none"
-              style={{ color: "hsl(194 100% 60%)" }}
-            >
-              JARVIS
-            </h1>
-            <p
-              className="hidden sm:block text-xs tracking-widest mt-0.5"
-              style={{ color: "hsl(196 40% 50%)" }}
-            >
-              AGENT v2 · INTENT ROUTING · WEB SEARCH
-            </p>
-          </div>
-        </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {/* ONLINE — compact, desktop only */}
-            <div className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-full border border-primary/30 bg-primary/5">
-              <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-xs font-medium tracking-wider" style={{ color: "hsl(142 71% 60%)" }}>ONLINE</span>
-            </div>
-            {/* Auto-speak */}
-            {speech.isSupported && (
-              <button
-                onClick={() => { speech.unlock(); speech.setAutoSpeak(!speech.autoSpeak); }}
-                className="w-8 h-8 rounded-xl border flex items-center justify-center transition-all duration-200 active:scale-95"
-                style={{ background: speech.autoSpeak ? "hsl(142 60% 40% / 0.15)" : "transparent", borderColor: speech.autoSpeak ? "hsl(142 60% 40% / 0.45)" : "hsl(210 15% 25%)" }}
-                aria-label={speech.autoSpeak ? "Disable auto-speak" : "Enable auto-speak"}
-              >
-                {speech.autoSpeak ? <Volume2 className="w-4 h-4" style={{ color: "hsl(142 71% 60%)" }} /> : <VolumeX className="w-4 h-4" style={{ color: "hsl(196 40% 40%)" }} />}
-              </button>
-            )}
-            {/* Memory */}
-            <button
-              onClick={() => setPanelOpen(true)}
-              data-testid="button-open-memory"
-              className="relative w-8 h-8 rounded-xl border border-border/60 bg-card flex items-center justify-center hover:border-primary/40 active:scale-95 transition-all"
-              aria-label="Open memory panel"
-            >
-              <Brain className="w-4 h-4" style={{ color: "hsl(194 100% 55%)" }} />
-              {(memory?.messageCount ?? 0) > 0 && (
-                <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-primary rounded-full" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* ── Tab bar — horizontally scrollable, 6 primary tabs ─────────── */}
-        <div
-          className="flex gap-1 px-3 pb-2 overflow-x-auto"
-          style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
-        >
-          {(["chat", "tasks", "diag", "status", "debug", "dev"] as const).map((tab) => {
-            const cfg = {
-              chat:   { label: "CHAT",   active: "hsl(194 100% 65%)", border: "hsl(194 100% 55% / 0.55)", bg: "hsl(194 100% 55% / 0.12)" },
-              tasks:  { label: "TASKS",  active: "hsl(150 70% 65%)",  border: "hsl(150 60% 45% / 0.55)", bg: "hsl(150 60% 45% / 0.12)" },
-              diag:   { label: "DIAG",   active: "hsl(264 80% 72%)",  border: "hsl(264 80% 55% / 0.55)", bg: "hsl(264 80% 55% / 0.12)" },
-              status: { label: "STATUS", active: "hsl(38 100% 70%)",  border: "hsl(38 100% 55% / 0.55)",  bg: "hsl(38 100% 55% / 0.12)" },
-              debug:  { label: "DEBUG",  active: "hsl(196 100% 65%)", border: "hsl(196 100% 55% / 0.55)", bg: "hsl(196 100% 55% / 0.12)" },
-              dev:    { label: "DEV",    active: "hsl(194 100% 65%)", border: "hsl(194 100% 50% / 0.55)", bg: "hsl(194 100% 50% / 0.12)" },
-            }[tab];
-            const isActive = activeTab === tab;
-            return (
-              <button
-                key={tab}
-                onClick={() => {
-                  setActiveTab(tab);
-                  if (tab === "tasks")  setTasksPanelOpen(true);
-                  if (tab === "diag")   setDiagPanelOpen(true);
-                  if (tab === "status") setStatusPanelOpen(true);
-                }}
-                className="flex-shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all duration-200 active:scale-95"
-                style={{
-                  whiteSpace: "nowrap",
-                  background:  isActive ? cfg.bg    : "transparent",
-                  border:      `1px solid ${isActive ? cfg.border : "hsl(210 15% 24%)"}`,
-                  color:       isActive ? cfg.active : "hsl(196 20% 40%)",
-                }}
-              >
-                {cfg.label}
-              </button>
-            );
-          })}
-        </div>
-      </header>
+      <ChatToolbar
+        agentStatus={agentStatus}
+        memory={memory}
+        speech={speech}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        setTasksPanelOpen={setTasksPanelOpen}
+        setDiagPanelOpen={setDiagPanelOpen}
+        setStatusPanelOpen={setStatusPanelOpen}
+        onOpenMemory={() => setPanelOpen(true)}
+      />
 
       {/* Status bar — shows while agent is active */}
       {agentStatus !== "idle" && !isLoadingHistory && (
@@ -2315,6 +1976,22 @@ export default function Chat() {
               const isBusy = (key: string) => actionStatus[key] === "loading";
               return (
                 <div className="flex-shrink-0 flex flex-wrap gap-1.5 px-4 py-2.5 border-b border-border/30">
+                  {/* ── WORK ON JARVIS — primary action ── */}
+                  <button
+                    onClick={() => { setDevSection("chat"); void withActionFeedback("WORK", () => sendDevMessage("Let's work on Jarvis. Review the project memory and current state, then identify the most impactful thing to build or fix next. Give me a concrete implementation plan with specific files and changes.")); }}
+                    disabled={devSending || isBusy("WORK")}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-[11px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
+                    style={{
+                      background: "hsl(264 80% 55% / 0.20)",
+                      border: "1.5px solid hsl(264 80% 65% / 0.70)",
+                      color: actionStatus["WORK"] === "success" ? "hsl(142 71% 62%)" : actionStatus["WORK"] === "error" ? "hsl(355 80% 62%)" : "hsl(264 80% 82%)",
+                      boxShadow: "0 0 12px hsl(264 80% 55% / 0.25)",
+                    }}
+                  >
+                    {isBusy("WORK") ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5" />}
+                    WORK ON JARVIS
+                  </button>
+
                   {/* ── Chat-prompt actions ── */}
                   {([
                     { key: "SCAN",  label: "SCAN PROJECT", prompt: "Scan this project's file structure and codebase. List key components, API routes, and libraries. Highlight quality issues and improvement opportunities." },
@@ -2333,7 +2010,7 @@ export default function Chat() {
                     </button>
                   ))}
 
-                  {/* ── RUN BUILD — switches to BUILD tab and runs real check ── */}
+                  {/* ── RUN BUILD ── */}
                   <button
                     onClick={() => { setDevSection("build"); void withActionFeedback("BUILD", () => runDevBuild(true)); }}
                     disabled={devBuildLoading || isBusy("BUILD")}
@@ -2344,18 +2021,7 @@ export default function Chat() {
                     RUN BUILD
                   </button>
 
-                  {/* ── WORK ON JARVIS ── */}
-                  <button
-                    onClick={() => { setDevSection("chat"); void withActionFeedback("WORK", () => sendDevMessage("Let's work on Jarvis. Review the project memory and current state, then identify the most impactful thing to build or fix next. Give me a concrete implementation plan with specific files and changes.")); }}
-                    disabled={devSending || isBusy("WORK")}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
-                    style={{ background: "hsl(264 80% 55% / 0.12)", border: "1px solid hsl(264 80% 55% / 0.45)", color: actionStatus["WORK"] === "success" ? "hsl(142 71% 62%)" : actionStatus["WORK"] === "error" ? "hsl(355 80% 62%)" : "hsl(264 80% 75%)" }}
-                  >
-                    {isBusy("WORK") ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Bot className="w-3 h-3" />}
-                    WORK ON JARVIS
-                  </button>
-
-                  {/* ── RUN ALL CHECKS ── */}
+                  {/* ── RUN ALL CHECKS (typecheck + build + diag) ── */}
                   <button
                     onClick={() => void withActionFeedback("RUN_ALL", () => runAllChecks())}
                     disabled={devBuildLoading || devDiagLoading || devLogsLoading || isBusy("RUN_ALL")}
@@ -2368,34 +2034,57 @@ export default function Chat() {
                     RUN ALL CHECKS
                   </button>
 
-                  {/* ── EXPORT SNAPSHOT ── */}
-                  <button
-                    onClick={() => void withActionFeedback("EXPORT", () => exportSnapshot())}
-                    disabled={isBusy("EXPORT")}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
-                    style={{ background: "hsl(142 60% 40% / 0.12)", border: "1px solid hsl(142 60% 40% / 0.40)", color: "hsl(142 71% 62%)" }}
-                  >
-                    {isBusy("EXPORT") ? <RefreshCw className="w-3 h-3 animate-spin" /> : btnIcon("EXPORT") ?? <Download className="w-3 h-3" />}
-                    EXPORT SNAPSHOT
-                  </button>
-
-                  {/* ── REFRESH CURRENT — refreshes the currently active sub-tab ── */}
-                  <button
-                    onClick={() => void withActionFeedback("REFRESH", async () => {
-                      if      (devSection === "build")     await runDevBuild(true);
-                      else if (devSection === "diag")      await runDevDiag();
-                      else if (devSection === "logs")      await loadDevLogs();
-                      else if (devSection === "patches")   { await fetchPendingPatches().then(setPendingPatches); }
-                      else if (devSection === "checklist") await runAllChecks();
-                      else { await Promise.all([loadDevProjectMemory(), fetchPendingPatches().then(setPendingPatches).catch(() => {})]); }
-                    })}
-                    disabled={isBusy("REFRESH") || devBuildLoading || devDiagLoading || devLogsLoading}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
-                    style={{ background: "transparent", border: "1px solid hsl(210 15% 24%)", color: actionStatus["REFRESH"] === "success" ? "hsl(142 71% 62%)" : actionStatus["REFRESH"] === "error" ? "hsl(355 80% 62%)" : "hsl(196 30% 44%)" }}
-                  >
-                    {isBusy("REFRESH") ? <RefreshCw className="w-3 h-3 animate-spin" /> : btnIcon("REFRESH") ?? <RefreshCw className="w-3 h-3" />}
-                    REFRESH CURRENT
-                  </button>
+                  {/* ── TOOLS dropdown — Export Snapshot + Refresh Current ── */}
+                  <div ref={toolsMenuRef} className="relative">
+                    <button
+                      onClick={() => setToolsMenuOpen(v => !v)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95"
+                      style={{
+                        background: toolsMenuOpen ? "hsl(196 30% 44% / 0.15)" : "transparent",
+                        border: `1px solid ${toolsMenuOpen ? "hsl(196 30% 44% / 0.55)" : "hsl(210 15% 24%)"}`,
+                        color: "hsl(196 30% 52%)",
+                      }}
+                    >
+                      <Wrench className="w-3 h-3" />
+                      TOOLS
+                      <ChevronDown className={`w-3 h-3 transition-transform duration-150 ${toolsMenuOpen ? "rotate-180" : ""}`} />
+                    </button>
+                    {toolsMenuOpen && (
+                      <div
+                        className="absolute top-full left-0 mt-1 z-50 rounded-xl overflow-hidden flex flex-col"
+                        style={{ background: "hsl(210 15% 8%)", border: "1px solid hsl(210 15% 18%)", minWidth: "175px", boxShadow: "0 8px 24px rgba(0,0,0,0.55)" }}
+                      >
+                        <button
+                          onClick={() => { setToolsMenuOpen(false); void withActionFeedback("EXPORT", () => exportSnapshot()); }}
+                          disabled={isBusy("EXPORT")}
+                          className="flex items-center gap-2 px-4 py-2.5 text-[10px] font-bold tracking-widest transition-all hover:bg-white/5 disabled:opacity-40 text-left"
+                          style={{ color: actionStatus["EXPORT"] === "success" ? "hsl(142 71% 62%)" : actionStatus["EXPORT"] === "error" ? "hsl(355 80% 62%)" : "hsl(142 71% 62%)" }}
+                        >
+                          {isBusy("EXPORT") ? <RefreshCw className="w-3 h-3 animate-spin" /> : btnIcon("EXPORT") ?? <Download className="w-3 h-3" />}
+                          EXPORT SNAPSHOT
+                        </button>
+                        <button
+                          onClick={() => {
+                            setToolsMenuOpen(false);
+                            void withActionFeedback("REFRESH", async () => {
+                              if      (devSection === "build")     await runDevBuild(true);
+                              else if (devSection === "diag")      await runDevDiag();
+                              else if (devSection === "logs")      await loadDevLogs();
+                              else if (devSection === "patches")   { await fetchPendingPatches().then(setPendingPatches); }
+                              else if (devSection === "checklist") await runAllChecks();
+                              else { await Promise.all([loadDevProjectMemory(), fetchPendingPatches().then(setPendingPatches).catch(() => {})]); }
+                            });
+                          }}
+                          disabled={isBusy("REFRESH") || devBuildLoading || devDiagLoading || devLogsLoading}
+                          className="flex items-center gap-2 px-4 py-2.5 text-[10px] font-bold tracking-widest transition-all hover:bg-white/5 disabled:opacity-40 text-left"
+                          style={{ color: actionStatus["REFRESH"] === "success" ? "hsl(142 71% 62%)" : actionStatus["REFRESH"] === "error" ? "hsl(355 80% 62%)" : "hsl(196 30% 52%)" }}
+                        >
+                          {isBusy("REFRESH") ? <RefreshCw className="w-3 h-3 animate-spin" /> : btnIcon("REFRESH") ?? <RefreshCw className="w-3 h-3" />}
+                          REFRESH CURRENT
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })()}
@@ -2873,8 +2562,8 @@ export default function Chat() {
               const aiKeyOk  = devDiagReport ? devDiagReport.checks["env_var_AI_INTEGRATIONS_ANTHROPIC_API_KEY"] === "pass" : null;
               const autoItems: Array<{ label: string; ok: boolean | null; detail?: string }> = [
                 { label: "API server online",           ok: true,          detail: "Server is responding" },
-                { label: "TypeScript clean (frontend)", ok: fe.errorCount === 0, detail: devBuildResult ? `${fe.errorCount} errors` : "Run Build first" },
-                { label: "TypeScript clean (backend)",  ok: be.errorCount === 0, detail: devBuildResult ? `${be.errorCount} errors` : "Run Build first" },
+                { label: "npm run typecheck (frontend)", ok: fe.errorCount === 0, detail: devBuildResult ? `${fe.errorCount} errors` : "Run Build first" },
+                { label: "npm run typecheck (backend)",  ok: be.errorCount === 0, detail: devBuildResult ? `${be.errorCount} errors` : "Run Build first" },
                 { label: "Health score ≥ 90",           ok: score !== null ? score >= 90 : null, detail: score !== null ? `Score: ${score}` : "Run Build first" },
                 { label: "PORT env var set",            ok: portOk,        detail: devDiagReport ? undefined : "Run Diag first" },
                 { label: "Anthropic API key set",       ok: aiKeyOk,       detail: devDiagReport ? undefined : "Run Diag first" },
@@ -2956,47 +2645,20 @@ export default function Chat() {
         </DevErrorBoundary>
       )}
 
-      {/* ── Message list ── */}
-      <main
-        className={`relative z-10 overflow-y-auto scrollbar-thin px-4 sm:px-8 py-6 ${activeTab === "debug" || activeTab === "dev" ? "hidden" : "flex-1"}`}
-        data-testid="chat-messages"
-      >
-        <div className="max-w-3xl mx-auto flex flex-col gap-5">
-          {/* Summary badge */}
-          {memory?.summary && !isLoadingHistory && (
-            <div className="flex items-center gap-2 py-2 px-3 rounded-xl bg-primary/5 border border-primary/20">
-              <Brain
-                className="w-3 h-3 flex-shrink-0"
-                style={{ color: "hsl(194 100% 55%)" }}
-              />
-              <p className="text-xs" style={{ color: "hsl(194 100% 55%)" }}>
-                Older messages are summarized in memory.{" "}
-                <button
-                  className="underline hover:no-underline"
-                  onClick={() => setPanelOpen(true)}
-                >
-                  View summary
-                </button>
-              </p>
-            </div>
-          )}
-
-          {messages.map((msg) => (
-            <MessageBubble
-              key={msg.id}
-              message={msg}
-              showDebug={debugMode}
-              isStreaming={isStreaming && msg.id === streamingMsgId}
-              isSpeaking={speech.isSpeakingMsg(msg.id)}
-              onSpeak={() => speech.toggle(msg.id, msg.content)}
-              onStopSpeak={speech.stop}
-            />
-          ))}
-
-          {isTyping && <TypingIndicator status={agentStatus} />}
-          <div ref={messagesEndRef} />
-        </div>
-      </main>
+      <ChatMessageList
+        activeTab={activeTab}
+        messages={messages}
+        memory={memory}
+        isLoadingHistory={isLoadingHistory}
+        isStreaming={isStreaming}
+        streamingMsgId={streamingMsgId}
+        isTyping={isTyping}
+        agentStatus={agentStatus}
+        debugMode={debugMode}
+        speech={speech}
+        messagesEndRef={messagesEndRef}
+        onOpenMemory={() => setPanelOpen(true)}
+      />
 
       {/* ── Pending patch notification bar — dev tools only ─────────────── */}
       {DEV_TOOLS_ENABLED && (
@@ -3010,121 +2672,21 @@ export default function Chat() {
       />
       )}
 
-      {/* ── Input bar ── */}
-      <footer className={`relative z-10 flex-shrink-0 border-t border-border/60 bg-background/90 backdrop-blur-sm px-3 sm:px-8 pt-3 pb-safe ${activeTab === "debug" || activeTab === "dev" ? "hidden" : ""}`}
-        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
-      >
-        <div className="max-w-3xl mx-auto">
-          {/* Auto-planner toggle row */}
-          <div className="flex items-center justify-between mb-2 px-1">
-            <span className="text-xs" style={{ color: "hsl(196 20% 38%)" }}>Auto-route complex tasks to Planner</span>
-            <button
-              type="button"
-              onClick={() => setAutoPlannerEnabled(v => { const n = !v; setAutoPlannerEnabledStorage(n); return n; })}
-              className="relative w-8 h-4 rounded-full transition-colors duration-200 flex-shrink-0"
-              style={{ background: autoPlannerEnabled ? "hsl(270 70% 50% / 0.7)" : "hsl(210 15% 20%)", border: `1px solid ${autoPlannerEnabled ? "hsl(270 100% 65% / 0.5)" : "hsl(210 15% 26%)"}` }}
-              aria-label={autoPlannerEnabled ? "Disable auto-planner" : "Enable auto-planner"}
-              title={autoPlannerEnabled ? "Auto-Planner ON" : "Auto-Planner OFF"}
-            >
-              <span className="absolute top-0.5 w-3 h-3 rounded-full transition-all duration-200" style={{ background: autoPlannerEnabled ? "hsl(270 100% 82%)" : "hsl(210 15% 42%)", left: autoPlannerEnabled ? "calc(100% - 13px)" : "1px" }} />
-            </button>
-          </div>
-          <div className="flex items-end gap-2.5 bg-card border border-border rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 focus-within:border-primary/60 focus-within:glow-primary transition-all duration-200">
-            <textarea
-              ref={textareaRef}
-              data-testid="input-message"
-              className="flex-1 bg-transparent resize-none outline-none text-sm leading-relaxed placeholder:text-muted-foreground min-h-[24px] max-h-[120px] scrollbar-thin"
-              style={{ color: "hsl(196 80% 85%)" }}
-              placeholder="Message Jarvis… ask anything, search the web, build apps, or open DEV."
-              value={input}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              rows={1}
-            />
-
-            {/* Mic button — hidden if speech not supported */}
-            {speechInput.isSupported && (
-              <div className="relative flex-shrink-0">
-                {speechInput.isListening && (
-                  <span className="mic-recording-ring" aria-hidden="true" />
-                )}
-                <button
-                  data-testid="button-mic"
-                  onClick={toggleMic}
-                  disabled={isTyping || isStreaming}
-                  aria-label={speechInput.isListening ? "Stop recording" : "Voice input"}
-                  title={
-                    speechInput.permissionDenied
-                      ? "Microphone access denied"
-                      : speechInput.isListening
-                        ? "Stop recording"
-                        : "Voice input"
-                  }
-                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
-                  style={{
-                    background: speechInput.isListening
-                      ? "hsl(355 80% 28% / 0.4)"
-                      : "hsl(194 100% 55% / 0.12)",
-                    border: `1px solid ${speechInput.isListening ? "hsl(355 80% 50%)" : "hsl(194 100% 55% / 0.3)"}`,
-                    color: speechInput.isListening
-                      ? "hsl(355 80% 62%)"
-                      : speechInput.permissionDenied
-                        ? "hsl(196 20% 35%)"
-                        : "hsl(194 100% 55%)",
-                  }}
-                >
-                  {speechInput.isListening
-                    ? <MicOff className={`w-4 h-4 mic-recording`} />
-                    : <Mic className="w-4 h-4" />
-                  }
-                </button>
-              </div>
-            )}
-
-            {/* ── Plan button (BRIGHT PURPLE = planner path) ───────── */}
-            <button
-              data-testid="button-plan"
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                console.log("[Planner] BUTTON CLICKED — input:", JSON.stringify(input.trim()), "isTyping:", isTyping, "isStreaming:", isStreaming);
-                sendPlan();
-              }}
-              disabled={!input.trim() || isTyping || isStreaming}
-              title="Run autonomous plan"
-              aria-label="Run autonomous plan"
-              className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
-              style={{
-                border: "2px solid hsl(270 100% 65%)",
-                background: "hsl(270 80% 55% / 0.18)",
-              }}
-            >
-              <ListChecks className="w-4 h-4" style={{ color: "hsl(270 100% 75%)" }} />
-            </button>
-
-            {/* ── Send button ──────────────────────────────────────── */}
-            <button
-              data-testid="button-send"
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                console.log("[Chat] sendMessage entered from send button");
-                sendMessage();
-              }}
-              disabled={!input.trim() || isTyping || isStreaming}
-              className="flex-shrink-0 w-9 h-9 rounded-xl bg-primary flex items-center justify-center transition-all duration-200 hover:bg-primary/80 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed glow-primary"
-              aria-label="Send message"
-            >
-              <Send className="w-4 h-4" style={{ color: "hsl(220 20% 6%)" }} />
-            </button>
-          </div>
-          {/* Footer hint — desktop only */}
-          <p className="hidden sm:block text-center text-xs mt-2 tracking-wider" style={{ color: "hsl(196 30% 40%)" }}>
-            Intent-routed · Web search · Persistent memory · Press ⌘ to toggle debug
-          </p>
-        </div>
-      </footer>
+      <ChatInput
+        activeTab={activeTab}
+        input={input}
+        isTyping={isTyping}
+        isStreaming={isStreaming}
+        autoPlannerEnabled={autoPlannerEnabled}
+        onToggleAutoPlanner={() => setAutoPlannerEnabled(v => { const n = !v; setAutoPlannerEnabledStorage(n); return n; })}
+        speechInput={speechInput}
+        textareaRef={textareaRef}
+        handleInputChange={handleInputChange}
+        handleKeyDown={handleKeyDown}
+        onToggleMic={toggleMic}
+        onSendPlan={sendPlan}
+        onSend={sendMessage}
+      />
 
       {/* Runtime inspector — visible when debug mode is on */}
       {debugMode && <RuntimeInspector />}
@@ -3275,7 +2837,7 @@ export default function Chat() {
         apiBase={BASE}
       />
 
-    </div>
+    </ChatPanel>
   );
 }
 
