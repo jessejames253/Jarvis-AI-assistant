@@ -947,6 +947,7 @@ export default function Chat() {
   const [devMessages,  setDevMessages]  = useState<Array<{id: string; role: "user"|"assistant"; content: string}>>([]);
   const [devInput,     setDevInput]     = useState("");
   const [devSending,   setDevSending]   = useState(false);
+  const devSendingRef  = useRef(false);  // guard ref — avoids stale-closure bug in sendDevMessage
   const [devSection,   setDevSection]   = useState<"chat"|"patches"|"build"|"diag"|"logs"|"checklist">("chat");
   const devChatEndRef = useRef<HTMLDivElement>(null);
 
@@ -1026,26 +1027,33 @@ export default function Chat() {
   // ── Dev workspace send ────────────────────────────────────────────────────
   const sendDevMessage = useCallback(async (text: string) => {
     const trimmed = text.trim();
-    if (!trimmed || devSending) return;
+    console.log("[DEV CHAT] sendDevMessage called", { len: trimmed.length, busy: devSendingRef.current });
+    if (!trimmed || devSendingRef.current) {
+      console.warn("[DEV CHAT] guard blocked — empty or already sending", { trimmed: !!trimmed, busy: devSendingRef.current });
+      return;
+    }
     setDevMessages(prev => [...prev, { id: `du-${Date.now()}`, role: "user", content: trimmed }]);
     setDevInput("");
-    setDevSending(true);
+    setDevSending(true); devSendingRef.current = true;
     setDevSection("chat");
     const assistantId = `da-${Date.now()}`;
     setDevMessages(prev => [...prev, { id: assistantId, role: "assistant", content: "" }]);
+    console.log("[DEV CHAT] POSTing to /api/chat/stream, session:", `dev-${sessionId}`);
     try {
-      const res = await fetch(`${BASE}api/chat`, {
+      const res = await fetch(`${BASE}api/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: trimmed, sessionId: `dev-${sessionId}` }),
       });
+      console.log("[DEV CHAT] response", { status: res.status, ok: res.ok, hasBody: !!res.body });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = "";
+      let tokens = 0;
       for (;;) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) { console.log("[DEV CHAT] stream done, tokens received:", tokens); break; }
         const lines = (buf + decoder.decode(value, { stream: true })).split("\n");
         buf = lines.pop() ?? "";
         for (const line of lines) {
@@ -1055,18 +1063,23 @@ export default function Chat() {
           try {
             const evt = JSON.parse(raw) as { type: string; text?: string; content?: string };
             const piece = evt.type === "token" ? (evt.text ?? evt.content ?? "") : "";
-            if (piece) setDevMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: m.content + piece } : m));
-          } catch { /* ignore */ }
+            if (piece) {
+              tokens++;
+              setDevMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: m.content + piece } : m));
+            }
+          } catch { /* malformed SSE line — skip */ }
         }
       }
     } catch (err) {
+      console.error("[DEV CHAT] fetch/stream error:", err);
       setDevMessages(prev => prev.map(m =>
-        m.id === assistantId ? { ...m, content: `⚠ ${String(err)}` } : m,
+        m.id === assistantId ? { ...m, content: `⚠ ${err instanceof Error ? err.message : String(err)}` } : m,
       ));
     } finally {
-      setDevSending(false);
+      console.log("[DEV CHAT] finally: clearing devSending");
+      setDevSending(false); devSendingRef.current = false;
     }
-  }, [BASE, sessionId, devSending]);
+  }, [BASE, sessionId]); // devSending intentionally removed — guard uses devSendingRef to avoid stale closure
 
   // ── Dev workspace helpers ─────────────────────────────────────────────────
   const loadDevProjectMemory = useCallback(async () => {
