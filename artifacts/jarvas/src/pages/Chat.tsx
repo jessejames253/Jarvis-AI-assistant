@@ -826,11 +826,16 @@ export default function Chat() {
     const orig = { log: console.log, warn: console.warn, error: console.error };
 
     function capture(level: string, args: unknown[]) {
-      const msg = args.map(a => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" ");
-      if (!PREFIX.test(msg)) return;
-      const ts = new Date().toISOString().slice(11, 23);
-      const tag = level === "log" ? "" : level === "warn" ? "⚠ " : "✖ ";
-      setDebugLogs(prev => [...prev.slice(-(MAX - 1)), `${ts} ${tag}${msg}`]);
+      try {
+        const msg = args.map(a => {
+          try { return typeof a === "object" ? JSON.stringify(a) : String(a); }
+          catch { return "[unserializable]"; }
+        }).join(" ");
+        if (!PREFIX.test(msg)) return;
+        const ts = new Date().toISOString().slice(11, 23);
+        const tag = level === "log" ? "" : level === "warn" ? "⚠ " : "✖ ";
+        setDebugLogs(prev => [...prev.slice(-(MAX - 1)), `${ts} ${tag}${msg}`]);
+      } catch { /* never let interceptor crash calling code */ }
     }
 
     console.log  = (...a) => { orig.log(...a);   capture("log",   a); };
@@ -950,14 +955,43 @@ export default function Chat() {
     const currentMsgId = msgId;
     console.log("[Chat] step 13: msgId =", currentMsgId);
 
-    const pendingToolCalls = new Map<string, ToolCallInfo>();
-    console.log("[Chat] step 14: pendingToolCalls created");
+    // ── Setup block — wrapped so any throw is caught and shown on-screen ────────
+    // If something here throws (e.g. _rt.bus.emit, flushTokenBuffer), we log it,
+    // clear isTyping/isStreaming, and bail — rather than leaving the UI stuck.
+    let pendingToolCalls = new Map<string, ToolCallInfo>();
+    let streamStartTime = Date.now();
 
-    /** Create the assistant message in state if not yet created */
+    const handleError = (reason?: string) => {
+      const label = reason ?? "Request failed — please try again.";
+      console.error("[Chat] handleError:", label);
+      try { _rt.bus.emit({ type: "stream:error", error: label, ts: Date.now() }); } catch { /* ignore bus errors */ }
+
+      if (messageCreated) {
+        setIsStreaming(false);
+        setStreamingMsgId(null);
+        try { flushTokenBuffer(currentMsgId, true); } catch { /* ignore */ }
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === currentMsgId
+              ? { ...m, content: m.content.trim() || `⚠️ ${label}` }
+              : m
+          )
+        );
+      } else {
+        setIsTyping(false);
+        setMessages((prev) => [
+          ...prev,
+          { id: currentMsgId, role: "assistant", content: `⚠️ ${label}`, timestamp: new Date() },
+        ]);
+      }
+      setAgentStatus("error");
+      setTimeout(() => setAgentStatus("idle"), 2500);
+    };
+
     function ensureMessageCreated(initialContent = "") {
       if (messageCreated) return;
       messageCreated = true;
-      console.log("[Chat] ensureMessageCreated — setIsTyping(false), setIsStreaming(true), msgId:", currentMsgId, "initialContent length:", initialContent.length);
+      console.log("[Chat] ensureMessageCreated — setIsTyping(false) setIsStreaming(true) msgId:", currentMsgId);
       setIsTyping(false);
       setAgentStatus("idle");
       setIsStreaming(true);
@@ -974,44 +1008,31 @@ export default function Chat() {
       ]);
       messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
     }
-    console.log("[Chat] step 15: ensureMessageCreated defined");
 
-    const streamStartTime = Date.now();
-    console.log("[Chat] step 16: streamStartTime =", streamStartTime);
-
-    try { _rt.bus.emit({ type: "stream:start", sessionId, ts: Date.now() }); } catch(e) { console.warn("[Chat] step 17 THREW: _rt.bus.emit:", e); }
-    console.log("[Chat] step 17: _rt.bus.emit stream:start done");
-
-    const handleError = (reason?: string) => {
-      const label = reason ?? "Request failed — please try again.";
-      console.error("[Jarvis] handleError:", label);
-      _rt.bus.emit({ type: "stream:error", error: label, ts: Date.now() });
-
-      if (messageCreated) {
-        // Message bubble already exists — stop streaming and fill it with the error.
-        setIsStreaming(false);
-        setStreamingMsgId(null);
-        flushTokenBuffer(currentMsgId, true);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === currentMsgId
-              ? { ...m, content: m.content.trim() || `⚠️ ${label}` }
-              : m
-          )
-        );
-      } else {
-        // No bubble yet — stop the typing indicator and add an error bubble.
-        setIsTyping(false);
-        setMessages((prev) => [
-          ...prev,
-          { id: currentMsgId, role: "assistant", content: `⚠️ ${label}`, timestamp: new Date() },
-        ]);
-      }
+    try {
+      console.log("[Chat] step 14: setup block entering");
+      pendingToolCalls = new Map<string, ToolCallInfo>();
+      console.log("[Chat] step 15: pendingToolCalls ok");
+      streamStartTime = Date.now();
+      console.log("[Chat] step 16: streamStartTime ok =", streamStartTime);
+      _rt.bus.emit({ type: "stream:start", sessionId, ts: Date.now() });
+      console.log("[Chat] step 17: _rt.bus.emit stream:start ok");
+    } catch (setupErr) {
+      const detail = setupErr instanceof Error ? setupErr.message : String(setupErr);
+      console.error("[Chat] SETUP BLOCK THREW (step 14-17):", detail);
+      // Clear the stuck typing indicator and bail — don't proceed to callChatStream
+      setIsTyping(false);
+      setIsStreaming(false);
+      setMessages((prev) => [
+        ...prev,
+        { id: currentMsgId, role: "assistant", content: `⚠️ Setup error: ${detail}`, timestamp: new Date() },
+      ]);
       setAgentStatus("error");
       setTimeout(() => setAgentStatus("idle"), 2500);
-    };
+      return;
+    }
 
-    console.log("[Chat] step 18: handleError defined, about to call callChatStream — BASE:", BASE, "sessionId:", sessionId);
+    console.log("[Chat] step 18: setup complete, about to call callChatStream — BASE:", BASE, "sessionId:", sessionId);
     try {
     await callChatStream(
       text,
