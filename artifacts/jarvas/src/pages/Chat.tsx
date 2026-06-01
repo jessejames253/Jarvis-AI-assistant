@@ -38,6 +38,7 @@ import {
   Users,
   Network,
   ClipboardList,
+  RefreshCw,
 } from "lucide-react";
 import { generateId } from "@/lib/uuid";
 import { useSpeechInput } from "@/hooks/useSpeechInput";
@@ -640,6 +641,134 @@ const WELCOME = (name?: string): Message => ({
   timestamp: new Date(),
 });
 
+// ─── PatchCard ────────────────────────────────────────────────────────────────
+
+function PatchCard({
+  patch,
+  onRemove,
+}: {
+  patch: PendingPatchSummary;
+  onRemove: (id: string) => void;
+}) {
+  const [status, setStatus] = useState<"idle" | "applying" | "done" | "error">("idle");
+  const [applyError, setApplyError] = useState<string | null>(null);
+
+  const RISK_COLOR: Record<string, string> = {
+    low:    "hsl(142 71% 55%)",
+    medium: "hsl(38 100% 65%)",
+    high:   "hsl(355 80% 62%)",
+  };
+
+  const handleAccept = async () => {
+    setStatus("applying");
+    setApplyError(null);
+    const result = await approvePatch(patch.patchId, patch.file);
+    if (result.ok) {
+      setStatus("done");
+      setTimeout(() => onRemove(patch.patchId), 1400);
+    } else {
+      setStatus("error");
+      setApplyError(result.error ?? "Apply failed");
+    }
+  };
+
+  const handleDecline = async () => {
+    await logRejectPatch(patch.patchId, patch.file);
+    onRemove(patch.patchId);
+  };
+
+  return (
+    <div
+      className="rounded-2xl border flex flex-col gap-3 p-4"
+      style={{ background: "hsl(210 15% 7%)", borderColor: "hsl(210 15% 16%)" }}
+    >
+      {/* Header row */}
+      <div className="flex items-start gap-3">
+        <p className="flex-1 text-sm font-semibold leading-snug" style={{ color: "hsl(196 80% 85%)" }}>
+          {patch.description}
+        </p>
+        {patch.riskLevel && (
+          <span
+            className="flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border"
+            style={{
+              color: RISK_COLOR[patch.riskLevel] ?? "hsl(196 60% 60%)",
+              borderColor: `${RISK_COLOR[patch.riskLevel] ?? "hsl(196 60% 60%)"}44`,
+            }}
+          >
+            {patch.riskLevel.toUpperCase()}
+          </span>
+        )}
+      </div>
+
+      {/* File */}
+      <div className="flex items-center gap-2">
+        <Code2 className="w-3 h-3 flex-shrink-0" style={{ color: "hsl(196 40% 42%)" }} />
+        <span className="text-xs font-mono truncate" style={{ color: "hsl(196 60% 58%)" }}>
+          {patch.file}
+        </span>
+      </div>
+
+      {/* Impact notes */}
+      {(patch.uiImpact || patch.logicImpact) && (
+        <div className="text-xs space-y-0.5" style={{ color: "hsl(196 25% 50%)" }}>
+          {patch.uiImpact   && <div>UI: {patch.uiImpact}</div>}
+          {patch.logicImpact && <div>Logic: {patch.logicImpact}</div>}
+        </div>
+      )}
+
+      {/* Status feedback */}
+      {status === "error" && applyError && (
+        <div
+          className="text-xs rounded-xl px-3 py-2"
+          style={{ background: "hsl(355 80% 14%)", color: "hsl(355 80% 68%)", border: "1px solid hsl(355 80% 28%)" }}
+        >
+          ✖ {applyError}
+        </div>
+      )}
+      {status === "done" && (
+        <div
+          className="text-xs rounded-xl px-3 py-2"
+          style={{ background: "hsl(142 60% 11%)", color: "hsl(142 71% 62%)", border: "1px solid hsl(142 60% 22%)" }}
+        >
+          ✓ Applied successfully
+        </div>
+      )}
+
+      {/* Action buttons */}
+      {status !== "done" && (
+        <div className="flex gap-2">
+          <button
+            onClick={handleAccept}
+            disabled={status === "applying"}
+            className="flex-1 py-2 rounded-xl text-xs font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
+            style={{
+              background: "hsl(142 60% 35% / 0.18)",
+              border: "1px solid hsl(142 60% 38%)",
+              color: "hsl(142 71% 62%)",
+            }}
+          >
+            {status === "applying" ? "APPLYING…" : "✓  ACCEPT"}
+          </button>
+          <button
+            onClick={handleDecline}
+            disabled={status === "applying"}
+            className="flex-1 py-2 rounded-xl text-xs font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
+            style={{
+              background: "hsl(355 80% 35% / 0.14)",
+              border: "1px solid hsl(355 80% 38% / 0.6)",
+              color: "hsl(355 80% 64%)",
+            }}
+          >
+            ✗  DECLINE
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export default function Chat() {
   const [, navigate] = useLocation();
   const [sessionId, setSessionId] = useState(() => getOrCreateSessionId());
@@ -655,6 +784,7 @@ export default function Chat() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<"chat" | "tasks" | "diag" | "status" | "debug" | "dev">("chat");
   const [autoPlannerEnabled, setAutoPlannerEnabled] = useState(() => getAutoPlannerEnabled());
   const [devPanelOpen, setDevPanelOpen] = useState(() => getDevPanelOpen());
   const [tasksPanelOpen,  setTasksPanelOpen]  = useState(false);
@@ -1459,9 +1589,8 @@ export default function Chat() {
       <div className="fixed bottom-24 right-8 w-64 h-64 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
 
       {/* ── Header ── */}
-      <header
-        className="relative z-10 flex-shrink-0 flex items-center justify-between px-4 sm:px-8 py-3 sm:py-4 border-b border-border/60 bg-background/90 backdrop-blur-sm pt-safe"
-      >
+      <header className="relative z-10 flex-shrink-0 border-b border-border/60 bg-background/90 backdrop-blur-sm">
+        <div className="flex items-center justify-between px-4 sm:px-8 py-3 pt-safe">
         <div className="flex items-center gap-2.5">
           <div
             className="relative w-9 h-9 rounded-xl bg-primary/10 border border-primary/40 flex items-center justify-center flex-shrink-0 transition-all duration-700"
@@ -1491,339 +1620,74 @@ export default function Chat() {
             </p>
           </div>
         </div>
-
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* ONLINE badge — desktop only */}
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary/30 bg-primary/5">
-            <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-xs font-medium tracking-wider" style={{ color: "hsl(142 71% 60%)" }}>
-              ONLINE
-            </span>
-          </div>
-
-          {/* Knowledge Base */}
-          <button
-            onClick={() => navigate("/kb")}
-            title="Notes"
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-border/60 bg-card flex items-center justify-center hover:border-primary/40 active:scale-95 transition-all"
-            aria-label="Open Knowledge Base"
-          >
-            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: "hsl(264 80% 70%)" }} />
-          </button>
-
-          {/* Dashboard */}
-          <button
-            onClick={() => navigate("/dashboard")}
-            title="Dashboard"
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-border/60 bg-card flex items-center justify-center hover:border-primary/40 active:scale-95 transition-all"
-            aria-label="Open dashboard"
-          >
-            <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: "hsl(194 100% 55%)" }} />
-          </button>
-
-          {/* Tasks panel — visible on all screen sizes */}
-          <button
-            onClick={() => setTasksPanelOpen(v => !v)}
-            title="Jarvis task list"
-            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
-            style={{
-              background:  tasksPanelOpen ? "hsl(150 60% 45% / 0.12)" : "transparent",
-              borderColor: tasksPanelOpen ? "hsl(150 60% 45% / 0.5)" : "hsl(210 15% 30%)",
-            }}
-            aria-label="Open task list"
-          >
-            <ListChecks className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: tasksPanelOpen ? "hsl(150 70% 65%)" : "hsl(196 60% 55%)" }} />
-            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: tasksPanelOpen ? "hsl(150 70% 65%)" : "hsl(196 60% 55%)" }}>TASKS</span>
-          </button>
-
-          {/* Diagnostics */}
-          <button
-            onClick={() => setDiagPanelOpen(v => !v)}
-            title="Build & system diagnostics"
-            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
-            style={{
-              background:  diagPanelOpen ? "hsl(264 80% 55% / 0.12)" : "transparent",
-              borderColor: diagPanelOpen ? "hsl(264 80% 55% / 0.5)" : "hsl(210 15% 30%)",
-            }}
-            aria-label="Open diagnostics"
-          >
-            <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: diagPanelOpen ? "hsl(264 80% 72%)" : "hsl(196 60% 55%)" }} />
-            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: diagPanelOpen ? "hsl(264 80% 72%)" : "hsl(196 60% 55%)" }}>DIAG</span>
-          </button>
-
-          {/* System Status */}
-          <button
-            onClick={() => setStatusPanelOpen(v => !v)}
-            title="System status overview"
-            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
-            style={{
-              background:  statusPanelOpen ? "hsl(38 100% 55% / 0.12)" : "transparent",
-              borderColor: statusPanelOpen ? "hsl(38 100% 55% / 0.5)" : "hsl(210 15% 30%)",
-            }}
-            aria-label="Open system status"
-          >
-            <Gauge className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: statusPanelOpen ? "hsl(38 100% 70%)" : "hsl(196 60% 55%)" }} />
-            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: statusPanelOpen ? "hsl(38 100% 70%)" : "hsl(196 60% 55%)" }}>STATUS</span>
-          </button>
-
-          {/* Activity Logs */}
-          <button
-            onClick={() => setLogsPanelOpen(v => !v)}
-            title="Activity logs"
-            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
-            style={{
-              background:  logsPanelOpen ? "hsl(196 100% 45% / 0.12)" : "transparent",
-              borderColor: logsPanelOpen ? "hsl(196 100% 55% / 0.5)" : "hsl(210 15% 30%)",
-            }}
-            aria-label="Open activity logs"
-          >
-            <ScrollText className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: logsPanelOpen ? "hsl(196 100% 65%)" : "hsl(196 60% 55%)" }} />
-            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: logsPanelOpen ? "hsl(196 100% 65%)" : "hsl(196 60% 55%)" }}>LOGS</span>
-          </button>
-
-          {/* Agent Actions */}
-          <button
-            onClick={() => setActionsPanelOpen(v => !v)}
-            title="Agent action approvals"
-            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
-            style={{
-              background:  actionsPanelOpen ? "hsl(320 80% 55% / 0.12)" : "transparent",
-              borderColor: actionsPanelOpen ? "hsl(320 80% 55% / 0.5)" : "hsl(210 15% 30%)",
-            }}
-            aria-label="Open agent actions"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: actionsPanelOpen ? "hsl(320 80% 72%)" : "hsl(196 60% 55%)" }} />
-            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: actionsPanelOpen ? "hsl(320 80% 72%)" : "hsl(196 60% 55%)" }}>ACTIONS</span>
-          </button>
-
-          {/* Checkpoints */}
-          <button
-            onClick={() => setCheckpointsPanelOpen(v => !v)}
-            title="Checkpoint rollback & recovery"
-            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
-            style={{
-              background:  checkpointsPanelOpen ? "hsl(150 70% 45% / 0.12)" : "transparent",
-              borderColor: checkpointsPanelOpen ? "hsl(150 70% 45% / 0.5)" : "hsl(210 15% 30%)",
-            }}
-            aria-label="Open checkpoints panel"
-          >
-            <History className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: checkpointsPanelOpen ? "hsl(150 70% 68%)" : "hsl(196 60% 55%)" }} />
-            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: checkpointsPanelOpen ? "hsl(150 70% 68%)" : "hsl(196 60% 55%)" }}>CHECKPOINTS</span>
-          </button>
-
-          {/* Executions */}
-          <button
-            onClick={() => setExecutionsPanelOpen(v => !v)}
-            title="Safe execution engine — queue and history"
-            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
-            style={{
-              background:  executionsPanelOpen ? "hsl(38 100% 55% / 0.12)" : "transparent",
-              borderColor: executionsPanelOpen ? "hsl(38 100% 55% / 0.5)"  : "hsl(210 15% 30%)",
-            }}
-            aria-label="Open executions panel"
-          >
-            <Cpu className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: executionsPanelOpen ? "hsl(38 100% 72%)" : "hsl(196 60% 55%)" }} />
-            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: executionsPanelOpen ? "hsl(38 100% 72%)" : "hsl(196 60% 55%)" }}>EXECUTIONS</span>
-          </button>
-
-          {/* Autonomous Dev Loop */}
-          <button
-            onClick={() => setAutoLoopPanelOpen(v => !v)}
-            title="Autonomous Dev Loop — auto-execute approved low-risk actions"
-            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
-            style={{
-              background:  autoLoopPanelOpen ? "hsl(150 70% 50% / 0.12)" : "transparent",
-              borderColor: autoLoopPanelOpen ? "hsl(150 70% 50% / 0.5)"  : "hsl(210 15% 30%)",
-            }}
-            aria-label="Open auto loop panel"
-          >
-            <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: autoLoopPanelOpen ? "hsl(150 70% 72%)" : "hsl(196 60% 55%)" }} />
-            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: autoLoopPanelOpen ? "hsl(150 70% 72%)" : "hsl(196 60% 55%)" }}>AUTO</span>
-          </button>
-
-          {/* Plans */}
-          <button
-            onClick={() => setPlansPanelOpen(v => !v)}
-            title="Planner Brain — generate and manage structured plans"
-            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
-            style={{
-              background:  plansPanelOpen ? "hsl(264 80% 65% / 0.12)" : "transparent",
-              borderColor: plansPanelOpen ? "hsl(264 80% 65% / 0.5)"  : "hsl(210 15% 30%)",
-            }}
-            aria-label="Open plans panel"
-          >
-            <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: plansPanelOpen ? "hsl(264 80% 75%)" : "hsl(196 60% 55%)" }} />
-            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: plansPanelOpen ? "hsl(264 80% 75%)" : "hsl(196 60% 55%)" }}>PLANS</span>
-          </button>
-
-          {/* Priority */}
-          <button
-            onClick={() => setPriorityPanelOpen(v => !v)}
-            title="Task Prioritizer — AI-scored rankings and recommendations"
-            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
-            style={{
-              background:  priorityPanelOpen ? "hsl(175 70% 55% / 0.12)" : "transparent",
-              borderColor: priorityPanelOpen ? "hsl(175 70% 55% / 0.5)"  : "hsl(210 15% 30%)",
-            }}
-            aria-label="Open priority panel"
-          >
-            <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: priorityPanelOpen ? "hsl(175 70% 70%)" : "hsl(196 60% 55%)" }} />
-            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: priorityPanelOpen ? "hsl(175 70% 70%)" : "hsl(196 60% 55%)" }}>PRIORITY</span>
-          </button>
-
-          {/* Workspace */}
-          <button
-            onClick={() => setWorkspacePanelOpen(v => !v)}
-            title="Workspace Intelligence — repo map, routes, components"
-            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
-            style={{
-              background:  workspacePanelOpen ? "hsl(28 100% 62% / 0.12)" : "transparent",
-              borderColor: workspacePanelOpen ? "hsl(28 100% 62% / 0.5)"  : "hsl(210 15% 30%)",
-            }}
-            aria-label="Open workspace panel"
-          >
-            <MapIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: workspacePanelOpen ? "hsl(28 100% 72%)" : "hsl(196 60% 55%)" }} />
-            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: workspacePanelOpen ? "hsl(28 100% 72%)" : "hsl(196 60% 55%)" }}>WORKSPACE</span>
-          </button>
-
-          {/* Repo Reasoner */}
-          <button
-            onClick={() => setReasonPanelOpen(v => !v)}
-            title="Repo Reasoning — AI analysis of where and how to make changes"
-            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
-            style={{
-              background:  reasonPanelOpen ? "hsl(264 80% 68% / 0.12)" : "transparent",
-              borderColor: reasonPanelOpen ? "hsl(264 80% 68% / 0.5)"  : "hsl(210 15% 30%)",
-            }}
-            aria-label="Open repo reasoning panel"
-          >
-            <Brain className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: reasonPanelOpen ? "hsl(264 80% 80%)" : "hsl(196 60% 55%)" }} />
-            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: reasonPanelOpen ? "hsl(264 80% 80%)" : "hsl(196 60% 55%)" }}>REASON</span>
-          </button>
-
-          {/* Agents */}
-          <button
-            onClick={() => setAgentsPanelOpen(v => !v)}
-            title="Specialist Agents — assign the right agent to any task"
-            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
-            style={{
-              background:  agentsPanelOpen ? "hsl(185 75% 52% / 0.12)" : "transparent",
-              borderColor: agentsPanelOpen ? "hsl(185 75% 52% / 0.5)"  : "hsl(210 15% 30%)",
-            }}
-            aria-label="Open agents panel"
-          >
-            <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: agentsPanelOpen ? "hsl(185 75% 65%)" : "hsl(196 60% 55%)" }} />
-            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: agentsPanelOpen ? "hsl(185 75% 65%)" : "hsl(196 60% 55%)" }}>AGENTS</span>
-          </button>
-
-          {/* Collaboration */}
-          <button
-            onClick={() => setCollabPanelOpen(v => !v)}
-            title="Agent Collaboration — plan multi-agent teamwork for a goal"
-            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
-            style={{
-              background:  collabPanelOpen ? "hsl(320 70% 62% / 0.12)" : "transparent",
-              borderColor: collabPanelOpen ? "hsl(320 70% 62% / 0.5)"  : "hsl(210 15% 30%)",
-            }}
-            aria-label="Open collaboration panel"
-          >
-            <Network className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: collabPanelOpen ? "hsl(320 70% 75%)" : "hsl(196 60% 55%)" }} />
-            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: collabPanelOpen ? "hsl(320 70% 75%)" : "hsl(196 60% 55%)" }}>COLLAB</span>
-          </button>
-
-          {/* Work Orders */}
-          <button
-            onClick={() => setWorkOrdersPanelOpen(v => !v)}
-            title="Work Orders — assigned tasks from collaboration plans"
-            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
-            style={{
-              background:  workOrdersPanelOpen ? "hsl(43 100% 55% / 0.12)" : "transparent",
-              borderColor: workOrdersPanelOpen ? "hsl(43 100% 55% / 0.5)"  : "hsl(210 15% 30%)",
-            }}
-            aria-label="Open work orders panel"
-          >
-            <ClipboardList className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: workOrdersPanelOpen ? "hsl(43 100% 68%)" : "hsl(196 60% 55%)" }} />
-            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: workOrdersPanelOpen ? "hsl(43 100% 68%)" : "hsl(196 60% 55%)" }}>ORDERS</span>
-          </button>
-
-          {/* Improvement Analysis */}
-          <button
-            onClick={() => setImprovementPanelOpen(v => !v)}
-            title="Self-Improvement Analysis — scan system and generate improvement suggestions"
-            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
-            style={{
-              background:  improvementPanelOpen ? "hsl(175 75% 52% / 0.12)" : "transparent",
-              borderColor: improvementPanelOpen ? "hsl(175 75% 52% / 0.5)"  : "hsl(210 15% 30%)",
-            }}
-            aria-label="Open improvement analysis panel"
-          >
-            <Cpu className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: improvementPanelOpen ? "hsl(175 75% 65%)" : "hsl(196 60% 55%)" }} />
-            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: improvementPanelOpen ? "hsl(175 75% 65%)" : "hsl(196 60% 55%)" }}>IMPROVE</span>
-          </button>
-
-          {/* Dev Agent — only shown when DEV_TOOLS_ENABLED */}
-          {DEV_TOOLS_ENABLED && (
-          <button
-            onClick={() => setDevPanelOpen(true)}
-            title="Dev Agent — inspect and edit project files"
-            className="flex items-center gap-1 px-2 h-8 sm:h-9 rounded-xl border transition-all duration-200 active:scale-95"
-            style={{
-              background: devPanelOpen ? "hsl(194 100% 50% / 0.12)" : "transparent",
-              borderColor: devPanelOpen ? "hsl(194 100% 50% / 0.5)" : "hsl(210 15% 30%)",
-            }}
-            aria-label="Open Dev Agent"
-          >
-            <Code2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: devPanelOpen ? "hsl(194 100% 65%)" : "hsl(196 60% 55%)" }} />
-            <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: devPanelOpen ? "hsl(194 100% 65%)" : "hsl(196 60% 55%)" }}>DEV</span>
-          </button>
-          )}
-
-          {/* Debug — hidden on mobile to reduce clutter */}
-          <button
-            onClick={toggleDebug}
-            data-testid="button-toggle-debug"
-            title={debugMode ? "Hide debug" : "Show debug"}
-            className="hidden sm:flex w-9 h-9 rounded-xl border items-center justify-center transition-all duration-200"
-            style={{
-              background: debugMode ? "hsl(38 100% 55% / 0.15)" : "transparent",
-              borderColor: debugMode ? "hsl(38 100% 55% / 0.4)" : "hsl(210 15% 25%)",
-            }}
-            aria-label="Toggle debug mode"
-          >
-            <Terminal className="w-4 h-4" style={{ color: debugMode ? "hsl(38 100% 65%)" : "hsl(196 40% 45%)" }} />
-          </button>
-
-          {/* Auto-speak toggle */}
-          {speech.isSupported && (
-            <button
-              onClick={() => { speech.unlock(); speech.setAutoSpeak(!speech.autoSpeak); }}
-              title={speech.autoSpeak ? "Auto-speak on — click to disable" : "Auto-speak off — click to enable"}
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border flex items-center justify-center transition-all duration-200 active:scale-95"
-              style={{
-                background: speech.autoSpeak ? "hsl(142 60% 40% / 0.15)" : "transparent",
-                borderColor: speech.autoSpeak ? "hsl(142 60% 40% / 0.45)" : "hsl(210 15% 25%)",
-              }}
-              aria-label={speech.autoSpeak ? "Disable auto-speak" : "Enable auto-speak"}
-            >
-              {speech.autoSpeak
-                ? <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: "hsl(142 71% 60%)" }} />
-                : <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: "hsl(196 40% 40%)" }} />
-              }
-            </button>
-          )}
-
-          {/* Memory */}
-          <button
-            onClick={() => setPanelOpen(true)}
-            data-testid="button-open-memory"
-            className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-border/60 bg-card flex items-center justify-center hover:border-primary/40 active:scale-95 transition-all"
-            aria-label="Open memory panel"
-          >
-            <Brain className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: "hsl(194 100% 55%)" }} />
-            {(memory?.messageCount ?? 0) > 0 && (
-              <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-primary rounded-full" />
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* ONLINE — compact, desktop only */}
+            <div className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-full border border-primary/30 bg-primary/5">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              <span className="text-xs font-medium tracking-wider" style={{ color: "hsl(142 71% 60%)" }}>ONLINE</span>
+            </div>
+            {/* Auto-speak */}
+            {speech.isSupported && (
+              <button
+                onClick={() => { speech.unlock(); speech.setAutoSpeak(!speech.autoSpeak); }}
+                className="w-8 h-8 rounded-xl border flex items-center justify-center transition-all duration-200 active:scale-95"
+                style={{ background: speech.autoSpeak ? "hsl(142 60% 40% / 0.15)" : "transparent", borderColor: speech.autoSpeak ? "hsl(142 60% 40% / 0.45)" : "hsl(210 15% 25%)" }}
+                aria-label={speech.autoSpeak ? "Disable auto-speak" : "Enable auto-speak"}
+              >
+                {speech.autoSpeak ? <Volume2 className="w-4 h-4" style={{ color: "hsl(142 71% 60%)" }} /> : <VolumeX className="w-4 h-4" style={{ color: "hsl(196 40% 40%)" }} />}
+              </button>
             )}
-          </button>
+            {/* Memory */}
+            <button
+              onClick={() => setPanelOpen(true)}
+              data-testid="button-open-memory"
+              className="relative w-8 h-8 rounded-xl border border-border/60 bg-card flex items-center justify-center hover:border-primary/40 active:scale-95 transition-all"
+              aria-label="Open memory panel"
+            >
+              <Brain className="w-4 h-4" style={{ color: "hsl(194 100% 55%)" }} />
+              {(memory?.messageCount ?? 0) > 0 && (
+                <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-primary rounded-full" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Tab bar — horizontally scrollable, 6 primary tabs ─────────── */}
+        <div
+          className="flex gap-1 px-3 pb-2 overflow-x-auto"
+          style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
+        >
+          {(["chat", "tasks", "diag", "status", "debug", "dev"] as const).map((tab) => {
+            const cfg = {
+              chat:   { label: "CHAT",   active: "hsl(194 100% 65%)", border: "hsl(194 100% 55% / 0.55)", bg: "hsl(194 100% 55% / 0.12)" },
+              tasks:  { label: "TASKS",  active: "hsl(150 70% 65%)",  border: "hsl(150 60% 45% / 0.55)", bg: "hsl(150 60% 45% / 0.12)" },
+              diag:   { label: "DIAG",   active: "hsl(264 80% 72%)",  border: "hsl(264 80% 55% / 0.55)", bg: "hsl(264 80% 55% / 0.12)" },
+              status: { label: "STATUS", active: "hsl(38 100% 70%)",  border: "hsl(38 100% 55% / 0.55)",  bg: "hsl(38 100% 55% / 0.12)" },
+              debug:  { label: "DEBUG",  active: "hsl(196 100% 65%)", border: "hsl(196 100% 55% / 0.55)", bg: "hsl(196 100% 55% / 0.12)" },
+              dev:    { label: "DEV",    active: "hsl(194 100% 65%)", border: "hsl(194 100% 50% / 0.55)", bg: "hsl(194 100% 50% / 0.12)" },
+            }[tab];
+            const isActive = activeTab === tab;
+            return (
+              <button
+                key={tab}
+                onClick={() => {
+                  setActiveTab(tab);
+                  if (tab === "tasks")  setTasksPanelOpen(true);
+                  if (tab === "diag")   setDiagPanelOpen(true);
+                  if (tab === "status") setStatusPanelOpen(true);
+                }}
+                className="flex-shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all duration-200 active:scale-95"
+                style={{
+                  whiteSpace: "nowrap",
+                  background:  isActive ? cfg.bg    : "transparent",
+                  border:      `1px solid ${isActive ? cfg.border : "hsl(210 15% 24%)"}`,
+                  color:       isActive ? cfg.active : "hsl(196 20% 40%)",
+                }}
+              >
+                {cfg.label}
+              </button>
+            );
+          })}
         </div>
       </header>
 
@@ -1878,9 +1742,92 @@ export default function Chat() {
         </div>
       )}
 
+      {/* ── Debug tab ─────────────────────────────────────────────────────── */}
+      {activeTab === "debug" && (
+        <div className="relative z-10 flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-6 py-6">
+          <div className="max-w-2xl mx-auto flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display font-bold text-sm tracking-widest" style={{ color: "hsl(196 100% 65%)" }}>
+                DEBUG LOG
+              </h2>
+              <div className="flex items-center gap-2">
+                <span className="text-xs" style={{ color: "hsl(196 30% 45%)" }}>{debugLogs.length} entries</span>
+                <button
+                  onClick={() => setDebugLogs([])}
+                  className="px-3 py-1 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95"
+                  style={{ background: "hsl(355 80% 35% / 0.15)", border: "1px solid hsl(355 80% 40% / 0.5)", color: "hsl(355 80% 64%)" }}
+                >
+                  CLEAR
+                </button>
+              </div>
+            </div>
+            {debugLogs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-2">
+                <Terminal className="w-10 h-10" style={{ color: "hsl(196 40% 30%)" }} />
+                <p className="text-sm tracking-wide" style={{ color: "hsl(196 25% 38%)" }}>No debug logs yet</p>
+              </div>
+            ) : (
+              <div
+                className="rounded-2xl p-4 font-mono text-[11px] leading-relaxed flex flex-col gap-0.5"
+                style={{ background: "hsl(210 15% 6%)", border: "1px solid hsl(210 15% 14%)" }}
+              >
+                {debugLogs.map((line, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      color: line.includes("✖") ? "hsl(355 80% 68%)" : line.includes("⚠") ? "hsl(38 100% 65%)" : "hsl(142 71% 60%)",
+                      wordBreak: "break-all",
+                    }}
+                  >
+                    {line}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Dev tab — pending code updates ────────────────────────────────── */}
+      {activeTab === "dev" && (
+        <div className="relative z-10 flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-6 py-6">
+          <div className="max-w-2xl mx-auto flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display font-bold text-sm tracking-widest" style={{ color: "hsl(194 100% 65%)" }}>
+                CODE UPDATES
+              </h2>
+              <button
+                onClick={() => fetchPendingPatches().then(setPendingPatches)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95"
+                style={{ background: "transparent", border: "1px solid hsl(210 15% 26%)", color: "hsl(196 40% 50%)" }}
+              >
+                <RefreshCw className="w-3 h-3" />
+                REFRESH
+              </button>
+            </div>
+            {pendingPatches.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-2">
+                <ShieldCheck className="w-10 h-10" style={{ color: "hsl(142 60% 30%)" }} />
+                <p className="text-sm tracking-wide" style={{ color: "hsl(196 25% 38%)" }}>No pending code updates</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {pendingPatches.map((patch) => (
+                  <PatchCard
+                    key={patch.patchId}
+                    patch={patch}
+                    onRemove={(id) => setPendingPatches((prev) => prev.filter((p) => p.patchId !== id))}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Message list ── */}
       <main
-        className="relative z-10 flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-8 py-6"
+        className={`relative z-10 overflow-y-auto scrollbar-thin px-4 sm:px-8 py-6 ${activeTab === "debug" || activeTab === "dev" ? "hidden" : "flex-1"}`}
         data-testid="chat-messages"
       >
         <div className="max-w-3xl mx-auto flex flex-col gap-5">
@@ -1933,7 +1880,7 @@ export default function Chat() {
       )}
 
       {/* ── Input bar ── */}
-      <footer className="relative z-10 flex-shrink-0 border-t border-border/60 bg-background/90 backdrop-blur-sm px-3 sm:px-8 pt-3 pb-safe"
+      <footer className={`relative z-10 flex-shrink-0 border-t border-border/60 bg-background/90 backdrop-blur-sm px-3 sm:px-8 pt-3 pb-safe ${activeTab === "debug" || activeTab === "dev" ? "hidden" : ""}`}
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
       >
         <div className="max-w-3xl mx-auto">
@@ -2071,21 +2018,21 @@ export default function Chat() {
       {/* Jarvis Tasks panel */}
       <JarvisTasksPanel
         isOpen={tasksPanelOpen}
-        onClose={() => setTasksPanelOpen(false)}
+        onClose={() => { setTasksPanelOpen(false); setActiveTab("chat"); }}
         apiBase={BASE}
       />
 
       {/* Diagnostics panel */}
       <DiagnosticsPanel
         isOpen={diagPanelOpen}
-        onClose={() => setDiagPanelOpen(false)}
+        onClose={() => { setDiagPanelOpen(false); setActiveTab("chat"); }}
         apiBase={BASE}
       />
 
       {/* System Status panel */}
       <SystemStatusPanel
         isOpen={statusPanelOpen}
-        onClose={() => setStatusPanelOpen(false)}
+        onClose={() => { setStatusPanelOpen(false); setActiveTab("chat"); }}
         apiBase={BASE}
       />
 
@@ -2197,53 +2144,6 @@ export default function Chat() {
         apiBase={BASE}
       />
 
-      {/* ── Temporary on-screen debug panel (iPhone Safari has no DevTools) ── */}
-      {debugLogs.length > 0 && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            maxHeight: "40vh",
-            overflowY: "auto",
-            background: "rgba(0,0,0,0.88)",
-            zIndex: 9999,
-            padding: "6px 8px",
-            fontFamily: "monospace",
-            fontSize: "10px",
-            lineHeight: "1.4",
-            color: "#a0ffa0",
-            borderTop: "1px solid #00ff0044",
-            WebkitOverflowScrolling: "touch",
-          }}
-          id="dbg-panel"
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-            <span style={{ color: "#00ff88", fontWeight: "bold" }}>
-              DEBUG LOG ({debugLogs.length})
-            </span>
-            <button
-              onClick={() => setDebugLogs([])}
-              style={{ color: "#ff6666", background: "none", border: "none", fontSize: 11, cursor: "pointer" }}
-            >
-              CLEAR
-            </button>
-          </div>
-          {debugLogs.map((line, i) => (
-            <div
-              key={i}
-              style={{
-                color: line.includes("✖") ? "#ff8888" : line.includes("⚠") ? "#ffcc44" : "#a0ffa0",
-                wordBreak: "break-all",
-                paddingBottom: 1,
-              }}
-            >
-              {line}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
