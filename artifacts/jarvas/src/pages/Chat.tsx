@@ -273,30 +273,39 @@ async function callChatStream(
 
   // ── Shared SSE line parser ──────────────────────────────────────────────────
   let doneEventReceived = false;
+  let tokenCount = 0;
 
-  function parseLine(line: string): void {
+  function parseLine(line: string, src: "stream" | "fallback"): void {
     if (!line.startsWith("data: ")) return;
     const jsonStr = line.slice(6).trim();
     if (!jsonStr) return;
     try {
       const event = JSON.parse(jsonStr) as Record<string, unknown>;
       const evType = event.type as string;
+      console.log(`[CSP:${src}] event type="${evType}"`, evType === "token" ? `text="${String(event.text).slice(0, 30)}"` : "");
       if (evType === "token" && typeof event.text === "string") {
+        tokenCount++;
         onToken(event.text);
       } else if (evType === "done") {
         doneEventReceived = true;
+        console.log(`[CSP:${src}] calling onDone — tokenCount:`, tokenCount);
         onDone(event as unknown as StreamDonePayload);
       } else if (evType === "error") {
         doneEventReceived = true;
         const msg = typeof event.message === "string" ? event.message : "Stream error from server";
+        console.warn(`[CSP:${src}] server error event:`, msg);
         onError(msg);
       } else if (
         (evType === "tool_start" || evType === "tool_done" || evType === "tool_error") &&
         onToolEvent
       ) {
         onToolEvent(event as unknown as ToolSSEEvent);
+      } else if (evType) {
+        console.log(`[CSP:${src}] unhandled event type:`, evType);
       }
-    } catch { /* ignore malformed SSE lines */ }
+    } catch (parseErr) {
+      console.warn(`[CSP:${src}] JSON parse failed for line:`, line.slice(0, 80), parseErr);
+    }
   }
 
   // ── Path A: ReadableStream progressive streaming ────────────────────────────
@@ -305,6 +314,7 @@ async function callChatStream(
   // Safari cross-origin SSE problem: reader.read() does NOT throw — it hangs
   // forever, suspending the while-loop.  A catch-based fallback never fires.
   // The only safe escape is Promise.race with a timeout.
+  console.log("[CSP] starting streaming attempt, URL:", url);
   const streamingAttempt = (async () => {
     try {
       const reader = res.body!.getReader();
@@ -313,37 +323,39 @@ async function callChatStream(
       try {
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done) { console.log("[CSP:stream] reader done, doneEventReceived:", doneEventReceived); break; }
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
           buffer = lines.pop() ?? "";
-          for (const line of lines) parseLine(line);
+          for (const line of lines) parseLine(line, "stream");
         }
         // Flush decoder, process any partial line left in the buffer
         const tail = decoder.decode();
         if (tail) buffer += tail;
-        if (buffer.trim()) parseLine(buffer);
+        if (buffer.trim()) parseLine(buffer, "stream");
       } catch (readErr) {
-        console.warn("[Jarvis] reader.read() threw:", readErr);
+        console.warn("[CSP:stream] reader.read() threw (likely Safari CORS hang):", readErr);
         try { reader.cancel(); } catch { /* ignore */ }
       }
     } catch (readerErr) {
-      console.warn("[Jarvis] getReader() threw:", readerErr);
+      console.warn("[CSP:stream] getReader() threw:", readerErr);
     }
+    console.log("[CSP:stream] streamingAttempt IIFE resolved — doneEventReceived:", doneEventReceived);
   })();
 
-  await Promise.race([
-    streamingAttempt,
-    new Promise<void>(resolve => setTimeout(resolve, 8_000)),
-  ]);
+  const raceTimer = new Promise<void>(resolve =>
+    setTimeout(() => { console.log("[CSP] 8s timeout fired"); resolve(); }, 8_000)
+  );
+
+  console.log("[CSP] awaiting Promise.race(streamingAttempt, 8s)");
+  await Promise.race([streamingAttempt, raceTimer]);
+  console.log("[CSP] race resolved — doneEventReceived:", doneEventReceived, "tokenCount:", tokenCount);
 
   // ── Path B: fresh fetch + res.text() fallback ───────────────────────────────
   // Triggered when streaming hung (Safari), threw, or completed without a done
   // event.  Mirrors DebugApi.tsx probeChat() exactly — proven to work.
   if (!doneEventReceived) {
-    console.warn(
-      "[Jarvis] No done event after streaming attempt — falling back to res.text(). URL:", url,
-    );
+    console.warn("[CSP] Path B fallback starting — no done event from streaming. URL:", url);
     try {
       // Fresh request — no AbortController signal, no getReader(), just text()
       const fbRes = await fetch(url, {
@@ -351,25 +363,28 @@ async function callChatStream(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message, sessionId }),
       });
+      console.log("[CSP:fallback] fetch status:", fbRes.status, fbRes.statusText);
       if (!fbRes.ok) {
         onError(`Fallback fetch returned ${fbRes.status} ${fbRes.statusText} (${url})`);
         return;
       }
       const fullText = await fbRes.text();
-      console.log("[Jarvis] Text fallback: received", fullText.length, "bytes");
-      for (const line of fullText.split("\n")) parseLine(line);
+      console.log("[CSP:fallback] received", fullText.length, "bytes — first 200:", fullText.slice(0, 200));
+      for (const line of fullText.split("\n")) parseLine(line, "fallback");
+      console.log("[CSP:fallback] parse complete — doneEventReceived:", doneEventReceived, "tokenCount:", tokenCount);
     } catch (fbErr) {
       const detail = fbErr instanceof Error ? fbErr.message : String(fbErr);
-      console.error("[Jarvis] Text fallback failed:", detail, "URL:", url);
+      console.error("[CSP:fallback] failed:", detail, "URL:", url);
       onError(`Text fallback failed: ${detail}`);
       return;
     }
   }
 
   if (!doneEventReceived) {
-    console.error("[Jarvis] No done event from streaming or fallback. URL:", url);
+    console.error("[CSP] No done event from streaming or fallback. URL:", url);
     onError(`Stream closed without a response (URL: ${url})`);
   }
+  console.log("[CSP] callChatStream returning — doneEventReceived:", doneEventReceived);
 }
 
 async function loadSession(
@@ -897,6 +912,7 @@ export default function Chat() {
     function ensureMessageCreated(initialContent = "") {
       if (messageCreated) return;
       messageCreated = true;
+      console.log("[Chat] ensureMessageCreated — setIsTyping(false), setIsStreaming(true), msgId:", currentMsgId, "initialContent length:", initialContent.length);
       setIsTyping(false);
       setAgentStatus("idle");
       setIsStreaming(true);
@@ -954,6 +970,8 @@ export default function Chat() {
       BASE,
       // onToken
       (tokenText) => {
+        const isFirst = !messageCreated;
+        console.log("[Chat] onToken fired — isFirst:", isFirst, "messageCreated:", messageCreated, "text:", JSON.stringify(tokenText.slice(0, 30)));
         responseContentRef.current += tokenText;
         if (!messageCreated) {
           ensureMessageCreated(tokenText);
@@ -969,8 +987,10 @@ export default function Chat() {
       },
       // onDone
       (data) => {
+        console.log("[Chat] onDone fired — messageCreated:", messageCreated, "responseContent length:", responseContentRef.current.length);
         flushTokenBuffer(currentMsgId, true);
         _rt.bus.emit({ type: "stream:done", sessionId, durationMs: Date.now() - streamStartTime, tokens: responseContentRef.current.length, ts: Date.now() });
+        console.log("[Chat] onDone: calling setIsStreaming(false)");
         setIsStreaming(false);
         setStreamingMsgId(null);
         setMessages((prev) =>
@@ -1110,6 +1130,7 @@ export default function Chat() {
       console.error("[Chat] callChatStream threw unexpectedly:", detail);
       handleError(`Unexpected error: ${detail}`);
     } finally {
+      console.log("[Chat] finally block running — resetting isTyping/isStreaming");
       // Safety net: if isTyping or isStreaming is somehow still true after
       // callChatStream returns (e.g. stream closed without done event before
       // the fix lands), reset them so the next Send is not permanently blocked.
