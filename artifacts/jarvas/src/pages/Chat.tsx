@@ -271,55 +271,91 @@ async function callChatStream(
     return;
   }
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
+  // Clone the response before touching the body so we have a fallback for
+  // Safari, which throws "TypeError: Load failed" when reading a cross-origin
+  // SSE stream via getReader() even with correct CORS headers.  res.text()
+  // works reliably in Safari; the clone lets us use it as a fallback while
+  // keeping progressive streaming for Chrome/Firefox.
+  let resClone: Response | null = null;
+  try { resClone = res.clone(); } catch { /* clone unavailable — text-only path */ }
+
+  // ── Shared SSE line parser ──────────────────────────────────────────────────
   let doneEventReceived = false;
 
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        const jsonStr = line.slice(6).trim();
-        if (!jsonStr) continue;
-        try {
-          const event = JSON.parse(jsonStr) as Record<string, unknown>;
-          const evType = event.type as string;
-          if (evType === "token" && typeof event.text === "string") {
-            onToken(event.text);
-          } else if (evType === "done") {
-            doneEventReceived = true;
-            onDone(event as unknown as StreamDonePayload);
-          } else if (evType === "error") {
-            doneEventReceived = true; // treat server error as terminal
-            const msg = typeof event.message === "string" ? event.message : "Stream error from server";
-            onError(msg);
-          } else if (
-            (evType === "tool_start" || evType === "tool_done" || evType === "tool_error") &&
-            onToolEvent
-          ) {
-            onToolEvent(event as unknown as ToolSSEEvent);
-          }
-        } catch { /* ignore malformed SSE lines */ }
+  function parseLine(line: string): void {
+    if (!line.startsWith("data: ")) return;
+    const jsonStr = line.slice(6).trim();
+    if (!jsonStr) return;
+    try {
+      const event = JSON.parse(jsonStr) as Record<string, unknown>;
+      const evType = event.type as string;
+      if (evType === "token" && typeof event.text === "string") {
+        onToken(event.text);
+      } else if (evType === "done") {
+        doneEventReceived = true;
+        onDone(event as unknown as StreamDonePayload);
+      } else if (evType === "error") {
+        doneEventReceived = true;
+        const msg = typeof event.message === "string" ? event.message : "Stream error from server";
+        onError(msg);
+      } else if (
+        (evType === "tool_start" || evType === "tool_done" || evType === "tool_error") &&
+        onToolEvent
+      ) {
+        onToolEvent(event as unknown as ToolSSEEvent);
       }
+    } catch { /* ignore malformed SSE lines */ }
+  }
+
+  // ── Path A: ReadableStream progressive streaming (Chrome, Firefox) ──────────
+  let streamingFailed = false;
+  try {
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) parseLine(line);
+      }
+      // Flush decoder and process any trailing data
+      const tail = decoder.decode();
+      if (tail) buffer += tail;
+      if (buffer.trim()) parseLine(buffer);
+    } catch (readErr) {
+      // Safari cross-origin SSE: getReader().read() throws TypeError: Load failed
+      console.warn("[Jarvis] Stream read threw — switching to text fallback:", readErr);
+      streamingFailed = true;
+      try { reader.cancel(); } catch { /* ignore */ }
     }
-    // Stream closed without a done event — surface the error so the UI
-    // doesn't get stuck in the thinking state.
-    if (!doneEventReceived) {
-      console.error("[Jarvis] Stream closed without done event (URL:", url, ")");
-      onError(`Stream closed without a response (URL: ${url}) — check VITE_API_BASE_URL`);
+  } catch (readerErr) {
+    // getReader() itself threw
+    console.warn("[Jarvis] getReader() threw — switching to text fallback:", readerErr);
+    streamingFailed = true;
+  }
+
+  // ── Path B: res.text() fallback (Safari cross-origin CORS + SSE) ───────────
+  if (streamingFailed && !doneEventReceived) {
+    const src = resClone ?? res;
+    try {
+      const fullText = await src.text();
+      console.log("[Jarvis] Text fallback: received", fullText.length, "bytes from", url);
+      for (const line of fullText.split("\n")) parseLine(line);
+    } catch (textErr) {
+      const detail = textErr instanceof Error ? textErr.message : String(textErr);
+      console.error("[Jarvis] Text fallback also failed:", detail, "URL:", url);
+      onError(`Stream read error: ${detail}`);
+      return;
     }
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-    console.error("[Jarvis] Stream read error:", detail, "URL:", url);
-    onError(`Stream read error: ${detail}`);
+  }
+
+  if (!doneEventReceived) {
+    console.error("[Jarvis] No done event received. URL:", url, "streamingFailed:", streamingFailed);
+    onError(`Stream closed without a response (URL: ${url})`);
   }
 }
 
