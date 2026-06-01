@@ -34,7 +34,7 @@ import {
   Bot,
   Layers,
   TrendingUp,
-  Map,
+  Map as MapIcon,
   Users,
   Network,
   ClipboardList,
@@ -1682,7 +1682,7 @@ export default function Chat() {
             }}
             aria-label="Open workspace panel"
           >
-            <Map className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: workspacePanelOpen ? "hsl(28 100% 72%)" : "hsl(196 60% 55%)" }} />
+            <MapIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" style={{ color: workspacePanelOpen ? "hsl(28 100% 72%)" : "hsl(196 60% 55%)" }} />
             <span className="text-[10px] sm:text-xs font-bold tracking-widest" style={{ color: workspacePanelOpen ? "hsl(28 100% 72%)" : "hsl(196 60% 55%)" }}>WORKSPACE</span>
           </button>
 
