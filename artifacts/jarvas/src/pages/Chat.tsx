@@ -814,6 +814,13 @@ export default function Chat() {
   // Track the last server startedAt we saw so we can detect a restart
   const lastServerStartRef = useRef<number | null>(null);
 
+  // ── Dev workspace ────────────────────────────────────────────────────────
+  const [devMessages,  setDevMessages]  = useState<Array<{id: string; role: "user"|"assistant"; content: string}>>([]);
+  const [devInput,     setDevInput]     = useState("");
+  const [devSending,   setDevSending]   = useState(false);
+  const [devSection,   setDevSection]   = useState<"chat"|"patches">("chat");
+  const devChatEndRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     localStorage.setItem(DEV_PANEL_KEY, String(devPanelOpen));
   }, [devPanelOpen]);
@@ -867,11 +874,60 @@ export default function Chat() {
   }, []);
 
   const handleRejectPatch = useCallback((patch: PendingPatchSummary) => {
-    // Persistently delete from server queue (async, non-blocking)
     void logRejectPatch(patch.patchId, patch.file);
     setDismissedIds(prev => new Set([...prev, patch.patchId]));
     setPendingPatches(prev => prev.filter(p => p.patchId !== patch.patchId));
   }, []);
+
+  // ── Dev chat scroll ───────────────────────────────────────────────────────
+  useEffect(() => {
+    devChatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [devMessages]);
+
+  // ── Dev workspace send ────────────────────────────────────────────────────
+  const sendDevMessage = useCallback(async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || devSending) return;
+    setDevMessages(prev => [...prev, { id: `du-${Date.now()}`, role: "user", content: trimmed }]);
+    setDevInput("");
+    setDevSending(true);
+    setDevSection("chat");
+    const assistantId = `da-${Date.now()}`;
+    setDevMessages(prev => [...prev, { id: assistantId, role: "assistant", content: "" }]);
+    try {
+      const res = await fetch(`${BASE}api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: trimmed, sessionId: `dev-${sessionId}` }),
+      });
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const lines = (buf + decoder.decode(value, { stream: true })).split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const raw = line.slice(6).trim();
+          if (!raw || raw === "[DONE]") continue;
+          try {
+            const evt = JSON.parse(raw) as { type: string; text?: string; content?: string };
+            const piece = evt.type === "token" ? (evt.text ?? evt.content ?? "") : "";
+            if (piece) setDevMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: m.content + piece } : m));
+          } catch { /* ignore */ }
+        }
+      }
+    } catch (err) {
+      setDevMessages(prev => prev.map(m =>
+        m.id === assistantId ? { ...m, content: `⚠ ${String(err)}` } : m,
+      ));
+    } finally {
+      setDevSending(false);
+    }
+  }, [BASE, sessionId, devSending]);
 
   // ── Voice ────────────────────────────────────────────────────────────────
   const speechInput = useSpeechInput();
@@ -1788,40 +1844,157 @@ export default function Chat() {
         </div>
       )}
 
-      {/* ── Dev tab — pending code updates ────────────────────────────────── */}
+      {/* ── Dev Workspace tab ─────────────────────────────────────────────── */}
       {activeTab === "dev" && (
-        <div className="relative z-10 flex-1 overflow-y-auto scrollbar-thin px-4 sm:px-6 py-6">
-          <div className="max-w-2xl mx-auto flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <h2 className="font-display font-bold text-sm tracking-widest" style={{ color: "hsl(194 100% 65%)" }}>
-                CODE UPDATES
-              </h2>
+        <div className="relative z-10 flex-1 flex flex-col overflow-hidden">
+
+          {/* Action buttons strip */}
+          <div
+            className="flex-shrink-0 flex gap-1.5 px-4 py-2.5 border-b border-border/30 overflow-x-auto"
+            style={{ scrollbarWidth: "none" } as React.CSSProperties}
+          >
+            {([
+              { label: "SCAN PROJECT", prompt: "Scan this project's file structure, list all key components, API routes, and libraries used. Highlight any obvious quality issues or improvement areas." },
+              { label: "PROPOSE FIX",  prompt: "Review the most recent debug logs and the current codebase state. Propose a specific, actionable code fix for the most critical issue you find." },
+              { label: "BUILD/TEST",   prompt: "Check the TypeScript compilation status for both the api-server and jarvas packages. List any errors, warnings, or type issues." },
+              { label: "CREATE PATCH", prompt: "Based on our conversation so far, create a concrete code patch for the most recently discussed fix and queue it for review." },
+            ] as const).map(({ label, prompt }) => (
               <button
-                onClick={() => fetchPendingPatches().then(setPendingPatches)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95"
-                style={{ background: "transparent", border: "1px solid hsl(210 15% 26%)", color: "hsl(196 40% 50%)" }}
+                key={label}
+                onClick={() => sendDevMessage(prompt)}
+                disabled={devSending}
+                className="flex-shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95 disabled:opacity-40"
+                style={{ background: "hsl(194 100% 55% / 0.10)", border: "1px solid hsl(194 100% 55% / 0.35)", color: "hsl(194 100% 68%)", whiteSpace: "nowrap" }}
               >
-                <RefreshCw className="w-3 h-3" />
-                REFRESH
+                {label}
               </button>
-            </div>
-            {pendingPatches.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-2">
-                <ShieldCheck className="w-10 h-10" style={{ color: "hsl(142 60% 30%)" }} />
-                <p className="text-sm tracking-wide" style={{ color: "hsl(196 25% 38%)" }}>No pending code updates</p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {pendingPatches.map((patch) => (
-                  <PatchCard
-                    key={patch.patchId}
-                    patch={patch}
-                    onRemove={(id) => setPendingPatches((prev) => prev.filter((p) => p.patchId !== id))}
-                  />
-                ))}
-              </div>
-            )}
+            ))}
+            <button
+              onClick={() => fetchPendingPatches().then(setPendingPatches)}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold tracking-widest transition-all active:scale-95"
+              style={{ background: "transparent", border: "1px solid hsl(210 15% 24%)", color: "hsl(196 30% 44%)", whiteSpace: "nowrap" }}
+            >
+              <RefreshCw className="w-3 h-3" />
+              REFRESH PATCHES
+            </button>
           </div>
+
+          {/* Sub-tab selector: CHAT | PATCHES */}
+          <div className="flex-shrink-0 flex gap-1 px-4 pt-2 pb-1">
+            {(["chat", "patches"] as const).map((sec) => {
+              const isActive = devSection === sec;
+              const label    = sec === "chat" ? "CHAT" : `PATCHES${pendingPatches.length ? ` (${pendingPatches.length})` : ""}`;
+              return (
+                <button
+                  key={sec}
+                  onClick={() => setDevSection(sec)}
+                  className="px-3 py-1 rounded-lg text-[10px] font-bold tracking-widest transition-all"
+                  style={{
+                    background: isActive ? "hsl(194 100% 55% / 0.14)" : "transparent",
+                    border:     `1px solid ${isActive ? "hsl(194 100% 55% / 0.45)" : "hsl(210 15% 22%)"}`,
+                    color:      isActive ? "hsl(194 100% 70%)" : "hsl(196 20% 38%)",
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── CHAT sub-section ── */}
+          {devSection === "chat" && (
+            <>
+              <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-3 flex flex-col gap-3">
+                {devMessages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-3 py-16">
+                    <Code2 className="w-10 h-10" style={{ color: "hsl(194 100% 38%)" }} />
+                    <p className="text-sm tracking-wide" style={{ color: "hsl(196 25% 40%)" }}>Dev coding assistant</p>
+                    <p className="text-xs text-center max-w-xs leading-relaxed" style={{ color: "hsl(196 20% 30%)" }}>
+                      Ask about the codebase, request bug fixes, or use the action buttons above.
+                    </p>
+                  </div>
+                ) : (
+                  devMessages.map((msg) => (
+                    <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                      <div
+                        className="max-w-[90%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed"
+                        style={msg.role === "user"
+                          ? { background: "hsl(194 100% 55% / 0.13)", border: "1px solid hsl(194 100% 55% / 0.32)", color: "hsl(194 100% 90%)" }
+                          : { background: "hsl(210 15% 8%)", border: "1px solid hsl(210 15% 16%)", color: "hsl(196 35% 80%)", whiteSpace: "pre-wrap" }
+                        }
+                      >
+                        {msg.content || (devSending && msg.role === "assistant"
+                          ? <span className="inline-block animate-pulse" style={{ color: "hsl(194 100% 55%)" }}>▋</span>
+                          : null
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+                <div ref={devChatEndRef} />
+              </div>
+
+              {/* Dev input bar */}
+              <div
+                className="flex-shrink-0 px-4 pb-4 pt-2 border-t border-border/30"
+                style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}
+              >
+                <div className="flex gap-2 items-end max-w-2xl mx-auto">
+                  <textarea
+                    value={devInput}
+                    onChange={(e) => setDevInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        void sendDevMessage(devInput);
+                      }
+                    }}
+                    placeholder="Ask about the codebase, request a fix, or describe a change…"
+                    rows={2}
+                    className="flex-1 resize-none rounded-2xl border bg-transparent px-4 py-2.5 text-sm outline-none"
+                    style={{ borderColor: "hsl(210 15% 22%)", color: "hsl(196 40% 80%)" }}
+                  />
+                  <button
+                    onClick={() => void sendDevMessage(devInput)}
+                    disabled={!devInput.trim() || devSending}
+                    className="flex-shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-40"
+                    style={{ background: "hsl(194 100% 55% / 0.18)", border: "1px solid hsl(194 100% 55% / 0.45)" }}
+                    aria-label="Send"
+                  >
+                    {devSending
+                      ? <RefreshCw className="w-4 h-4 animate-spin" style={{ color: "hsl(194 100% 65%)" }} />
+                      : <Send className="w-4 h-4" style={{ color: "hsl(194 100% 65%)" }} />
+                    }
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── PATCHES sub-section ── */}
+          {devSection === "patches" && (
+            <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-4">
+              {pendingPatches.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <ShieldCheck className="w-10 h-10" style={{ color: "hsl(142 60% 30%)" }} />
+                  <p className="text-sm tracking-wide" style={{ color: "hsl(196 25% 40%)" }}>No pending patches</p>
+                  <p className="text-xs text-center max-w-xs leading-relaxed" style={{ color: "hsl(196 20% 30%)" }}>
+                    Use the CREATE PATCH action or ask Jarvis to propose a fix in the chat tab.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3 max-w-2xl mx-auto">
+                  {pendingPatches.map((patch) => (
+                    <PatchCard
+                      key={patch.patchId}
+                      patch={patch}
+                      onRemove={(id) => setPendingPatches((prev) => prev.filter((p) => p.patchId !== id))}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
