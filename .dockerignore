@@ -25,10 +25,12 @@
 **/.nyc_output/
 
 # ── Frontend / mockup builds not needed in the API image ─────────────────────
+# apps/web/nginx/ and apps/web/Dockerfile are needed by the frontend build —
+# do NOT exclude apps/ wholesale.  Heavy subdirs are caught by **/node_modules/
+# and **/dist/ above.
 artifacts/jarvas/dist/
 artifacts/jarvas/public/
 artifacts/mockup-sandbox/
-apps/
 
 # ── Replit environment files ──────────────────────────────────────────────────
 .cache/
@@ -56,7 +58,7 @@ Thumbs.db
 *.swp
 
 # ── Misc ─────────────────────────────────────────────────────────────────────
+# attached_assets/ is copied by apps/web/Dockerfile — do NOT exclude it.
 .git/
-attached_assets/
 MIGRATION_PLAN.md
 *.devbak
