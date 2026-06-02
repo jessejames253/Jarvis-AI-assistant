@@ -495,12 +495,20 @@ export async function proposePatchHunk(
     throw new Error(`File not found: ${params.file}`);
   }
 
-  if (!oldContent.includes(params.oldText)) {
-    // Anchor not found — emit a manual-patch event so the frontend shows a card
+  // Count exact (non-overlapping) occurrences of oldText in the file.
+  // String.prototype.replace(string, …) only replaces the FIRST occurrence, so
+  // we must detect ambiguity ourselves — 2+ matches mean we cannot know which
+  // site was intended and must fall back to a manual patch.
+  const occurrenceCount = oldContent.split(params.oldText).length - 1;
+
+  if (occurrenceCount === 0) {
+    // Anchor not found — emit a manual-patch event so the frontend shows a card.
     send({
       type: "dev:manual_patch",
       file: params.file,
       description: `Anchor text not found in ${params.file}. Apply this replacement manually.`,
+      reason: "anchor_not_found",
+      matchCount: 0,
       oldText: params.oldText,
       newContent: params.newText,
     });
@@ -510,6 +518,28 @@ export async function proposePatchHunk(
     });
   }
 
+  if (occurrenceCount >= 2) {
+    // Ambiguous anchor — more than one site matches, so we cannot safely pick one.
+    // Do NOT replace anything; surface a manual-patch card with the match count.
+    send({
+      type: "dev:manual_patch",
+      file: params.file,
+      description: `Anchor text appears ${occurrenceCount} times in ${params.file} — cannot determine which occurrence to replace. Apply this replacement manually at the correct location.`,
+      reason: "anchor_ambiguous",
+      matchCount: occurrenceCount,
+      oldText: params.oldText,
+      newContent: params.newText,
+    });
+    return JSON.stringify({
+      error: "anchor_ambiguous",
+      matchCount: occurrenceCount,
+      message: `The anchor text appears ${occurrenceCount} times in ${params.file}. Replacement was not applied to avoid modifying the wrong location. A Manual Patch Required card has been shown to the user. Narrow the oldText to include more surrounding context so it is unique.`,
+    });
+  }
+
+  // occurrenceCount === 1: exactly one match — safe to replace.
+  // String.replace(string, …) is non-global and stops after the first match,
+  // which is the only match here.
   const newContent = oldContent.replace(params.oldText, params.newText);
   return proposeFilePatch(
     {
