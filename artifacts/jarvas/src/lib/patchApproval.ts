@@ -27,6 +27,8 @@ export interface ApproveResult {
   validation?:  { passed: boolean; summary: string };
   autoFixResult?: unknown;
   validationEvents?: Array<Record<string, unknown>>;
+  /** True when the patch was already applied in a previous request (prevents confusing re-apply errors). */
+  alreadyApplied?: boolean;
 }
 
 export interface PendingPatchSummary {

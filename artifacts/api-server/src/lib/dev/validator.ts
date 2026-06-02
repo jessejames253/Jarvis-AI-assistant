@@ -40,14 +40,20 @@ async function getAvailableScripts(project: string): Promise<string[]> {
 
 async function runScript(project: string, script: string, timeout = 45000): Promise<{ passed: boolean; output: string; durationMs: number }> {
   const start = Date.now();
-  const cmd = `cd "${PROJECT_ROOT}" && pnpm --filter @workspace/${project} run ${script} 2>&1 | head -80`;
+  // Do NOT pipe through `head` — that masks the real exit code (bash exits with
+  // the last command's code, which would always be 0 from `head`).
+  const cmd = `cd "${PROJECT_ROOT}" && pnpm --filter @workspace/${project} run ${script} 2>&1`;
   try {
-    const { stdout } = await execAsync(cmd, { timeout, shell: "/bin/bash" });
+    const { stdout } = await execAsync(cmd, { timeout, maxBuffer: 512 * 1024, shell: "/bin/bash" });
     const output = stdout.trim();
-    const failed = output.includes("error TS") || output.toLowerCase().includes("error:") || output.includes("✗");
-    return { passed: !failed, output: output.slice(0, 1200), durationMs: Date.now() - start };
+    // Only fail on genuine TypeScript compiler errors (exit-0 means tsc passed,
+    // but double-check for "error TS" in case the script wraps tsc with pipefail).
+    const hasTypeErrors = output.includes("error TS");
+    return { passed: !hasTypeErrors, output: output.slice(0, 1200), durationMs: Date.now() - start };
   } catch (err: unknown) {
-    const out = ((err as { stdout?: string }).stdout ?? String(err)).slice(0, 1200);
+    // Non-zero exit — process genuinely failed.
+    const raw = (err as { stdout?: string }).stdout ?? String(err);
+    const out = raw.trim().slice(0, 1200);
     return { passed: false, output: out, durationMs: Date.now() - start };
   }
 }
@@ -83,9 +89,20 @@ export async function runValidation(
     if (!passed) break; // stop on first failure
   }
 
-  const summary = allPassed
-    ? `✓ All ${checks.length} check(s) passed (${checks.map(c => c.name).join(", ")})`
-    : `✗ ${checks.find(c => !c.passed)?.name} failed`;
+  const failedCheck = checks.find(c => !c.passed);
+  let summary: string;
+  if (allPassed) {
+    summary = `✓ All ${checks.length} check(s) passed (${checks.map(c => c.name).join(", ")})`;
+  } else {
+    // Include the first meaningful error lines so the user sees what actually broke.
+    const errorLines = (failedCheck?.output ?? "")
+      .split("\n")
+      .filter(l => l.includes("error TS") || l.trim().startsWith("error"))
+      .slice(0, 3)
+      .join(" | ")
+      .trim();
+    summary = `✗ ${failedCheck?.name} failed${errorLines ? `: ${errorLines}` : ""}`;
+  }
 
   const result: ValidationResult = { project, passed: allPassed, checks, summary };
   send({ type: "dev:validation_done", project, passed: allPassed, summary });

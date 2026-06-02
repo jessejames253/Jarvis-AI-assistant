@@ -95,6 +95,11 @@ function scoreLabel(score: number): HealthResult["label"] {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+/** Immediately clears the health cache so the next read triggers a fresh tsc run. */
+export function invalidateHealthCache(): void {
+  _cache = null;
+}
+
 export async function getHealth(forceRefresh = false): Promise<HealthResult> {
   const now = Date.now();
   if (!forceRefresh && _cache && _cache.expiry > now) {

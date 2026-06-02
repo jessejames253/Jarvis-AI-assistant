@@ -568,7 +568,12 @@ function PatchCard({
     if (result.ok) {
       setStatus("done");
       setSnapshotId(result.snapshotId ?? null);
-      setValidation(result.validation ?? null);
+      if (result.alreadyApplied) {
+        // Duplicate apply (tab navigation reset local state) — show a neutral note.
+        setValidation({ passed: true, summary: "Patch was already applied" });
+      } else {
+        setValidation(result.validation ?? null);
+      }
     } else {
       setStatus("error");
       setApplyError(result.error ?? "Apply failed");

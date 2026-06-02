@@ -25,6 +25,7 @@ import {
 } from "../lib/dev/taskStore";
 import { runValidation } from "../lib/dev/validator";
 import { runAutoFixAnalysis, getLastAutoFixResult } from "../lib/dev/autoFixEngine";
+import { invalidateHealthCache } from "../lib/dev/health";
 
 const router = Router();
 
@@ -172,6 +173,13 @@ router.post("/dev/apply", async (req, res) => {
     return;
   }
 
+  // Patch was already applied in a previous request (duplicate click / tab remount).
+  // Return success immediately so the UI shows "already applied" instead of an error.
+  if (result.alreadyApplied) {
+    res.json({ ok: true, alreadyApplied: true });
+    return;
+  }
+
   // Mark patch applied in task store
   if (taskId && patchId) {
     markPatchApplied(taskId, patchId, snapshotId);
@@ -182,6 +190,11 @@ router.post("/dev/apply", async (req, res) => {
   const validationSend = (d: object) => validationEvents.push(d);
   const proj = (project ?? "jarvas") as "jarvas" | "api-server";
   const validation = await runValidation(proj, validationSend);
+
+  // Invalidate the health cache so the BUILD tab reflects the post-apply state
+  // immediately rather than serving the 30-second stale result.
+  invalidateHealthCache();
+  console.log(`[dev/apply] patchId=${patchId} validation=${validation.passed ? "passed" : "failed"} — health cache invalidated`);
 
   // Update task with validation result
   if (taskId) {

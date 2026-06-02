@@ -624,9 +624,30 @@ export async function runBuild(
 
 // ─── Apply patch ──────────────────────────────────────────────────────────────
 
-export async function applyPatch(patchId: string): Promise<{ ok: boolean; error?: string; backupPath?: string }> {
+// Track recently-applied patchIds so a duplicate apply (e.g. after tab navigation
+// resets PatchCard local state) returns a graceful "already applied" rather than
+// an opaque 400 error. Entries expire after 10 minutes.
+const _recentlyApplied = new Map<string, number>();
+
+function _pruneRecentlyApplied(): void {
+  const cutoff = Date.now() - 10 * 60 * 1000;
+  for (const [id, ts] of _recentlyApplied.entries()) {
+    if (ts < cutoff) _recentlyApplied.delete(id);
+  }
+}
+
+export async function applyPatch(patchId: string): Promise<{ ok: boolean; alreadyApplied?: boolean; error?: string; backupPath?: string }> {
   const patch = pendingPatches.get(patchId);
-  if (!patch) return { ok: false, error: "Patch not found — server may have restarted. Use Manual Patch to apply manually." };
+  if (!patch) {
+    // If we applied this same patchId recently, tell the caller gracefully so
+    // the UI can show "already applied" instead of a confusing "Patch not found".
+    if (_recentlyApplied.has(patchId)) {
+      console.log(`[applyPatch] patchId=${patchId} already applied recently — returning alreadyApplied`);
+      return { ok: true, alreadyApplied: true };
+    }
+    console.warn(`[applyPatch] patchId=${patchId} NOT FOUND — in-memory keys: ${[...pendingPatches.keys()].join(", ") || "(empty)"}`);
+    return { ok: false, error: "Patch not found — server may have restarted. Use Manual Patch to apply manually." };
+  }
   if (!isPathSafe(patch.file)) return { ok: false, error: "Path not allowed" };
 
   const abs = path.resolve(PROJECT_ROOT, patch.file);
@@ -638,6 +659,10 @@ export async function applyPatch(patchId: string): Promise<{ ok: boolean; error?
     await fs.writeFile(abs, patch.newContent, "utf8");
     pendingPatches.delete(patchId);
     savePatches();
+    // Record so a duplicate apply call returns "alreadyApplied" instead of 400.
+    _pruneRecentlyApplied();
+    _recentlyApplied.set(patchId, Date.now());
+    console.log(`[applyPatch] patchId=${patchId} applied — ${pendingPatches.size} patches remaining`);
     return { ok: true, backupPath: path.relative(PROJECT_ROOT, backupPath) };
   } catch (err) {
     return { ok: false, error: String(err) };
