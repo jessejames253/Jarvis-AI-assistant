@@ -1,0 +1,62 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# .dockerignore — Jarvis monorepo
+#
+# Keeps the Docker build context lean so builds are fast and deterministic.
+# node_modules and dist are excluded because they are re-created inside the
+# container during the build stage.
+#
+# ⚠️  The build MUST be run from the monorepo root:
+#     docker build -t jarvis-api .
+#
+# Coolify settings:
+#   Build Context:   .
+#   Dockerfile Path: Dockerfile
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Dependencies — always reinstalled inside the build stage ─────────────────
+**/node_modules/
+
+# ── Compiled output — always rebuilt inside the build stage ──────────────────
+**/dist/
+**/out/
+**/.turbo/
+**/*.tsbuildinfo
+**/coverage/
+**/.nyc_output/
+
+# ── Frontend / mockup builds not needed in the API image ─────────────────────
+artifacts/jarvas/dist/
+artifacts/jarvas/public/
+artifacts/mockup-sandbox/
+apps/
+
+# ── Replit environment files ──────────────────────────────────────────────────
+.cache/
+.local/
+.config/
+.agents/
+replit.nix
+.replit
+
+# ── Runtime data dirs (mounted as Docker volumes in production) ───────────────
+.jarvis/
+.jarvas-data/
+
+# ── Secrets — never bake into an image ───────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Editor / OS noise ────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.local
+.idea/
+.vscode/
+*.swp
+
+# ── Misc ─────────────────────────────────────────────────────────────────────
+.git/
+attached_assets/
+MIGRATION_PLAN.md
+*.devbak

@@ -1,0 +1,63 @@
+Backend Coolify deployment is failing and I think we’ve identified the root cause.
+
+Important clues from the Coolify logs:
+
+* Docker build context shows: transferring context: 2B
+* Deployment fails during Dockerfile COPY steps around lines 112–113.
+* Error indicates COPY is trying to access paths like:
+    * /workspace/artifacts/...
+    * /workspace/tsconfig...
+* Docker reports a failure while resolving those paths and exits with status 1.
+
+This suggests either:
+
+1. The Docker build context is effectively empty.
+2. .dockerignore is excluding most of the repository.
+3. Coolify is building from the wrong root directory.
+4. The Dockerfile is using /workspace/... paths that do not actually exist in the build stage.
+5. The build stage never copied the required files before the final stage attempts COPY --from=build.
+
+Please investigate and fix all deployment-related issues:
+
+Check
+
+* .dockerignore
+* Dockerfile build stages
+* Dockerfile COPY paths
+* WORKDIR values
+* Coolify build context/root directory configuration
+
+Verify the build context includes
+
+* package.json
+* pnpm-workspace.yaml
+* pnpm-lock.yaml
+* artifacts/api-server
+* artifacts/jarvas
+* artifacts/jarvas/src
+* lib/
+
+Fix requirements
+
+* Ensure artifacts/jarvas/src is available inside the production image.
+* Ensure artifacts/api-server/src is available inside the production image.
+* Ensure shared lib/ code is available if required by scanning, diagnostics, or agent tooling.
+* Do not assume /workspace/... exists unless that stage explicitly creates and populates it.
+* Verify all COPY –from=build statements reference real paths that exist in the build stage.
+
+After fixing
+
+Run a clean verification build:
+
+docker build –no-cache .
+
+or the equivalent build process used by Coolify.
+
+Also verify:
+
+* DEV → LOGS no longer returns HTTP 404.
+* DEV → DIAG runtime debug endpoint works.
+* SCAN PROJECT can see both frontend and backend source trees.
+* Production deployment succeeds without Docker COPY failures.
+
+Focus on fixing the Docker build/deployment configuration first before making additional application changes.

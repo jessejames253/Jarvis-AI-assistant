@@ -7,8 +7,21 @@
 #   3. build       — compile shared libs + api-server (esbuild → ESM)
 #   4. production  — minimal runtime image
 #
-# Build from the monorepo root:
-#   docker build -t jarvis-api .
+# ⚠️  IMPORTANT — always build from the MONOREPO ROOT, not a sub-directory:
+#
+#   docker build -t jarvis-api .               ← correct  (run from repo root)
+#   docker build -t jarvis-api ./artifacts/    ← WRONG    (missing lib/, tsconfigs, etc.)
+#
+# Coolify / CI settings:
+#   Build Context:   .   (repo root)
+#   Dockerfile Path: Dockerfile
+#
+# Required files in build context (see .dockerignore for exclusions):
+#   package.json, pnpm-workspace.yaml, pnpm-lock.yaml
+#   tsconfig.base.json, tsconfig.json
+#   lib/
+#   artifacts/api-server/
+#   artifacts/jarvas/src/
 #
 # Run (requires .env):
 #   docker run --env-file .env -p 8080:8080 jarvis-api
@@ -47,9 +60,12 @@ RUN pnpm install --frozen-lockfile
 # ── 3. Build ──────────────────────────────────────────────────────────────────
 FROM deps AS build
 
-# Copy full source tree
-COPY lib/                   lib/
-COPY artifacts/api-server/  artifacts/api-server/
+# Copy full source tree.
+# artifacts/jarvas/src is included so the production image can serve it to the
+# dev agent's SCAN PROJECT / file-read routes without needing a separate stage.
+COPY lib/                      lib/
+COPY artifacts/api-server/     artifacts/api-server/
+COPY artifacts/jarvas/src/     artifacts/jarvas/src/
 
 # Build shared packages
 RUN pnpm --filter @workspace/api-zod run build 2>/dev/null || true
