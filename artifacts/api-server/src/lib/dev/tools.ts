@@ -78,13 +78,24 @@ const SEARCH_EXTS = new Set([".ts", ".tsx", ".js", ".jsx", ".json", ".css", ".md
 
 /**
  * Directory names to skip when listing project files for the agent or file browser.
- * These are build artifacts, dependency trees, and caches that pollute the listing
- * and push the 200-file cap before real source files are returned.
+ * These are build artifacts, dependency trees, caches, and non-source dirs that
+ * pollute the listing and cause the walk to time out in production.
  */
 const LISTING_SKIP_DIRS = new Set([
-  "node_modules", ".pnpm-store", "dist", "build", ".cache", ".vite",
-  "coverage", "__pycache__", ".next", "out", ".turbo", "storybook-static",
-  ".temp", "temp", "tmp", ".nyc_output",
+  // Dependency trees — always reinstalled, never source
+  "node_modules", ".pnpm-store",
+  // Compiled output — always rebuilt
+  "dist", "build", "out", ".next", ".turbo", "storybook-static",
+  // Caches
+  ".cache", ".vite", ".nyc_output", "__pycache__",
+  // Temp
+  ".temp", "temp", "tmp",
+  // Runtime data dirs (production-only: .jarvis / .jarvas-data hold patch/task state)
+  ".jarvis", ".jarvas-data",
+  // Non-source assets: binary files, Docker config, nginx config, uploaded files
+  "attached_assets", "public", "nginx", "apps",
+  // Test coverage output
+  "coverage",
 ]);
 
 async function nodeSearch(
@@ -283,39 +294,83 @@ export function registerPatch(params: {
 
 // ─── Tool implementations ─────────────────────────────────────────────────────
 
+const LIST_MAX_FILES  = 500;
+const LIST_MAX_DEPTH  = 6;
+const LIST_DEADLINE   = 15_000; // ms — abort and return partial results
+
 export async function listProjectFiles(
   params: { directory?: string; pattern?: string },
   send: (d: object) => void,
 ): Promise<string> {
+  const t0  = Date.now();
   const dir = params.directory ?? "";
   const absDir = path.resolve(PROJECT_ROOT, dir);
   if (dir && !isPathSafe(dir)) throw new Error(`Path not allowed: ${dir}`);
   const pattern = params.pattern?.toLowerCase();
+
+  console.log(`[list_project_files] start — projectRoot=${PROJECT_ROOT} dir=${dir || "."}`);
   send({ type: "dev:file_op", op: "list", path: dir || "." });
 
-  async function walk(d: string, depth = 0): Promise<string[]> {
-    if (depth > 4) return [];
-    const entries = await fs.readdir(d, { withFileTypes: true });
-    const results: string[] = [];
+  const files: string[]      = [];
+  let   aborted              = false;
+  let   abortReason          = "";
+
+  async function walk(d: string, depth = 0): Promise<void> {
+    if (aborted) return;
+    if (depth > LIST_MAX_DEPTH) return;
+    if (files.length >= LIST_MAX_FILES) {
+      aborted     = true;
+      abortReason = `file limit (${LIST_MAX_FILES})`;
+      return;
+    }
+    const elapsed = Date.now() - t0;
+    if (elapsed > LIST_DEADLINE) {
+      aborted     = true;
+      abortReason = `time limit (${LIST_DEADLINE}ms)`;
+      return;
+    }
+
+    let entries: import("fs").Dirent[];
+    try { entries = await fs.readdir(d, { withFileTypes: true }); } catch { return; }
+
     for (const e of entries) {
+      if (aborted) break;
+      if (files.length >= LIST_MAX_FILES) { aborted = true; abortReason = `file limit (${LIST_MAX_FILES})`; break; }
+      if (Date.now() - t0 > LIST_DEADLINE)  { aborted = true; abortReason = `time limit (${LIST_DEADLINE}ms)`; break; }
+
       const rel = path.relative(PROJECT_ROOT, path.join(d, e.name));
       if (BLOCKED_PATHS.some(b => rel.startsWith(b) || e.name === b.replace("/", ""))) continue;
       if (e.name.startsWith(".") && e.name !== ".gitignore") continue;
       if (e.isDirectory() && LISTING_SKIP_DIRS.has(e.name)) continue;
       if (e.name.endsWith(".devbak") || e.name.includes(".devbak.")) continue;
       if (pattern && !rel.toLowerCase().includes(pattern) && e.isFile()) continue;
+
       if (e.isDirectory()) {
-        results.push(`${rel}/`);
-        results.push(...await walk(path.join(d, e.name), depth + 1));
+        files.push(`${rel}/`);
+        await walk(path.join(d, e.name), depth + 1);
       } else {
-        results.push(rel);
+        files.push(rel);
       }
     }
-    return results;
   }
 
-  const files = await walk(absDir);
-  return files.slice(0, 200).join("\n") || "(empty directory)";
+  await walk(absDir);
+
+  const elapsed = Date.now() - t0;
+  console.log(
+    `[list_project_files] done — ${files.length} entries in ${elapsed}ms` +
+    (aborted ? ` [ABORTED: ${abortReason}]` : ""),
+  );
+
+  if (files.length === 0) return "(empty directory)";
+
+  let result = files.join("\n");
+  if (aborted) {
+    result +=
+      `\n\n[SCAN ABORTED after ${elapsed}ms — returned ${files.length} entries; stopped at ${abortReason}. ` +
+      `For a complete listing narrow the directory, e.g. 'artifacts/jarvas/src' or 'artifacts/api-server/src'.]`;
+  }
+  return result;
 }
 
 /** REST-friendly version for the file browser UI — no SSE send needed */
@@ -718,7 +773,19 @@ export type DevToolName =
   | "list_project_files" | "read_project_file" | "search_project_files"
   | "propose_patch_hunk" | "propose_file_patch" | "run_typecheck" | "run_build";
 
-export async function executeDevTool(
+// Per-tool hard timeouts (ms). Slow filesystem or Claude thinking should never
+// block the SSE stream indefinitely — partial results are always better than a hang.
+const TOOL_TIMEOUTS: Record<string, number> = {
+  list_project_files:   20_000,
+  read_project_file:    10_000,
+  search_project_files: 15_000,
+  propose_patch_hunk:   10_000,
+  propose_file_patch:   10_000,
+  run_typecheck:        60_000,
+  run_build:            60_000,
+};
+
+async function dispatchDevTool(
   name: string,
   input: Record<string, unknown>,
   send: (d: object) => void,
@@ -748,5 +815,36 @@ export async function executeDevTool(
       return runBuild(input as { project?: string }, send);
     default:
       throw new Error(`Unknown dev tool: ${name}`);
+  }
+}
+
+export async function executeDevTool(
+  name: string,
+  input: Record<string, unknown>,
+  send: (d: object) => void,
+): Promise<unknown> {
+  const t0      = Date.now();
+  const timeout = TOOL_TIMEOUTS[name] ?? 20_000;
+
+  console.log(`[tool:${name}] start`, JSON.stringify(input).slice(0, 200));
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`[tool:${name}] hard timeout after ${timeout}ms`)),
+      timeout,
+    );
+  });
+
+  try {
+    const result = await Promise.race([dispatchDevTool(name, input, send), timeoutPromise]);
+    clearTimeout(timer);
+    console.log(`[tool:${name}] done in ${Date.now() - t0}ms`);
+    return result;
+  } catch (err) {
+    clearTimeout(timer);
+    const elapsed = Date.now() - t0;
+    console.error(`[tool:${name}] error after ${elapsed}ms:`, err instanceof Error ? err.message : String(err));
+    throw err;
   }
 }
