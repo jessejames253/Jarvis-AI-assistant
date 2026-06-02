@@ -540,10 +540,14 @@ function computeLineDiff(oldText: string, newText: string): Array<{ t: "add" | "
 function PatchCard({
   patch,
   onRemove,
+  onAfterAction,
   onAcceptedGoToBuild,
 }: {
   patch: PendingPatchSummary;
   onRemove: (id: string) => void;
+  /** Called after every mutation (accept-done/decline/rollback/dismiss) to
+   *  re-fetch the authoritative server registry and keep badge + list in sync. */
+  onAfterAction?: () => void;
   onAcceptedGoToBuild?: () => void;
 }) {
   const BASE = getApiBase();
@@ -582,7 +586,8 @@ function PatchCard({
 
   const handleDecline = async () => {
     await logRejectPatch(patch.patchId, patch.file);
-    onRemove(patch.patchId);
+    onRemove(patch.patchId);   // optimistic — removes card immediately
+    onAfterAction?.();         // re-fetches server registry to sync badge + list
   };
 
   const handleRollback = async () => {
@@ -601,6 +606,8 @@ function PatchCard({
       setRollResult({ ok: false, msg: String(err) });
     } finally {
       setRolling(false);
+      // Re-fetch so the list and badge reflect post-rollback server state.
+      onAfterAction?.();
     }
   };
 
@@ -736,7 +743,10 @@ function PatchCard({
           {/* Action row after apply */}
           <div className="flex gap-2">
             <button
-              onClick={() => { onAcceptedGoToBuild?.(); }}
+              onClick={() => {
+                onAfterAction?.();       // re-sync list/badge before navigating away
+                onAcceptedGoToBuild?.();
+              }}
               className="flex-1 py-2 rounded-xl text-xs font-bold tracking-widest transition-all active:scale-95"
               style={{ background: "hsl(38 100% 55% / 0.12)", color: "hsl(38 100% 70%)", border: "1px solid hsl(38 100% 55% / 0.40)" }}
             >
@@ -753,7 +763,10 @@ function PatchCard({
               </button>
             )}
             <button
-              onClick={() => onRemove(patch.patchId)}
+              onClick={() => {
+                onRemove(patch.patchId); // optimistic visual removal
+                onAfterAction?.();       // re-fetches server registry
+              }}
               className="px-3 py-2 rounded-xl text-xs font-bold tracking-widest transition-all active:scale-95"
               style={{ background: "transparent", color: "hsl(196 20% 36%)", border: "1px solid hsl(210 15% 18%)" }}
             >
@@ -913,6 +926,23 @@ export default function Chat() {
     setDismissedIds(prev => new Set([...prev, patch.patchId]));
     setPendingPatches(prev => prev.filter(p => p.patchId !== patch.patchId));
   }, []);
+
+  /**
+   * Re-fetches the authoritative patch registry from the server and updates
+   * both the PATCHES list and the badge count.  Logs before/after counts so
+   * stale-state issues are easy to spot in the console.
+   */
+  const refreshPendingPatches = useCallback(async () => {
+    try {
+      const fresh = await fetchPendingPatches();
+      setPendingPatches(prev => {
+        console.log(`[patches] refresh — before: ${prev.length}  after: ${fresh.length}`);
+        return fresh;
+      });
+    } catch (err) {
+      console.warn("[patches] refresh failed:", err);
+    }
+  }, []); // fetchPendingPatches and setPendingPatches are module-stable
 
   // ── Dev chat scroll ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -2171,6 +2201,9 @@ export default function Chat() {
                       if (sec === "build"     && !devBuildResult)        void runDevBuild();
                       if (sec === "diag"      && !devDiagReport)         void runDevDiag();
                       if (sec === "logs"      && devLogs.length === 0)   void loadDevLogs();
+                      // Always re-fetch the server registry when opening the PATCHES tab
+                      // so the list and badge count reflect authoritative state, not stale React state.
+                      if (sec === "patches")                             void refreshPendingPatches();
                     }}
                     className="px-3 py-1 rounded-lg text-[10px] font-bold tracking-widest transition-all active:scale-95"
                     style={{
@@ -2344,6 +2377,7 @@ export default function Chat() {
                         key={patch.patchId}
                         patch={patch}
                         onRemove={(id) => setPendingPatches((prev) => prev.filter((p) => p.patchId !== id))}
+                        onAfterAction={refreshPendingPatches}
                         onAcceptedGoToBuild={() => setDevSection("build")}
                       />
                     ))}
