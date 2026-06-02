@@ -239,11 +239,14 @@ try {
   }
 } catch { /* no file yet — fresh start */ }
 
-function savePatches(): void {
+export function savePatches(): void {
   try {
     mkdirSync(JARVIS_DIR, { recursive: true });
     writeFileSync(PATCHES_FILE, JSON.stringify(Array.from(pendingPatches.entries())), "utf8");
-  } catch { /* non-fatal */ }
+  } catch (err) {
+    // Log loudly — a silent failure here means applied patches return on the next restart.
+    console.error("[pendingPatches] savePatches FAILED — registry may be stale after restart:", err);
+  }
 }
 
 /**
@@ -666,13 +669,22 @@ function _pruneRecentlyApplied(): void {
   }
 }
 
+/**
+ * Returns true if this patchId was successfully applied in this server process
+ * within the last 10 minutes.  Used by the GET /patches route as a safety filter
+ * so even an unexpected Map-retention bug cannot expose an applied patch as pending.
+ */
+export function isApplied(patchId: string): boolean {
+  return _recentlyApplied.has(patchId);
+}
+
 export async function applyPatch(patchId: string): Promise<{ ok: boolean; alreadyApplied?: boolean; error?: string; backupPath?: string }> {
   const patch = pendingPatches.get(patchId);
   if (!patch) {
     // If we applied this same patchId recently, tell the caller gracefully so
     // the UI can show "already applied" instead of a confusing "Patch not found".
     if (_recentlyApplied.has(patchId)) {
-      console.log(`[applyPatch] patchId=${patchId} already applied recently — returning alreadyApplied`);
+      console.log(`[applyPatch] patchId=${patchId} status: already-applied (in _recentlyApplied) — returning alreadyApplied`);
       return { ok: true, alreadyApplied: true };
     }
     console.warn(`[applyPatch] patchId=${patchId} NOT FOUND — in-memory keys: ${[...pendingPatches.keys()].join(", ") || "(empty)"}`);
@@ -683,18 +695,26 @@ export async function applyPatch(patchId: string): Promise<{ ok: boolean; alread
   const abs = path.resolve(PROJECT_ROOT, patch.file);
   const backupPath = `${abs}.devbak.${Date.now()}`;
 
+  console.log(`[applyPatch] patchId=${patchId} file=${patch.file} status: pending → applying (registry size before: ${pendingPatches.size})`);
+
   try {
     try { await fs.copyFile(abs, backupPath); } catch { /* new file */ }
     await fs.mkdir(path.dirname(abs), { recursive: true });
     await fs.writeFile(abs, patch.newContent, "utf8");
+
+    // Remove from registry immediately — must happen before savePatches so the
+    // file on disk does NOT contain this patch even if the process crashes next.
     pendingPatches.delete(patchId);
     savePatches();
+
     // Record so a duplicate apply call returns "alreadyApplied" instead of 400.
     _pruneRecentlyApplied();
     _recentlyApplied.set(patchId, Date.now());
-    console.log(`[applyPatch] patchId=${patchId} applied — ${pendingPatches.size} patches remaining`);
+
+    console.log(`[applyPatch] patchId=${patchId} file=${patch.file} status: pending → applied ✓ (registry size after: ${pendingPatches.size})`);
     return { ok: true, backupPath: path.relative(PROJECT_ROOT, backupPath) };
   } catch (err) {
+    console.error(`[applyPatch] patchId=${patchId} status: pending → FAILED —`, err);
     return { ok: false, error: String(err) };
   }
 }

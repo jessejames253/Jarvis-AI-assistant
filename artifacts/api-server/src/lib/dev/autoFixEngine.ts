@@ -23,7 +23,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import { randomUUID } from "crypto";
 
-import { PROJECT_ROOT, pendingPatches, type PendingPatch } from "./tools";
+import { PROJECT_ROOT, pendingPatches, savePatches, type PendingPatch } from "./tools";
 import { createSnapshot } from "./snapshotStore";
 
 const execAsync = promisify(exec);
@@ -459,6 +459,8 @@ async function createReviewPatch(
   };
 
   pendingPatches.set(patchId, patch);
+  savePatches(); // persist so the review patch survives a server restart
+  console.log(`[autoFixEngine] queued review patch ${patchId} for ${err.file} — registry size: ${pendingPatches.size}`);
   return patchId;
 }
 

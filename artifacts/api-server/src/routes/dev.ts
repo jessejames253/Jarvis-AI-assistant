@@ -14,7 +14,7 @@ import path from "path";
 import { existsSync, readdirSync, readFileSync, statSync } from "fs";
 import { runDevAgent } from "../lib/dev/agent";
 import {
-  applyPatch, rollbackFile, listProjectFilesRest, readProjectFileRest,
+  applyPatch, isApplied, rollbackFile, listProjectFilesRest, readProjectFileRest,
   PROJECT_ROOT, deletePatch, SERVER_STARTED_AT, RECOVERED_PATCH_COUNT,
   pendingPatches, getProjectRootDiagnostics,
 } from "../lib/dev/tools";
@@ -317,7 +317,11 @@ router.post("/dev/patches", async (req, res): Promise<void> => {
 
 router.get("/dev/patches", (_req, res) => {
   try {
-    const patches = Array.from(pendingPatches.values());
+    // Filter out any patch that was applied in this process run.
+    // This is belt-and-suspenders: applyPatch already deletes from the Map,
+    // but isApplied() catches any edge case where the Map retained a stale entry.
+    const patches = Array.from(pendingPatches.values()).filter(p => !isApplied(p.patchId));
+    console.log(`[GET /dev/patches] returning ${patches.length} patch(es) (map size: ${pendingPatches.size})`);
     res.json({ ok: true, patches });
   } catch (err) {
     res.json({ ok: true, patches: [] });
