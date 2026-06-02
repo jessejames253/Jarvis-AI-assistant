@@ -1,0 +1,64 @@
+The previous sprint did not fix the live deployed Jarvis runtime.
+
+Confirmed after redeploy/testing:
+1. LOGS still returns HTTP 404 in the live DEV tab.
+2. DIAG still false-fails:
+   - lockfile
+   - build artifact
+   - node_modules
+3. SCAN PROJECT still says:
+   - workspace empty
+   - artifacts/jarvas/src not found
+   - artifacts/api-server/src not found
+4. Jarvis DEV still cannot access real project files.
+
+Important:
+Do not rely only on Replit dev smoke tests. Test the same API base URL that the frontend uses in the live deployed Jarvis app.
+
+Find the real mismatch:
+- Is frontend calling the wrong API base URL?
+- Are /api/dev/logs and /api/dev/files registered in the production server?
+- Is Coolify running an older backend bundle?
+- Is the production Docker image missing source files?
+- Is project root detection pointing to /home/runner/workspace instead of the actual deployed app path?
+- Are source files excluded from the production container?
+
+Required fix:
+1. Add a visible DIAG debug section showing:
+   - frontend API base URL
+   - backend process.cwd()
+   - detected project root
+   - __dirname/import.meta.url equivalent
+   - NODE_ENV
+   - server version/build timestamp
+   - list of detected root marker files
+   - whether /api/dev/logs exists
+   - whether /api/dev/files exists
+
+2. Add endpoint:
+   GET /api/dev/debug
+   It returns all the above runtime info.
+
+3. Fix production root detection so it finds the real project files in the running environment OR clearly reports that the production container does not include source files.
+
+4. If production container does not include source files, update Docker/Nixpacks/Coolify config so safe source files are included:
+   - artifacts/jarvas/src
+   - artifacts/api-server/src
+   - lib/
+   - package.json
+   - pnpm-workspace.yaml
+
+5. Confirm these live URLs work from the same deployed app:
+   - /api/dev/logs
+   - /api/dev/files
+   - /api/dev/debug
+   - /api/system/diagnostics
+
+6. After fix, redeploy and verify from the live Jarvis UI, not just Replit preview:
+   - LOGS no longer 404
+   - DIAG no longer false-fails dev/prod checks
+   - SCAN PROJECT lists real files
+   - WORK ON JARVIS no longer says filesystem unavailable
+   - CREATE PATCH can read real files before proposing patches
+
+Do not add new features until these runtime/debug/root issues are fixed.

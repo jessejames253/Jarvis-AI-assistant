@@ -86,9 +86,11 @@ COPY --from=build /workspace/artifacts/api-server/node_modules ./artifacts/api-s
 #   - dev agent file-read/write routes (reads source files by path)
 #   - health route (runs tsc --noEmit against src/)
 #   - patch system (writes to project files)
-COPY --from=build /workspace/artifacts/api-server/src    ./artifacts/api-server/src
+#   - SCAN PROJECT / WORK ON JARVIS (reads both api and frontend source)
+COPY --from=build /workspace/artifacts/api-server/src        ./artifacts/api-server/src
 COPY --from=build /workspace/artifacts/api-server/tsconfig.json ./artifacts/api-server/
-COPY --from=build /workspace/tsconfig.base.json          ./
+COPY --from=build /workspace/artifacts/jarvas/src             ./artifacts/jarvas/src
+COPY --from=build /workspace/tsconfig.base.json               ./
 
 # Create the .jarvis directory for patch persistence
 RUN mkdir -p /workspace/.jarvis /workspace/.jarvas-data

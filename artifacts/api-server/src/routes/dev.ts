@@ -542,6 +542,59 @@ router.get("/dev/diagnostics", async (_req, res): Promise<void> => {
   }
 });
 
+// ─── GET /dev/debug ───────────────────────────────────────────────────────────
+// Single endpoint that surfaces every runtime variable needed to diagnose
+// "filesystem unavailable" / wrong root / stale bundle issues in production.
+// Designed to be called from the live Jarvis UI even before other routes work.
+
+router.get("/dev/debug", (_req, res) => {
+  const checkList = [
+    "package.json",
+    "pnpm-workspace.yaml",
+    "pnpm-lock.yaml",
+    "artifacts",
+    "artifacts/api-server/src",
+    "artifacts/api-server/dist",
+    "artifacts/jarvas/src",
+    "artifacts/jarvas/dist",
+    "lib",
+    "node_modules",
+    ".jarvis",
+    ".jarvas-data",
+  ];
+  const markers: Record<string, boolean> = {};
+  for (const rel of checkList) {
+    try { markers[rel] = existsSync(path.join(PROJECT_ROOT, rel)); }
+    catch { markers[rel] = false; }
+  }
+
+  res.json({
+    ok:               true,
+    timestamp:        new Date().toISOString(),
+    serverStartedAt:  new Date(SERVER_STARTED_AT).toISOString(),
+    uptimeSeconds:    Math.round((Date.now() - SERVER_STARTED_AT) / 1000),
+    env: {
+      NODE_ENV:          process.env["NODE_ENV"]      ?? "not set",
+      PORT:              process.env["PORT"]           ?? "not set",
+      PROJECT_ROOT_ENV:  process.env["PROJECT_ROOT"]  ?? "not set (auto-detected)",
+    },
+    paths: {
+      projectRoot: PROJECT_ROOT,
+      cwd:         process.cwd(),
+      dirname:     __dirname,
+    },
+    markers,
+    routes: {
+      "GET /api/dev/debug":          true,
+      "GET /api/dev/logs":           true,
+      "GET /api/dev/files":          true,
+      "DELETE /api/dev/tasks":       true,
+      "GET /api/system/diagnostics": true,
+      "POST /api/dev/stream":        true,
+    },
+  });
+});
+
 // ─── GET /dev/logs ────────────────────────────────────────────────────────────
 // The frontend DEV → LOGS tab calls GET /api/dev/logs.
 // We read from .jarvas-data/logs/ if it exists; fall back to a friendly message

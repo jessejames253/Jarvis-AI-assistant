@@ -493,6 +493,23 @@ interface DevDiagReport {
   issues: DevDiagIssue[];
   checks: Record<string, string>;
   runtimeInfo: { nodeVersion: string; pnpmVersion: string; platform: string; uptimeSeconds: number };
+  debugInfo?: {
+    projectRoot: string;
+    cwd: string;
+    nodeEnv: string;
+    isProductionLike: boolean;
+    isDevServer: boolean;
+  };
+}
+interface DevDebugInfo {
+  ok: boolean;
+  timestamp: string;
+  serverStartedAt: string;
+  uptimeSeconds: number;
+  env: { NODE_ENV: string; PORT: string; PROJECT_ROOT_ENV: string };
+  paths: { projectRoot: string; cwd: string; dirname: string };
+  markers: Record<string, boolean>;
+  routes: Record<string, boolean>;
 }
 interface DevHealthResult {
   ok: boolean;
@@ -825,6 +842,7 @@ export default function Chat() {
   const [devMemoryOpen,    setDevMemoryOpen]    = useState(false);
   const [devDiagReport,    setDevDiagReport]    = useState<DevDiagReport | null>(null);
   const [devDiagLoading,   setDevDiagLoading]   = useState(false);
+  const [devDebugInfo,     setDevDebugInfo]     = useState<DevDebugInfo | null>(null);
   const [devBuildResult,   setDevBuildResult]   = useState<DevHealthResult | null>(null);
   const [devBuildLoading,  setDevBuildLoading]  = useState(false);
   const [devLogs,          setDevLogs]          = useState<string[]>([]);
@@ -1016,7 +1034,11 @@ export default function Chat() {
   const runDevDiag = useCallback(async () => {
     setDevDiagLoading(true);
     try {
-      const res = await fetch(`${BASE}api/system/diagnostics`);
+      // Fetch diagnostics + debug info in parallel; debug is best-effort
+      const [res, dbgRes] = await Promise.all([
+        fetch(`${BASE}api/system/diagnostics`),
+        fetch(`${BASE}api/dev/debug`).catch(() => null),
+      ]);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const raw = await res.json() as Partial<DevDiagReport>;
       setDevDiagReport({
@@ -1028,7 +1050,12 @@ export default function Chat() {
         issues:      raw.issues      ?? [],
         checks:      raw.checks      ?? {},
         runtimeInfo: raw.runtimeInfo ?? { nodeVersion: "unknown", pnpmVersion: "unknown", platform: "unknown", uptimeSeconds: 0 },
+        debugInfo:   raw.debugInfo,
       });
+      if (dbgRes?.ok) {
+        const dbg = await dbgRes.json() as DevDebugInfo;
+        setDevDebugInfo(dbg);
+      }
     } catch (err) {
       setDevDiagReport({
         ok: false, checkedAt: new Date().toISOString(),
@@ -1995,7 +2022,7 @@ export default function Chat() {
 
                   {/* ── Chat-prompt actions ── */}
                   {([
-                    { key: "SCAN",  label: "SCAN PROJECT", prompt: "Use list_project_files to scan the project structure, then read key source files. List main components, API routes, and libraries. Highlight quality issues and improvement opportunities. Start with artifacts/jarvas/src and artifacts/api-server/src." },
+                    { key: "SCAN",  label: "SCAN PROJECT", prompt: "Call list_project_files with an empty directory argument to discover what's in the project root. Then read source files in the src/ directories you find. List main components, API routes, and libraries. Highlight quality issues and improvement opportunities." },
                     { key: "FIX",   label: "PROPOSE FIX",  prompt: "Review the project memory and current debug context. Propose a specific, actionable code fix for the most critical issue." },
                     { key: "PATCH", label: "CREATE PATCH", prompt: "Based on our conversation, create a concrete code patch for the most recently discussed fix. Queue it for review in the Patches tab." },
                   ] as const).map(({ key, label, prompt }) => (
@@ -2506,6 +2533,86 @@ export default function Chat() {
                               </div>
                             );
                           })}
+                        </div>
+                      )}
+
+                      {/* ── Runtime debug info ── */}
+                      {(devDiagReport.debugInfo || devDebugInfo) && (
+                        <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: "hsl(210 15% 6%)", border: "1px solid hsl(210 15% 13%)" }}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold tracking-widest" style={{ color: "hsl(196 25% 38%)" }}>RUNTIME DEBUG</span>
+                            {devDebugInfo && <CopyButton text={JSON.stringify(devDebugInfo, null, 2)} label="COPY" />}
+                          </div>
+                          <div className="font-mono text-[10px] flex flex-col gap-1" style={{ color: "hsl(196 25% 38%)" }}>
+                            {/* Frontend side */}
+                            <div className="flex gap-2">
+                              <span className="flex-shrink-0" style={{ color: "hsl(196 40% 48%)" }}>FRONTEND API BASE</span>
+                              <span className="truncate" style={{ color: "hsl(38 90% 60%)" }}>{BASE || "/"}</span>
+                            </div>
+                            {/* Backend paths */}
+                            {(devDebugInfo?.paths.projectRoot ?? devDiagReport.debugInfo?.projectRoot) && (
+                              <div className="flex gap-2">
+                                <span className="flex-shrink-0" style={{ color: "hsl(196 40% 48%)" }}>PROJECT ROOT</span>
+                                <span className="truncate" style={{ color: "hsl(38 90% 60%)" }}>{devDebugInfo?.paths.projectRoot ?? devDiagReport.debugInfo?.projectRoot}</span>
+                              </div>
+                            )}
+                            {devDebugInfo?.paths.cwd && (
+                              <div className="flex gap-2">
+                                <span className="flex-shrink-0" style={{ color: "hsl(196 40% 48%)" }}>CWD</span>
+                                <span className="truncate" style={{ color: "hsl(38 90% 60%)" }}>{devDebugInfo.paths.cwd}</span>
+                              </div>
+                            )}
+                            {devDebugInfo?.paths.dirname && (
+                              <div className="flex gap-2">
+                                <span className="flex-shrink-0" style={{ color: "hsl(196 40% 48%)" }}>__DIRNAME</span>
+                                <span className="truncate" style={{ color: "hsl(38 90% 60%)" }}>{devDebugInfo.paths.dirname}</span>
+                              </div>
+                            )}
+                            <div className="flex gap-2">
+                              <span className="flex-shrink-0" style={{ color: "hsl(196 40% 48%)" }}>NODE_ENV</span>
+                              <span style={{ color: "hsl(38 90% 60%)" }}>{devDebugInfo?.env.NODE_ENV ?? devDiagReport.debugInfo?.nodeEnv ?? "?"}</span>
+                            </div>
+                            {devDebugInfo?.env.PORT && (
+                              <div className="flex gap-2">
+                                <span className="flex-shrink-0" style={{ color: "hsl(196 40% 48%)" }}>PORT</span>
+                                <span style={{ color: "hsl(38 90% 60%)" }}>{devDebugInfo.env.PORT}</span>
+                              </div>
+                            )}
+                            {devDebugInfo?.env.PROJECT_ROOT_ENV && (
+                              <div className="flex gap-2">
+                                <span className="flex-shrink-0" style={{ color: "hsl(196 40% 48%)" }}>PROJECT_ROOT env</span>
+                                <span className="truncate" style={{ color: "hsl(38 90% 60%)" }}>{devDebugInfo.env.PROJECT_ROOT_ENV}</span>
+                              </div>
+                            )}
+                            {devDebugInfo?.serverStartedAt && (
+                              <div className="flex gap-2">
+                                <span className="flex-shrink-0" style={{ color: "hsl(196 40% 48%)" }}>SERVER STARTED</span>
+                                <span style={{ color: "hsl(38 90% 60%)" }}>{new Date(devDebugInfo.serverStartedAt).toLocaleString()}</span>
+                              </div>
+                            )}
+                            {(devDiagReport.debugInfo?.isProductionLike !== undefined || devDiagReport.debugInfo?.isDevServer !== undefined) && (
+                              <div className="flex gap-3">
+                                <span style={{ color: devDiagReport.debugInfo?.isProductionLike ? "hsl(142 71% 55%)" : "hsl(196 40% 48%)" }}>
+                                  {devDiagReport.debugInfo?.isProductionLike ? "✓ PRODUCTION" : "○ not production-like"}
+                                </span>
+                                <span style={{ color: devDiagReport.debugInfo?.isDevServer ? "hsl(142 71% 55%)" : "hsl(196 40% 48%)" }}>
+                                  {devDiagReport.debugInfo?.isDevServer ? "✓ DEV SERVER" : "○ not dev server"}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          {/* Marker files */}
+                          {devDebugInfo?.markers && (
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                              {Object.entries(devDebugInfo.markers).map(([key, exists]) => (
+                                <div key={key} className="flex items-center gap-1.5 text-[9px] font-mono">
+                                  <div className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: exists ? "hsl(142 71% 55%)" : "hsl(355 80% 55%)" }} />
+                                  <span className="truncate" style={{ color: "hsl(196 20% 35%)" }}>{key}</span>
+                                  <span className="ml-auto font-bold flex-shrink-0" style={{ color: exists ? "hsl(142 71% 55%)" : "hsl(355 80% 55%)" }}>{exists ? "✓" : "✗"}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </>
