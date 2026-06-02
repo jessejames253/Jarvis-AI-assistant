@@ -355,6 +355,40 @@ router.get("/dev/server-status", (_req, res) => {
   }
 });
 
+// ─── GET /dev/debug-patches ───────────────────────────────────────────────────
+// Diagnostic: dump the raw in-memory patch registry and disk state so we can
+// verify that apply + GET are reading the same data source.
+
+router.get("/dev/debug-patches", (_req, res) => {
+  try {
+    const JARVIS_DIR = path.join(PROJECT_ROOT, ".jarvis");
+    const PATCHES_FILE = path.join(JARVIS_DIR, "pending_patches.json");
+    const mapEntries = Array.from(pendingPatches.entries()).map(([id, p]) => ({
+      patchId: id,
+      file: p.file,
+      isAppliedFlag: isApplied(id),
+    }));
+    let diskRaw: string | null = null;
+    let diskParsed: unknown = null;
+    try {
+      diskRaw = readFileSync(PATCHES_FILE, "utf8");
+      diskParsed = JSON.parse(diskRaw);
+    } catch {
+      diskRaw = "(file missing or unreadable)";
+    }
+    res.json({
+      ok: true,
+      mapSize: pendingPatches.size,
+      mapEntries,
+      patchesFilePath: PATCHES_FILE,
+      diskEntryCount: Array.isArray(diskParsed) ? diskParsed.length : "n/a",
+      diskRaw,
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err) });
+  }
+});
+
 // ─── GET /dev/health ──────────────────────────────────────────────────────────
 // Returns a 0–100 health score plus TypeScript error details for both packages.
 // Results are cached for 30 seconds. Add ?refresh=1 to force a fresh check.

@@ -541,6 +541,7 @@ function PatchCard({
   patch,
   onRemove,
   onAfterAction,
+  onAccepted,
   onAcceptedGoToBuild,
 }: {
   patch: PendingPatchSummary;
@@ -548,6 +549,9 @@ function PatchCard({
   /** Called after every mutation (accept-done/decline/rollback/dismiss) to
    *  re-fetch the authoritative server registry and keep badge + list in sync. */
   onAfterAction?: () => void;
+  /** Called immediately after a successful apply so the parent can track this
+   *  patchId as "accepted in this session" and filter it from re-appearing. */
+  onAccepted?: (patchId: string) => void;
   onAcceptedGoToBuild?: () => void;
 }) {
   const BASE = getApiBase();
@@ -578,6 +582,11 @@ function PatchCard({
       } else {
         setValidation(result.validation ?? null);
       }
+      // Notify parent so it can (a) add patchId to appliedInSession — preventing
+      // this card from re-appearing after tab navigation — and (b) re-fetch the
+      // server registry to keep the badge count accurate.
+      onAccepted?.(patch.patchId);
+      onAfterAction?.();
     } else {
       setStatus("error");
       setApplyError(result.error ?? "Apply failed");
@@ -844,6 +853,9 @@ export default function Chat() {
   const [approvingPatchId,  setApprovingPatchId]  = useState<string | null>(null);
   const [patchBarError,     setPatchBarError]     = useState<string | null>(null);
   const [dismissedIds,      setDismissedIds]      = useState<Set<string>>(new Set());
+  // patchIds accepted in this session — prevents cards from re-appearing after
+  // tab navigation before the async refreshPendingPatches fetch completes.
+  const [appliedInSession,  setAppliedInSession]  = useState<ReadonlySet<string>>(new Set());
   const [serverStatus,      setServerStatus]      = useState<ServerStatus | null>(null);
   // Track the last server startedAt we saw so we can detect a restart
   const lastServerStartRef = useRef<number | null>(null);
@@ -2362,27 +2374,38 @@ export default function Chat() {
                   <span>→</span>
                   <span style={{ color: "hsl(142 70% 60%)" }}>Deploy</span>
                 </div>
-                {pendingPatches.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 gap-3">
-                    <ShieldCheck className="w-10 h-10" style={{ color: "hsl(142 60% 30%)" }} />
-                    <p className="text-sm tracking-wide" style={{ color: "hsl(196 25% 40%)" }}>No pending patches</p>
-                    <p className="text-xs text-center max-w-xs leading-relaxed" style={{ color: "hsl(196 20% 30%)" }}>
-                      Use PATCH or ask Jarvis to propose a fix in the Chat tab.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-3 max-w-2xl mx-auto">
-                    {pendingPatches.map((patch) => (
-                      <PatchCard
-                        key={patch.patchId}
-                        patch={patch}
-                        onRemove={(id) => setPendingPatches((prev) => prev.filter((p) => p.patchId !== id))}
-                        onAfterAction={refreshPendingPatches}
-                        onAcceptedGoToBuild={() => setDevSection("build")}
-                      />
-                    ))}
-                  </div>
-                )}
+                {(() => {
+                  // Filter out patches accepted in this session so they never
+                  // re-appear as "Accept/Decline" after tab navigation.
+                  const visiblePatches = pendingPatches.filter(
+                    (p) => !appliedInSession.has(p.patchId),
+                  );
+                  return visiblePatches.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 gap-3">
+                      <ShieldCheck className="w-10 h-10" style={{ color: "hsl(142 60% 30%)" }} />
+                      <p className="text-sm tracking-wide" style={{ color: "hsl(196 25% 40%)" }}>No pending patches</p>
+                      <p className="text-xs text-center max-w-xs leading-relaxed" style={{ color: "hsl(196 20% 30%)" }}>
+                        Use PATCH or ask Jarvis to propose a fix in the Chat tab.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3 max-w-2xl mx-auto">
+                      {visiblePatches.map((patch) => (
+                        <PatchCard
+                          key={patch.patchId}
+                          patch={patch}
+                          onRemove={(id) => setPendingPatches((prev) => prev.filter((p) => p.patchId !== id))}
+                          onAfterAction={refreshPendingPatches}
+                          onAccepted={(id) => {
+                            console.log("[patches] accepted in session:", id);
+                            setAppliedInSession((prev) => new Set([...prev, id]));
+                          }}
+                          onAcceptedGoToBuild={() => setDevSection("build")}
+                        />
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
